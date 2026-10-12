@@ -201,7 +201,7 @@ class TelegramClientManager(private val context: Context) {
     }
 
     private fun deriveTopicBase(sector: String, password: String): String {
-        val cleanSector = sector.trim().replace(" ", "_").lowercase()
+        val cleanSector = sector.trim().lowercase().replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "default" }
         val cleanPass = password.trim()
         return if (cleanPass.isNotBlank()) {
             val raw = "$cleanSector:$cleanPass:VARTA_SECURE_SALT_2026"
@@ -263,7 +263,7 @@ class TelegramClientManager(private val context: Context) {
             telegramDirectClient.startPolling()
         }
 
-        // 2. Connect to encrypted TLS mesh broker for ultra-low latency PTT
+        // 2. Connect to resilient real-time mesh broker cluster for ultra-low latency PTT
         scope.launch {
             try {
                 disconnectMqtt()
@@ -271,26 +271,45 @@ class TelegramClientManager(private val context: Context) {
                 currentTopicBase = deriveTopicBase(sector, password)
                 Log.d("VartaNetwork", "Connecting to sector topic: $currentTopicBase")
 
-                // Use SSL on port 8883 to prevent mobile network port 1883 blockage
-                val brokerUrl = "ssl://broker.hivemq.com:8883"
+                // Multi-broker failover cluster: EMQX, HiveMQ, and Mosquitto across TCP & TLS
+                val brokerUrl = "tcp://broker.emqx.io:1883"
                 val clientId = "Varta_${mySenderId}"
 
                 val client = MqttAsyncClient(brokerUrl, clientId, MemoryPersistence())
                 mqttClient = client
 
                 val connOpts = MqttConnectOptions().apply {
+                    serverURIs = arrayOf(
+                        "tcp://broker.emqx.io:1883",
+                        "ssl://broker.emqx.io:8883",
+                        "tcp://broker.hivemq.com:1883",
+                        "ssl://broker.hivemq.com:8883",
+                        "tcp://test.mosquitto.org:1883"
+                    )
                     isAutomaticReconnect = true
                     isCleanSession = true
-                    connectionTimeout = 12
-                    keepAliveInterval = 20
+                    connectionTimeout = 10
+                    keepAliveInterval = 15
+                    maxInflight = 50
+
                     try {
-                        socketFactory = javax.net.ssl.SSLContext.getDefault().socketFactory
-                    } catch (_: Exception) {}
+                        val trustAll = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                        })
+                        val sslCtx = javax.net.ssl.SSLContext.getInstance("TLS")
+                        sslCtx.init(null, trustAll, java.security.SecureRandom())
+                        socketFactory = sslCtx.socketFactory
+                        isHttpsHostnameVerificationEnabled = false
+                    } catch (e: Exception) {
+                        Log.w("VartaNetwork", "SSL setup warning: ${e.message}")
+                    }
                 }
 
                 client.setCallback(object : MqttCallbackExtended {
                     override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-                        Log.d("VartaNetwork", "MQTT TLS Connected/Reconnected! Reconnect=$reconnect")
+                        Log.d("VartaNetwork", "MQTT Connected! server=$serverURI, reconnect=$reconnect")
                         scope.launch {
                             _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
                         }
@@ -300,7 +319,7 @@ class TelegramClientManager(private val context: Context) {
                     }
 
                     override fun connectionLost(cause: Throwable?) {
-                        Log.w("VartaNetwork", "MQTT TLS connection lost: ${cause?.message}")
+                        Log.w("VartaNetwork", "MQTT connection lost: ${cause?.message}")
                         if (telegramDirectClient.botToken.isBlank()) {
                             scope.launch {
                                 _events.emit(TelegramLiveEvent.ConnectionState(false, "Переподключение к эфиру..."))
@@ -318,7 +337,7 @@ class TelegramClientManager(private val context: Context) {
 
                 client.connect(connOpts, null, object : IMqttActionListener {
                     override fun onSuccess(asyncActionToken: IMqttToken?) {
-                        Log.d("VartaNetwork", "Connected successfully to MQTT TLS broker on initial attempt")
+                        Log.d("VartaNetwork", "Connected successfully to mesh broker on initial attempt")
                         scope.launch {
                             _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
                         }
@@ -328,13 +347,11 @@ class TelegramClientManager(private val context: Context) {
                     }
 
                     override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                        Log.e("VartaNetwork", "MQTT TLS connect failed", exception)
-                        if (telegramDirectClient.botToken.isBlank()) {
-                            scope.launch {
-                                delay(4000)
-                                if (isActive && _authState.value is TelegramAuthState.Ready) {
-                                    connectToSector(sector, password)
-                                }
+                        Log.e("VartaNetwork", "Mesh broker connect failed", exception)
+                        scope.launch {
+                            delay(3000)
+                            if (isActive && _authState.value is TelegramAuthState.Ready) {
+                                connectToSector(sector, password)
                             }
                         }
                     }
@@ -349,17 +366,27 @@ class TelegramClientManager(private val context: Context) {
     private fun subscribeToSectorTopics() {
         val client = mqttClient ?: return
         try {
-            val fullTopic = "$currentTopicBase/#"
-            client.subscribe(fullTopic, 1, null, object : IMqttActionListener {
+            val topics = arrayOf(
+                "$currentTopicBase/presence",
+                "$currentTopicBase/voice",
+                "$currentTopicBase/alert",
+                "$currentTopicBase/control",
+                "$currentTopicBase/+"
+            )
+            val qos = intArrayOf(1, 1, 1, 1, 1)
+            client.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("VartaNetwork", "Subscribed successfully to $fullTopic")
+                    Log.d("VartaNetwork", "Subscribed successfully to sector topics!")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                    Log.e("VartaNetwork", "Failed to subscribe to $fullTopic", exception)
+                    Log.e("VartaNetwork", "Failed to subscribe to sector topics array, falling back to wildcard", exception)
+                    try {
+                        client.subscribe("$currentTopicBase/#", 1)
+                    } catch (_: Exception) {}
                 }
             })
-            Log.d("VartaNetwork", "Subscribed to $fullTopic")
+            Log.d("VartaNetwork", "Subscribing to topics: ${topics.joinToString()}")
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Subscribe error", e)
         }
@@ -415,6 +442,7 @@ class TelegramClientManager(private val context: Context) {
             senderId = mySenderId,
             senderNick = callSign,
             avatar = userAvatar,
+            timestamp = System.currentTimeMillis(),
             sig = generateSignature("JOIN:$mySenderId:$callSign", communityPassword)
         )
         publishPacket("$currentTopicBase/presence", packet, qos = 1)
@@ -426,9 +454,10 @@ class TelegramClientManager(private val context: Context) {
             senderId = mySenderId,
             senderNick = callSign,
             avatar = userAvatar,
+            timestamp = System.currentTimeMillis(),
             sig = generateSignature("HEARTBEAT:$mySenderId:$callSign", communityPassword)
         )
-        publishPacket("$currentTopicBase/presence", packet, qos = 1)
+        publishPacket("$currentTopicBase/presence", packet, qos = 0)
     }
 
     private fun pruneInactiveMembers() {
@@ -475,14 +504,7 @@ class TelegramClientManager(private val context: Context) {
             // Ignore our own echo
             if (packet.senderId == mySenderId) return
 
-            // Deduplication filter: Drop duplicates within recent window
-            val packetKey = "${packet.type}_${packet.senderId}_${packet.timestamp}_${packet.alertId}"
-            if (!processedPacketIds.add(packetKey)) {
-                Log.d("VartaNetwork", "Dropped duplicate packet: $packetKey")
-                return
-            }
-
-            // Immediately register or refresh member presence & avatar on ANY received packet!
+            // Always immediately register or refresh member presence & avatar on ANY received packet!
             membersSeen[packet.senderId] = Triple(
                 packet.senderNick,
                 packet.avatar.ifBlank { "shield" },
@@ -490,9 +512,17 @@ class TelegramClientManager(private val context: Context) {
             )
             pruneInactiveMembers()
 
+            // Deduplication filter for alerts and voice: Drop duplicates within recent window
+            val packetKey = "${packet.type}_${packet.senderId}_${packet.timestamp}_${packet.alertId}"
+            if (packet.type != "HEARTBEAT" && !processedPacketIds.add(packetKey)) {
+                Log.d("VartaNetwork", "Dropped duplicate packet: $packetKey")
+                return
+            }
+
             when (packet.type) {
                 "JOIN" -> {
                     // A peer just joined! Announce ourselves immediately back so they discover us in <100ms
+                    Log.d("VartaNetwork", "Peer JOIN received from ${packet.senderNick}. Responding with heartbeat.")
                     sendHeartbeat()
                 }
 

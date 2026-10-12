@@ -133,6 +133,9 @@ class MainActivity : ComponentActivity() {
         var alerts by remember { mutableStateOf<List<Alert>>(emptyList()) }
         var voiceMessages by remember { mutableStateOf<List<VoiceMessage>>(emptyList()) }
 
+        val mainPrefs = remember { getSharedPreferences("varta_main_prefs", android.content.Context.MODE_PRIVATE) }
+        var isMuted by remember { mutableStateOf(mainPrefs.getBoolean("is_muted", false)) }
+
         var isConnected by remember { mutableStateOf(false) }
         var alertRadiusKm by remember { mutableDoubleStateOf(2.0) }
         var soundEnabled by remember { mutableStateOf(true) }
@@ -161,8 +164,12 @@ class MainActivity : ComponentActivity() {
                         isConnected = event.isConnected
                     }
                     is TelegramLiveEvent.LiveVoice -> {
-                        // Immediately play loud over loudspeaker!
-                        walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick)
+                        // Play loud over loudspeaker unless muted!
+                        if (!isMuted) {
+                            walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick)
+                        } else {
+                            Toast.makeText(this@MainActivity, "🎙 Голосовое от ${event.senderNick} (Без звука)", Toast.LENGTH_SHORT).show()
+                        }
                         val newVoice = VoiceMessage(
                             id = event.messageId,
                             senderNick = event.senderNick,
@@ -241,6 +248,13 @@ class MainActivity : ComponentActivity() {
                     members = currentMembers,
                     userAvatar = telegramClient.userAvatar,
                     onChangeAvatar = { telegramClient.userAvatar = it },
+                    isMuted = isMuted,
+                    onToggleMute = {
+                        isMuted = !isMuted
+                        mainPrefs.edit().putBoolean("is_muted", isMuted).apply()
+                        val msg = if (isMuted) "🔇 Режим «Без звука» включён" else "🔊 Громкий эфир рации включён"
+                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                    },
                     alerts = alerts,
                     voiceMessages = voiceMessages,
                     userLat = userLat,

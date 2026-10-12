@@ -61,6 +61,8 @@ fun MainHubScreen(
     onStopHistoryVoice: () -> Unit,
     userAvatar: String = "shield",
     onChangeAvatar: (String) -> Unit = {},
+    isMuted: Boolean = false,
+    onToggleMute: () -> Unit = {},
     onKickMember: (GroupMember) -> Unit,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
     onHapticTick: () -> Unit
@@ -106,16 +108,26 @@ fun MainHubScreen(
                                 color = TelegramTextPrimary
                             )
                             Text(
-                                text = if (isConnected) "${members.size} в сети • Рация активна" else "Подключение к сети...",
+                                text = if (isConnected) {
+                                    "${members.size} в сети" + (if (isMuted) " • 🔇 Без звука" else " • 🔊 Рация активна")
+                                } else "Подключение к сети...",
                                 fontSize = 11.sp,
-                                color = if (isConnected) TelegramTextSecondary else AlertShellingRed
+                                color = if (isConnected) (if (isMuted) Color(0xFFFFD600) else TelegramTextSecondary) else AlertShellingRed
                             )
                         }
                     }
                 },
                 actions = {
+                    // Mute / Live Audio Toggle Button
+                    IconButton(onClick = onToggleMute) {
+                        Icon(
+                            imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = if (isMuted) "Включить звук" else "Без звука",
+                            tint = if (isMuted) Color(0xFFFF5252) else Color(0xFFFFD600)
+                        )
+                    }
                     IconButton(onClick = { showHistoryDialog = true }) {
-                        Icon(imageVector = Icons.Default.VolumeUp, contentDescription = "История рации", tint = TelegramBlue)
+                        Icon(imageVector = Icons.Default.History, contentDescription = "История рации", tint = TelegramBlue)
                     }
                     IconButton(onClick = { showMembersDialog = true }) {
                         Icon(imageVector = Icons.Default.Group, contentDescription = "Участники", tint = TelegramTextSecondary)
