@@ -72,6 +72,7 @@ fun SettingsDialog(
     var newRoomPasswordInput by remember { mutableStateOf("") }
     var isAutoDeleteEnabled by remember { mutableStateOf(initialAutoDeleteEnabled) }
     var isTelegramBridgeEnabled by remember { mutableStateOf(initialTelegramBridgeEnabled) }
+    var showLegacyTelegramSettings by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
 
@@ -203,75 +204,99 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "ИНТЕГРАЦИЯ С ТЕЛЕГРАМ (БЕЗ СЕРВЕРА):",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TelegramTextSecondary,
-                    letterSpacing = 0.5.sp
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Telegram Bot Token
-                OutlinedTextField(
-                    value = tokenInput,
-                    onValueChange = { tokenInput = it.trim() },
-                    label = { Text("Токен бота Telegram (от @BotFather)", color = TelegramTextSecondary, fontSize = 12.sp) },
-                    placeholder = { Text("123456789:ABCDefGhIJKlmNoPQR", color = TelegramTextSecondary) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        focusedBorderColor = TelegramBlue,
-                        unfocusedBorderColor = TelegramDivider,
-                        focusedContainerColor = TelegramDarkCard,
-                        unfocusedContainerColor = TelegramDarkCard
-                    ),
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLegacyTelegramSettings = !showLegacyTelegramSettings },
+                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
                     shape = RoundedCornerShape(12.dp)
-                )
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🤖 Прямой бот Telegram (опционально)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TelegramTextSecondary
+                            )
+                            Text(
+                                text = if (showLegacyTelegramSettings) "▲" else "▼",
+                                fontSize = 12.sp,
+                                color = TelegramTextSecondary
+                            )
+                        }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                        if (showLegacyTelegramSettings) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Токен бота и ID группы для прямого резервного опроса без TDLib:",
+                                fontSize = 10.sp,
+                                color = TelegramTextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                // Chat ID
-                OutlinedTextField(
-                    value = chatIdInput,
-                    onValueChange = { chatIdInput = it.trim() },
-                    label = { Text("ID группы/канала (напр. -1001234567890)", color = TelegramTextSecondary, fontSize = 12.sp) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        focusedBorderColor = TelegramBlue,
-                        unfocusedBorderColor = TelegramDivider,
-                        focusedContainerColor = TelegramDarkCard,
-                        unfocusedContainerColor = TelegramDarkCard
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                            OutlinedTextField(
+                                value = tokenInput,
+                                onValueChange = { tokenInput = it.trim() },
+                                label = { Text("Токен бота Telegram (@BotFather)", color = TelegramTextSecondary, fontSize = 11.sp) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TelegramTextPrimary,
+                                    unfocusedTextColor = TelegramTextPrimary,
+                                    focusedBorderColor = TelegramBlue,
+                                    unfocusedBorderColor = TelegramDivider,
+                                    focusedContainerColor = TelegramDarkSurface,
+                                    unfocusedContainerColor = TelegramDarkSurface
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
-                // Password
-                OutlinedTextField(
-                    value = passwordInput,
-                    onValueChange = { passwordInput = it },
-                    label = { Text("Пароль закрытого сообщества", color = TelegramTextSecondary, fontSize = 12.sp) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        focusedBorderColor = TelegramBlue,
-                        unfocusedBorderColor = TelegramDivider,
-                        focusedContainerColor = TelegramDarkCard,
-                        unfocusedContainerColor = TelegramDarkCard
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                            OutlinedTextField(
+                                value = chatIdInput,
+                                onValueChange = { chatIdInput = it.trim() },
+                                label = { Text("ID группы/канала (-100...)", color = TelegramTextSecondary, fontSize = 11.sp) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TelegramTextPrimary,
+                                    unfocusedTextColor = TelegramTextPrimary,
+                                    focusedBorderColor = TelegramBlue,
+                                    unfocusedBorderColor = TelegramDivider,
+                                    focusedContainerColor = TelegramDarkSurface,
+                                    unfocusedContainerColor = TelegramDarkSurface
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            OutlinedTextField(
+                                value = passwordInput,
+                                onValueChange = { passwordInput = it },
+                                label = { Text("Пароль сообщества", color = TelegramTextSecondary, fontSize = 11.sp) },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TelegramTextPrimary,
+                                    unfocusedTextColor = TelegramTextPrimary,
+                                    focusedBorderColor = TelegramBlue,
+                                    unfocusedBorderColor = TelegramDivider,
+                                    focusedContainerColor = TelegramDarkSurface,
+                                    unfocusedContainerColor = TelegramDarkSurface
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(18.dp))
 
@@ -469,36 +494,15 @@ fun SettingsDialog(
 
                 // --- GITHUB AUTO-UPDATE SECTION ---
                 Text(
-                    text = "🚀 АВТООБНОВЛЕНИЕ С GITHUB",
+                    text = "🚀 ОБНОВЛЕНИЕ ПРИЛОЖЕНИЯ",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = TelegramTextPrimary
                 )
                 Text(
-                    text = "Текущая версия приложения: v$appVersion\nПроверка релизов на GitHub напрямую без Google Play",
-                    fontSize = 11.sp,
+                    text = "Текущая версия: v$appVersion",
+                    fontSize = 12.sp,
                     color = TelegramTextSecondary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                var repoInput by remember { mutableStateOf(githubRepo) }
-                OutlinedTextField(
-                    value = repoInput,
-                    onValueChange = { repoInput = it.trim() },
-                    label = { Text("GitHub репозиторий (owner/repo)", color = TelegramTextSecondary, fontSize = 12.sp) },
-                    placeholder = { Text("owner/varta-radio", color = TelegramTextSecondary) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        focusedBorderColor = TelegramBlue,
-                        unfocusedBorderColor = TelegramDivider,
-                        focusedContainerColor = TelegramDarkCard,
-                        unfocusedContainerColor = TelegramDarkCard
-                    ),
-                    shape = RoundedCornerShape(12.dp)
                 )
 
                 if (updateStatusText.isNotBlank()) {
@@ -532,23 +536,22 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedButton(
-                    onClick = { onCheckUpdate(repoInput) },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("🔍 Проверить обновления", fontSize = 13.sp)
-                }
-
                 if (isUpdateAvailable) {
-                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = onInstallUpdate,
                         modifier = Modifier.fillMaxWidth().height(46.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("📦 Скачать и установить обновление", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("📦 Скачать и обновить", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { onCheckUpdate(githubRepo) },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("🔄 Проверить обновления", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                 }
 
@@ -564,7 +567,7 @@ fun SettingsDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Сохранить и подключиться", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("💾 Сохранить настройки", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -578,20 +581,20 @@ fun SettingsDialog(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
                         onClick = {
                             onDismiss()
                             onLeaveRoom()
                         },
-                        modifier = Modifier.weight(1f).height(46.dp),
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
                     ) {
-                        Text("🔄 Сменить комнату", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("🚪 Сменить комнату", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -599,11 +602,11 @@ fun SettingsDialog(
                             onDismiss()
                             onLogOutTelegram()
                         },
-                        modifier = Modifier.weight(1f).height(46.dp),
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
                     ) {
-                        Text("Выйти из Telegram", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("🔴 Выйти из радиоэфира", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
