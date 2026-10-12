@@ -102,6 +102,14 @@ class TelegramClientManager(private val context: Context) {
         get() = prefs.getString("user_avatar", "shield") ?: "shield"
         set(value) = prefs.edit().putString("user_avatar", value.trim()).apply()
 
+    var telegramUsername: String
+        get() = prefs.getString("telegram_username", "") ?: ""
+        set(value) = prefs.edit().putString("telegram_username", value.trim()).apply()
+
+    var botToken: String
+        get() = prefs.getString("bot_token", "") ?: ""
+        set(value) = prefs.edit().putString("bot_token", value.trim()).apply()
+
     var userPhoneNumber: String
         get() = prefs.getString("phone_number", "") ?: ""
         set(value) = prefs.edit().putString("phone_number", value.trim()).apply()
@@ -110,9 +118,11 @@ class TelegramClientManager(private val context: Context) {
         get() = prefs.getString("session_token", "") ?: ""
         set(value) = prefs.edit().putString("session_token", value.trim()).apply()
 
+    val telegramDirectClient = TelegramDirectClient(context)
+
     private val _authState = MutableStateFlow<TelegramAuthState>(
         if (sessionToken.isNotBlank() && communityLinkOrTag.isNotBlank()) {
-            TelegramAuthState.Ready(userPhoneNumber, communityLinkOrTag)
+            TelegramAuthState.Ready(telegramUsername.ifBlank { userPhoneNumber }, communityLinkOrTag)
         } else {
             TelegramAuthState.Unauthenticated
         }
@@ -141,6 +151,30 @@ class TelegramClientManager(private val context: Context) {
     private var currentTopicBase: String = ""
 
     init {
+        // Forward direct Telegram events from Telegram groups
+        scope.launch {
+            telegramDirectClient.events.collect { tgEvent ->
+                when (tgEvent) {
+                    is TelegramLiveEvent.LiveVoice -> {
+                        membersSeen[tgEvent.senderNick] = Triple(tgEvent.senderNick, "shield", System.currentTimeMillis())
+                        pruneInactiveMembers()
+                        _events.emit(tgEvent)
+                    }
+                    is TelegramLiveEvent.LiveAlert -> {
+                        membersSeen[tgEvent.alert.senderNick] = Triple(tgEvent.alert.senderNick, "shield", System.currentTimeMillis())
+                        pruneInactiveMembers()
+                        _events.emit(tgEvent)
+                    }
+                    is TelegramLiveEvent.LiveAlertResolved -> {
+                        _events.emit(tgEvent)
+                    }
+                    is TelegramLiveEvent.ConnectionState -> {
+                        _events.emit(tgEvent)
+                    }
+                }
+            }
+        }
+
         if (_authState.value is TelegramAuthState.Ready) {
             connectToSector(communityLinkOrTag, communityPassword)
         }
@@ -188,7 +222,7 @@ class TelegramClientManager(private val context: Context) {
             communityLinkOrTag = targetCommunity
             communityPassword = password
 
-            _authState.value = TelegramAuthState.Ready(userPhoneNumber, targetCommunity)
+            _authState.value = TelegramAuthState.Ready(telegramUsername.ifBlank { userPhoneNumber.ifBlank { callSign } }, targetCommunity)
             connectToSector(targetCommunity, password)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -214,14 +248,31 @@ class TelegramClientManager(private val context: Context) {
     fun connectToSector(sector: String, password: String) {
         if (sector.isBlank()) return
 
+        communityLinkOrTag = sector
+        communityPassword = password
+
+        // 1. Configure and start Telegram Direct client for Telegram Group channels
+        telegramDirectClient.chatId = sector
+        telegramDirectClient.botToken = botToken
+        telegramDirectClient.groupPassword = password
+        telegramDirectClient.callSign = callSign
+        telegramDirectClient.userAvatar = userAvatar
+
+        if (botToken.isNotBlank() && sector.isNotBlank()) {
+            Log.d("VartaNetwork", "Starting direct Telegram group long-polling for $sector")
+            telegramDirectClient.startPolling()
+        }
+
+        // 2. Connect to encrypted TLS mesh broker for ultra-low latency PTT
         scope.launch {
             try {
-                disconnectFromSector()
+                disconnectMqtt()
 
                 currentTopicBase = deriveTopicBase(sector, password)
                 Log.d("VartaNetwork", "Connecting to sector topic: $currentTopicBase")
 
-                val brokerUrl = "tcp://broker.hivemq.com:1883"
+                // Use SSL on port 8883 to prevent mobile network port 1883 blockage
+                val brokerUrl = "ssl://broker.hivemq.com:8883"
                 val clientId = "Varta_${mySenderId}"
 
                 val client = MqttAsyncClient(brokerUrl, clientId, MemoryPersistence())
@@ -230,13 +281,16 @@ class TelegramClientManager(private val context: Context) {
                 val connOpts = MqttConnectOptions().apply {
                     isAutomaticReconnect = true
                     isCleanSession = true
-                    connectionTimeout = 15
+                    connectionTimeout = 12
                     keepAliveInterval = 20
+                    try {
+                        socketFactory = javax.net.ssl.SSLContext.getDefault().socketFactory
+                    } catch (_: Exception) {}
                 }
 
                 client.setCallback(object : MqttCallbackExtended {
                     override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-                        Log.d("VartaNetwork", "MQTT Connected/Reconnected! Reconnect=$reconnect")
+                        Log.d("VartaNetwork", "MQTT TLS Connected/Reconnected! Reconnect=$reconnect")
                         scope.launch {
                             _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
                         }
@@ -246,9 +300,11 @@ class TelegramClientManager(private val context: Context) {
                     }
 
                     override fun connectionLost(cause: Throwable?) {
-                        Log.w("VartaNetwork", "MQTT connection lost: ${cause?.message}")
-                        scope.launch {
-                            _events.emit(TelegramLiveEvent.ConnectionState(false, "Переподключение к эфиру..."))
+                        Log.w("VartaNetwork", "MQTT TLS connection lost: ${cause?.message}")
+                        if (telegramDirectClient.botToken.isBlank()) {
+                            scope.launch {
+                                _events.emit(TelegramLiveEvent.ConnectionState(false, "Переподключение к эфиру..."))
+                            }
                         }
                     }
 
@@ -262,7 +318,7 @@ class TelegramClientManager(private val context: Context) {
 
                 client.connect(connOpts, null, object : IMqttActionListener {
                     override fun onSuccess(asyncActionToken: IMqttToken?) {
-                        Log.d("VartaNetwork", "Connected successfully to broker on initial attempt")
+                        Log.d("VartaNetwork", "Connected successfully to MQTT TLS broker on initial attempt")
                         scope.launch {
                             _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
                         }
@@ -272,11 +328,13 @@ class TelegramClientManager(private val context: Context) {
                     }
 
                     override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                        Log.e("VartaNetwork", "Connect failed, will retry in 3 seconds...", exception)
-                        scope.launch {
-                            delay(3000)
-                            if (isActive && _authState.value is TelegramAuthState.Ready) {
-                                connectToSector(sector, password)
+                        Log.e("VartaNetwork", "MQTT TLS connect failed", exception)
+                        if (telegramDirectClient.botToken.isBlank()) {
+                            scope.launch {
+                                delay(4000)
+                                if (isActive && _authState.value is TelegramAuthState.Ready) {
+                                    connectToSector(sector, password)
+                                }
                             }
                         }
                     }
@@ -307,7 +365,12 @@ class TelegramClientManager(private val context: Context) {
         }
     }
 
-    private fun disconnectFromSector() {
+    fun disconnectFromSector() {
+        telegramDirectClient.stopPolling()
+        disconnectMqtt()
+    }
+
+    private fun disconnectMqtt() {
         heartbeatJob?.cancel()
         memberPruneJob?.cancel()
         try {
@@ -521,6 +584,22 @@ class TelegramClientManager(private val context: Context) {
     // --- Outgoing Voice Transmission ---
 
     suspend fun transmitVoice(audioFile: File, durationSec: Int): Result<VoiceMessage> = withContext(Dispatchers.IO) {
+        var tgSuccess = false
+        var msgId = System.currentTimeMillis()
+
+        // 1. Transmit directly to Telegram group if bot & chat configured
+        if (telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
+            val tgRes = telegramDirectClient.sendVoice(audioFile, durationSec)
+            if (tgRes.isSuccess) {
+                tgSuccess = true
+                msgId = tgRes.getOrNull() ?: msgId
+                Log.d("VartaNetwork", "Voice message sent successfully to Telegram group!")
+            } else {
+                Log.w("VartaNetwork", "Telegram sendVoice failed: ${tgRes.exceptionOrNull()?.message}")
+            }
+        }
+
+        // 2. Also transmit via MQTT mesh packet
         try {
             val audioBytes = audioFile.readBytes()
             val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
@@ -531,27 +610,27 @@ class TelegramClientManager(private val context: Context) {
                 senderId = mySenderId,
                 senderNick = callSign,
                 avatar = userAvatar,
-                timestamp = System.currentTimeMillis(),
+                timestamp = msgId,
                 durationSec = durationSec,
                 audioBase64 = base64Audio,
                 sig = sig
             )
 
             publishPacket("$currentTopicBase/voice", packet, qos = 1)
-            Log.d("VartaNetwork", "Transmitted voice message to sector: ${audioBytes.size} bytes, duration=${durationSec}s")
-
-            val voiceMsg = VoiceMessage(
-                id = packet.timestamp,
-                senderNick = "$callSign (Вы)",
-                filePath = audioFile.absolutePath,
-                durationSec = durationSec,
-                createdAt = "Только что"
-            )
-            Result.success(voiceMsg)
+            Log.d("VartaNetwork", "Transmitted voice message to sector mesh")
         } catch (e: Exception) {
-            Log.e("VartaNetwork", "Transmit voice failed", e)
-            Result.failure(e)
+            Log.e("VartaNetwork", "MQTT transmit voice failed", e)
+            if (!tgSuccess) return@withContext Result.failure(e)
         }
+
+        val voiceMsg = VoiceMessage(
+            id = msgId,
+            senderNick = "$callSign (Вы)",
+            filePath = audioFile.absolutePath,
+            durationSec = durationSec,
+            createdAt = "Только что"
+        )
+        Result.success(voiceMsg)
     }
 
     // --- Outgoing Emergency Panic Alert ---
@@ -563,13 +642,28 @@ class TelegramClientManager(private val context: Context) {
         desc: String,
         photoFile: File? = null
     ): Result<Alert> = withContext(Dispatchers.IO) {
+        var tgSuccess = false
+        var alertId = System.currentTimeMillis()
+
+        // 1. Transmit directly to Telegram group if bot & chat configured
+        if (telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
+            val tgRes = telegramDirectClient.sendAlert(type, lat, lng, desc, photoFile)
+            if (tgRes.isSuccess) {
+                tgSuccess = true
+                alertId = tgRes.getOrNull() ?: alertId
+                Log.d("VartaNetwork", "Alert broadcasted successfully to Telegram group!")
+            } else {
+                Log.w("VartaNetwork", "Telegram sendAlert failed: ${tgRes.exceptionOrNull()?.message}")
+            }
+        }
+
+        // 2. Also broadcast via MQTT mesh packet
         try {
             var photoBase64 = ""
             if (photoFile != null && photoFile.exists()) {
                 photoBase64 = compressAndEncodePhoto(photoFile)
             }
 
-            val alertId = System.currentTimeMillis()
             val sig = generateSignature("ALERT:$alertId:${type.rawValue}", communityPassword)
 
             val packet = VartaPacket(
@@ -588,29 +682,32 @@ class TelegramClientManager(private val context: Context) {
             )
 
             publishPacket("$currentTopicBase/alert", packet, qos = 1)
-            Log.d("VartaNetwork", "Broadcasted alert ${type.label} at $lat, $lng")
-
-            val alert = Alert(
-                id = alertId,
-                senderNick = "$callSign (Вы)",
-                alertType = type.rawValue,
-                latitude = lat,
-                longitude = lng,
-                description = desc,
-                photoPath = photoFile?.absolutePath ?: "",
-                isActive = true,
-                createdAt = "Только что"
-            )
-            Result.success(alert)
+            Log.d("VartaNetwork", "Broadcasted alert ${type.label} at $lat, $lng to mesh")
         } catch (e: Exception) {
-            Log.e("VartaNetwork", "Broadcast alert failed", e)
-            Result.failure(e)
+            Log.e("VartaNetwork", "MQTT broadcast alert failed", e)
+            if (!tgSuccess) return@withContext Result.failure(e)
         }
+
+        val alert = Alert(
+            id = alertId,
+            senderNick = "$callSign (Вы)",
+            alertType = type.rawValue,
+            latitude = lat,
+            longitude = lng,
+            description = desc,
+            photoPath = photoFile?.absolutePath ?: "",
+            isActive = true,
+            createdAt = "Только что"
+        )
+        Result.success(alert)
     }
 
     // --- Outgoing Resolve Alert ---
 
     suspend fun resolveAlert(alertId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        if (telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
+            telegramDirectClient.resolveAlert(alertId)
+        }
         try {
             val sig = generateSignature("RESOLVE:$alertId", communityPassword)
             val packet = VartaPacket(

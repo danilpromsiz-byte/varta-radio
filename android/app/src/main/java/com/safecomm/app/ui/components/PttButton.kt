@@ -65,40 +65,7 @@ fun PttButton(
         1.0f
     }
 
-    // 3D Convex Dome Gradients (light source at top-left ~35% offset)
-    val domeBrush = when {
-        isRecording -> Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFF6E6E),
-                Color(0xFFE53935),
-                Color(0xFFB71C1C),
-                Color(0xFF7F0000)
-            ),
-            center = Offset(130f, 130f),
-            radius = 240f
-        )
-        isReceivingVoice -> Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFE082),
-                Color(0xFFFFA726),
-                Color(0xFFF57C00),
-                Color(0xFFBF360C)
-            ),
-            center = Offset(130f, 130f),
-            radius = 240f
-        )
-        else -> Brush.radialGradient(
-            colors = listOf(
-                Color(0xFF64B5F6), // Top-left specular highlight
-                Color(0xFF2196F3),
-                Color(0xFF1976D2),
-                Color(0xFF0D47A1)  // Bottom-right shadow rim
-            ),
-            center = Offset(130f, 130f),
-            radius = 240f
-        )
-    }
-
+    // 3D Convex Dome Gradients (light source at top center ~20% from top rim)
     Box(
         modifier = modifier
             .size(174.dp)
@@ -119,10 +86,10 @@ fun PttButton(
             )
         }
 
-        // --- LAYER 1: 3D Outer Tactical Bezel Ring (162dp) ---
+        // --- LAYER 1: 3D Outer Tactical Bezel Ring (164dp) ---
         Box(
             modifier = Modifier
-                .size(162.dp)
+                .size(164.dp)
                 .shadow(
                     elevation = if (isRecording) 6.dp else 16.dp,
                     shape = CircleShape,
@@ -132,9 +99,9 @@ fun PttButton(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF37474F), // Light bezel top
+                            Color(0xFF546E7A), // Crisp metallic bezel top
                             Color(0xFF263238),
-                            Color(0xFF10171B)  // Dark bezel bottom
+                            Color(0xFF0E1418)  // Dark bezel bottom
                         )
                     )
                 )
@@ -142,26 +109,64 @@ fun PttButton(
                     width = 2.dp,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0x88FFFFFF), // Top highlight specular edge
-                            Color(0x22FFFFFF),
-                            Color(0x99000000)  // Bottom shadow edge
+                            Color(0xEEFFFFFF), // Bright top metallic bezel reflection
+                            Color(0x33FFFFFF),
+                            Color(0xDD000000)  // Deep bottom shadow edge
                         )
                     ),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // --- LAYER 2: Inner Convex Dome Button (138dp) ---
+            // --- LAYER 2: Inner Convex Dome Button (152dp, seamless convex spherical dome) ---
             Box(
                 modifier = Modifier
-                    .size(if (isRecording) 134.dp else 138.dp) // Slight mechanical recession when pressed
+                    .size(if (isRecording) 146.dp else 152.dp) // Mechanical depression on press
                     .shadow(
-                        elevation = if (isRecording) 2.dp else 10.dp,
+                        elevation = if (isRecording) 2.dp else 12.dp,
                         shape = CircleShape,
                         spotColor = Color.Black
                     )
                     .clip(CircleShape)
-                    .background(domeBrush)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = when {
+                                isRecording -> listOf(
+                                    Color(0xFFFF8A80), // Brilliant top convex crest
+                                    Color(0xFFFF5252),
+                                    Color(0xFFD32F2F),
+                                    Color(0xFF850000),
+                                    Color(0xFF3B0000)  // Deep bottom convex shadow
+                                )
+                                isReceivingVoice -> listOf(
+                                    Color(0xFFFFF59D), // Brilliant top convex crest
+                                    Color(0xFFFFD54F),
+                                    Color(0xFFFFA726),
+                                    Color(0xFFE65100),
+                                    Color(0xFF5D1A00)  // Deep bottom convex shadow
+                                )
+                                else -> listOf(
+                                    Color(0xFFB3E5FC), // Brilliant top convex crest
+                                    Color(0xFF4FC3F7),
+                                    Color(0xFF1976D2),
+                                    Color(0xFF0D47A1),
+                                    Color(0xFF031B4D)  // Deep bottom convex shadow
+                                )
+                            }
+                        )
+                    )
+                    .border(
+                        width = 2.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFFFFFFFF), // Pure white razor-sharp top specular edge
+                                Color(0x66FFFFFF),
+                                Color(0x22FFFFFF),
+                                Color(0xAA000000)  // Ambient occlusion at bottom
+                            )
+                        ),
+                        shape = CircleShape
+                    )
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onPress = {
@@ -173,18 +178,37 @@ fun PttButton(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // --- LAYER 3: Specular Glass Reflection Arc (Top dome highlight) ---
+                // --- LAYER 3: Full-Surface 3D Spherical Convex Glare Overlay ---
+                // Covering 100% of the dome surface from top rim to bottom shadow
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.78f)
-                        .height(34.dp)
-                        .align(Alignment.TopCenter)
-                        .offset(y = 6.dp)
+                        .fillMaxSize()
                         .clip(CircleShape)
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0x55FFFFFF),
+                                    Color(0x88FFFFFF), // Luminous specular light across the entire top rim
+                                    Color(0x35FFFFFF), // Smooth mid-dome falloff
+                                    Color(0x00FFFFFF), // Natural clear equator
+                                    Color(0x40000000), // Spherical curvature shadow
+                                    Color(0x80000000)  // Deep bottom shadow rim
+                                )
+                            )
+                        )
+                )
+
+                // Secondary top-crest light halo (top 45% arc)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .fillMaxHeight(0.48f)
+                        .align(Alignment.TopCenter)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x66FFFFFF),
+                                    Color(0x15FFFFFF),
                                     Color(0x00FFFFFF)
                                 )
                             )

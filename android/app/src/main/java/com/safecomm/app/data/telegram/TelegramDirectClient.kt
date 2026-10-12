@@ -32,6 +32,7 @@ import javax.crypto.spec.SecretKeySpec
 data class SafeCommMetadata(
     val v: Int = 1,
     val nick: String,
+    val avatar: String = "shield",
     val action: String, // "VOICE", "ALERT", "RESOLVE"
     val threat: String = "other",
     val lat: Double = 0.0,
@@ -87,6 +88,10 @@ class TelegramDirectClient(private val context: Context) {
     var callSign: String
         get() = prefs.getString("call_sign", "Позывной-" + (100..999).random()) ?: "Позывной-1"
         set(value) = prefs.edit().putString("call_sign", value.trim()).apply()
+
+    var userAvatar: String
+        get() = prefs.getString("user_avatar", "shield") ?: "shield"
+        set(value) = prefs.edit().putString("user_avatar", value.trim()).apply()
 
     var groupName: String
         get() = prefs.getString("group_name", "Telegram Сектор") ?: "Telegram Сектор"
@@ -272,6 +277,7 @@ class TelegramDirectClient(private val context: Context) {
             val sig = generateSignature(contentToSign, groupPassword)
             val metadata = SafeCommMetadata(
                 nick = callSign,
+                avatar = userAvatar,
                 action = "VOICE",
                 sig = sig
             )
@@ -318,6 +324,7 @@ class TelegramDirectClient(private val context: Context) {
             val sig = generateSignature(contentToSign, groupPassword)
             val metadata = SafeCommMetadata(
                 nick = callSign,
+                avatar = userAvatar,
                 action = "ALERT",
                 threat = type.rawValue,
                 lat = lat,

@@ -28,9 +28,6 @@ import com.safecomm.app.service.LocationHelper
 import com.safecomm.app.service.UpdateStatus
 import com.safecomm.app.service.WalkieTalkieManager
 import com.safecomm.app.ui.screens.AuthCommunityScreen
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import com.safecomm.app.service.VartaRadioService
 import com.safecomm.app.ui.screens.MainHubScreen
 import com.safecomm.app.ui.theme.*
@@ -46,44 +43,6 @@ class MainActivity : ComponentActivity() {
 
     private var currentPhotoUri: Uri? = null
     private var currentPhotoFile: File? = null
-
-    private var googleAccountEmail by mutableStateOf<String?>(null)
-
-    // Google Sign-In launcher
-    private val googleSignInLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            val account = task.getResult(ApiException::class.java)
-            googleAccountEmail = account?.email
-            account?.displayName?.let { name ->
-                if (telegramClient.callSign.startsWith("Позывной-")) {
-                    telegramClient.callSign = name.split(" ").firstOrNull() ?: name
-                }
-            }
-            Toast.makeText(this, "Вход Google: ${account?.email}", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Log.e("GoogleAuth", "Google sign-in error", e)
-            Toast.makeText(this, "Google вход: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun signInWithGoogle() {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .build()
-        val client = GoogleSignIn.getClient(this, gso)
-        googleSignInLauncher.launch(client.signInIntent)
-    }
-
-    private fun signOutGoogle() {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
-        GoogleSignIn.getClient(this, gso).signOut().addOnCompleteListener {
-            googleAccountEmail = null
-            Toast.makeText(this, "Вы вышли из Google", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     // Permissions launcher
     private val requestPermissionsLauncher = registerForActivityResult(
@@ -112,10 +71,6 @@ class MainActivity : ComponentActivity() {
         walkieTalkieManager = WalkieTalkieManager(this)
         alertNotificationManager = AlertNotificationManager(this)
         locationHelper = LocationHelper(this)
-
-        // Check if user was previously signed in with Google
-        val lastAccount = GoogleSignIn.getLastSignedInAccount(this)
-        googleAccountEmail = lastAccount?.email
 
         checkPermissions()
         locationHelper.startLocationUpdates()
@@ -243,13 +198,16 @@ class MainActivity : ComponentActivity() {
                     currentAvatar = telegramClient.userAvatar,
                     initialCommunity = telegramClient.communityLinkOrTag,
                     initialPassword = telegramClient.communityPassword,
-                    googleAccountEmail = googleAccountEmail,
-                    onGoogleSignInClick = { signInWithGoogle() },
-                    onGoogleSignOutClick = { signOutGoogle() },
-                    onEnterCommunity = { callSign, communityTarget, groupPassword, avatar ->
+                    initialTelegramUsername = telegramClient.telegramUsername,
+                    initialBotToken = telegramClient.botToken,
+                    onEnterCommunity = { callSign, communityTarget, groupPassword, avatar, tgUsername, botToken ->
                         coroutineScope.launch {
                             telegramClient.callSign = callSign
                             telegramClient.userAvatar = avatar
+                            telegramClient.telegramUsername = tgUsername
+                            if (botToken.isNotBlank()) {
+                                telegramClient.botToken = botToken
+                            }
                             telegramClient.verifyCodeAndSignIn("OK", communityTarget, groupPassword)
                                 .onSuccess {
                                     VartaRadioService.start(this@MainActivity, communityTarget, callSign)
@@ -294,7 +252,7 @@ class MainActivity : ComponentActivity() {
                     amplitude = amplitude,
                     currentRadiusKm = alertRadiusKm,
                     soundEnabled = soundEnabled,
-                    botToken = TelegramConfig.APP_TITLE,
+                    botToken = telegramClient.botToken,
                     chatId = state.activeCommunityName,
                     groupPassword = telegramClient.communityPassword,
                     currentUserId = 1L,
@@ -407,11 +365,13 @@ class MainActivity : ComponentActivity() {
                         walkieTalkieManager.stopPlayback()
                     },
                     onKickMember = {},
-                    onSaveSettings = { radius, sound, _, chat, pass ->
+                    onSaveSettings = { radius, sound, token, chat, pass ->
                         alertRadiusKm = radius
                         soundEnabled = sound
+                        if (token.isNotBlank()) telegramClient.botToken = token
                         if (chat.isNotBlank()) telegramClient.communityLinkOrTag = chat
                         if (pass.isNotBlank()) telegramClient.communityPassword = pass
+                        telegramClient.connectToSector(telegramClient.communityLinkOrTag, telegramClient.communityPassword)
                         Toast.makeText(this@MainActivity, "Настройки сохранены", Toast.LENGTH_SHORT).show()
                     },
                     onHapticTick = {

@@ -10,31 +10,31 @@
         android:fillColor="#78909C"
         android:pathData="M38,20 h4 v18 h-4 z" />
     <path
-        android:fillColor="#FF9800"
+        android:fillColor="#FFD600"
         android:pathData="M37,17 h6 v4 h-6 z" />
 
     <!-- Radio Pulse Soundwaves (Left & Right) -->
     <path
-        android:strokeColor="#FF6D00"
+        android:strokeColor="#FFD600"
         android:strokeWidth="2.2"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M24,42 C20,49 20,59 24,66" />
     <path
-        android:strokeColor="#FF9100"
+        android:strokeColor="#FFEA00"
         android:strokeWidth="2.0"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M18,36 C13,47 13,63 18,74" />
 
     <path
-        android:strokeColor="#FF6D00"
+        android:strokeColor="#FFD600"
         android:strokeWidth="2.2"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
         android:pathData="M84,42 C88,49 88,59 84,66" />
     <path
-        android:strokeColor="#FF9100"
+        android:strokeColor="#FFEA00"
         android:strokeWidth="2.0"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
@@ -53,9 +53,9 @@
         android:fillColor="#223244"
         android:pathData="M54,30 L72,36 C72,55 64,69 54,76 C44,69 36,55 36,36 Z" />
 
-    <!-- Golden-Orange Tactical V Emblem -->
+    <!-- Tactical Yellow V Emblem -->
     <path
-        android:fillColor="#FF6D00"
+        android:fillColor="#FFD600"
         android:pathData="M44,40 L49,40 L54,58 L59,40 L64,40 L56,66 L52,66 Z" />
 
     <!-- Central Signal Beacon / LED -->
@@ -65,7 +65,7 @@
 
     <!-- Walkie-Talkie Speaker Grille Lines -->
     <path
-        android:strokeColor="#FF9100"
+        android:strokeColor="#FFEA00"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
