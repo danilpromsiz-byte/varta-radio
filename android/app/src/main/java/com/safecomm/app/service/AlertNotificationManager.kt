@@ -48,6 +48,15 @@ class AlertNotificationManager(private val context: Context) {
         return distanceKm
     }
 
+    fun triggerRoomSiren(type: AlertType = AlertType.SHELLING, soundEnabled: Boolean = true, vibrateEnabled: Boolean = true) {
+        if (vibrateEnabled) {
+            triggerHapticAlert(type)
+        }
+        if (soundEnabled) {
+            triggerSoundAlert(type)
+        }
+    }
+
     fun triggerHapticFeedback(isLong: Boolean = false) {
         if (vibrator == null || !vibrator.hasVibrator()) return
         try {
@@ -65,7 +74,7 @@ class AlertNotificationManager(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-    private fun triggerHapticAlert(type: AlertType) {
+    fun triggerHapticAlert(type: AlertType = AlertType.SHELLING) {
         if (vibrator == null || !vibrator.hasVibrator()) return
         try {
             val timings = when (type) {
@@ -90,7 +99,7 @@ class AlertNotificationManager(private val context: Context) {
         }
     }
 
-    private fun triggerSoundAlert(type: AlertType) {
+    fun triggerSoundAlert(type: AlertType = AlertType.SHELLING) {
         scope.launch {
             try {
                 val toneType = when (type) {

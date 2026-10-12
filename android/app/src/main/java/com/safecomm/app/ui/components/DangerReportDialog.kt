@@ -41,15 +41,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun DangerReportDialog(
     onDismiss: () -> Unit,
-    onConfirmAlert: (type: AlertType, description: String) -> Unit,
-    onHapticTick: () -> Unit = {}
+    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int) -> Unit,
+    onHapticTick: () -> Unit = {},
+    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
     var selectedType by remember { mutableStateOf(AlertType.SHELLING) }
+    var selectedDurationMinutes by remember { mutableIntStateOf(30) } // Default: 30 minutes
     var description by remember { mutableStateOf("") }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -73,7 +74,7 @@ fun DangerReportDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = com.safecomm.app.ui.i18n.I18n.placeDangerTitle(context),
+                        text = com.safecomm.app.ui.i18n.I18n.placeDangerTitle(currentLanguage),
                         style = MaterialTheme.typography.titleLarge,
                         color = AlertShellingRed,
                         fontWeight = FontWeight.Bold
@@ -84,7 +85,7 @@ fun DangerReportDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = com.safecomm.app.ui.i18n.I18n.close(context),
+                            contentDescription = com.safecomm.app.ui.i18n.I18n.close(currentLanguage),
                             tint = TelegramTextSecondary
                         )
                     }
@@ -92,14 +93,14 @@ fun DangerReportDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = com.safecomm.app.ui.i18n.I18n.chooseDangerDesc(context),
+                    text = com.safecomm.app.ui.i18n.I18n.chooseDangerDesc(currentLanguage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TelegramTextSecondary,
                     textAlign = TextAlign.Start,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Danger Categories 3x2 Grid
                 val categories = AlertType.entries
@@ -123,7 +124,7 @@ fun DangerReportDialog(
                                 Card(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(80.dp)
+                                        .height(76.dp)
                                         .border(
                                             width = if (isSelected) 2.dp else 1.dp,
                                             color = if (isSelected) catColor else TelegramDivider,
@@ -140,10 +141,10 @@ fun DangerReportDialog(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        Text(text = cat.icon, fontSize = 28.sp)
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(text = cat.icon, fontSize = 26.sp)
+                                        Spacer(modifier = Modifier.height(3.dp))
                                         Text(
-                                            text = com.safecomm.app.ui.i18n.I18n.alertTypeName(context, cat.rawValue),
+                                            text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, cat.rawValue),
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             color = if (isSelected) Color.White else TelegramTextSecondary
@@ -155,13 +156,73 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Alert Expiry / Duration Selector
+                Text(
+                    text = com.safecomm.app.ui.i18n.I18n.alertDurationLabel(currentLanguage),
+                    fontSize = 12.sp,
+                    color = TelegramTextSecondary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                val durations = listOf(
+                    15 to com.safecomm.app.ui.i18n.I18n.duration15m(currentLanguage),
+                    30 to com.safecomm.app.ui.i18n.I18n.duration30m(currentLanguage),
+                    60 to com.safecomm.app.ui.i18n.I18n.duration1h(currentLanguage),
+                    120 to com.safecomm.app.ui.i18n.I18n.duration2h(currentLanguage),
+                    240 to com.safecomm.app.ui.i18n.I18n.duration4h(currentLanguage)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    durations.forEach { (mins, label) ->
+                        val isSelected = selectedDurationMinutes == mins
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .border(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) TelegramBlue else TelegramDivider.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { selectedDurationMinutes = mins },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) TelegramBlue.copy(alpha = 0.25f) else TelegramDarkCard
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) Color.White else TelegramTextSecondary,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Optional description input
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    placeholder = { Text(com.safecomm.app.ui.i18n.I18n.dangerDetailsHint(context), color = TelegramTextSecondary, fontSize = 13.sp) },
+                    placeholder = {
+                        Text(
+                            com.safecomm.app.ui.i18n.I18n.dangerDetailsHint(currentLanguage),
+                            color = TelegramTextSecondary,
+                            fontSize = 13.sp
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -175,7 +236,7 @@ fun DangerReportDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // HOLD TO CONFIRM BUTTON (False-trigger protection)
                 Box(
@@ -185,7 +246,7 @@ fun DangerReportDialog(
                         .clip(RoundedCornerShape(16.dp))
                         .background(TelegramDarkCard)
                         .border(1.dp, AlertShellingRed.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .pointerInput(selectedType, description) {
+                        .pointerInput(selectedType, description, selectedDurationMinutes) {
                             detectTapGestures(
                                 onPress = {
                                     isHolding = true
@@ -194,7 +255,7 @@ fun DangerReportDialog(
                                         val stepMs = 50L
                                         var elapsed = 0L
                                         while (elapsed < totalMs && isHolding) {
-                                             delay(stepMs)
+                                            delay(stepMs)
                                             elapsed += stepMs
                                             holdProgress = (elapsed.toFloat() / totalMs).coerceIn(0f, 1f)
                                             if (elapsed % 300 == 0L) {
@@ -202,7 +263,7 @@ fun DangerReportDialog(
                                             }
                                         }
                                         if (holdProgress >= 1.0f) {
-                                            onConfirmAlert(selectedType, description)
+                                            onConfirmAlert(selectedType, description, selectedDurationMinutes)
                                         }
                                     }
                                     tryAwaitRelease()
@@ -228,7 +289,7 @@ fun DangerReportDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isHolding) com.safecomm.app.ui.i18n.I18n.holdingProgress(context, (holdProgress * 100).toInt()) else com.safecomm.app.ui.i18n.I18n.holdToBroadcastPrompt(context),
+                            text = if (isHolding) com.safecomm.app.ui.i18n.I18n.holdingProgress(currentLanguage, (holdProgress * 100).toInt()) else com.safecomm.app.ui.i18n.I18n.holdToBroadcastPrompt(currentLanguage),
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
@@ -237,10 +298,10 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 TextButton(onClick = onDismiss) {
-                    Text(com.safecomm.app.ui.i18n.I18n.cancel(context), color = TelegramTextSecondary)
+                    Text(com.safecomm.app.ui.i18n.I18n.cancel(currentLanguage), color = TelegramTextSecondary)
                 }
             }
         }

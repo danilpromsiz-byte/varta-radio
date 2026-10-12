@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.safecomm.app.data.model.Group
 import com.safecomm.app.data.model.GroupMember
+import com.safecomm.app.ui.i18n.AppLanguage
 import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.theme.*
 
@@ -37,6 +38,7 @@ fun GroupMembersDialog(
     currentUserId: Long,
     isChiefAdmin: Boolean,
     isAdmin: Boolean,
+    currentLanguage: AppLanguage = AppLanguage.EN,
     onDelegateAdmin: (GroupMember, Boolean) -> Unit,
     onKickMember: (GroupMember) -> Unit,
     onBanMember: (GroupMember, Long) -> Unit,
@@ -67,19 +69,19 @@ fun GroupMembersDialog(
                 ) {
                     Column {
                         Text(
-                            text = group?.name ?: I18n.appTitle(context),
+                            text = group?.name ?: I18n.appTitle(currentLanguage),
                             style = MaterialTheme.typography.titleMedium,
                             color = TelegramTextPrimary,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = I18n.membersDialogTitle(context, members.size),
+                            text = I18n.membersDialogTitle(currentLanguage, members.size),
                             fontSize = 12.sp,
                             color = TelegramTextSecondary
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = I18n.close(context), tint = TelegramTextSecondary)
+                        Icon(imageVector = Icons.Default.Close, contentDescription = I18n.close(currentLanguage), tint = TelegramTextSecondary)
                     }
                 }
 
@@ -94,7 +96,7 @@ fun GroupMembersDialog(
                             .clickable {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Varta Channel Code", code))
-                                Toast.makeText(context, "ID copied", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.copiedToClipboard(context), Toast.LENGTH_SHORT).show()
                             },
                         colors = CardDefaults.cardColors(containerColor = TelegramDarkCard)
                     ) {
@@ -106,7 +108,7 @@ fun GroupMembersDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(I18n.roomLabel(context), fontSize = 11.sp, color = TelegramTextSecondary)
+                                Text(I18n.roomLabel(currentLanguage), fontSize = 11.sp, color = TelegramTextSecondary)
                                 Text(code, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TelegramBlue)
                             }
                             Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Copy", tint = TelegramBlue)
@@ -157,9 +159,9 @@ fun GroupMembersDialog(
                                     )
 
                                     val roleText = when (member.role) {
-                                        "owner" -> I18n.ownerBadge(context)
-                                        "admin" -> I18n.adminBadge(context)
-                                        else -> I18n.memberBadge(context)
+                                        "owner" -> I18n.ownerBadge(currentLanguage)
+                                        "admin" -> I18n.adminBadge(currentLanguage)
+                                        else -> I18n.memberBadge(currentLanguage)
                                     }
                                     val roleColor = when (member.role) {
                                         "owner" -> Color(0xFFFFD600)
@@ -189,7 +191,7 @@ fun GroupMembersDialog(
                                             tint = AlertShellingRed
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Action", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(I18n.actionManageBtn(currentLanguage), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -236,7 +238,7 @@ fun GroupMembersDialog(
                             )
                         ) {
                             Text(
-                                text = if (isTargetAdmin) I18n.removeAdminBtn(context) else I18n.makeAdminBtn(context),
+                                text = if (isTargetAdmin) I18n.removeAdminBtn(currentLanguage) else I18n.makeAdminBtn(currentLanguage),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
@@ -254,7 +256,7 @@ fun GroupMembersDialog(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
                     ) {
-                        Text(I18n.kickBtn(context), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(I18n.kickBtn(currentLanguage), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
 
                     // 3. BAN 15 min
@@ -267,7 +269,7 @@ fun GroupMembersDialog(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertShellingRed)
                     ) {
-                        Text(I18n.ban15mBtn(context), fontSize = 12.sp)
+                        Text(I18n.ban15mBtn(currentLanguage), fontSize = 12.sp)
                     }
 
                     // 4. BAN 1 hour
@@ -280,7 +282,7 @@ fun GroupMembersDialog(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertShellingRed)
                     ) {
-                        Text(I18n.ban1hBtn(context), fontSize = 12.sp)
+                        Text(I18n.ban1hBtn(currentLanguage), fontSize = 12.sp)
                     }
 
                     // 5. BAN 24 hours
@@ -293,7 +295,7 @@ fun GroupMembersDialog(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertShellingRed)
                     ) {
-                        Text(I18n.ban24hBtn(context), fontSize = 12.sp)
+                        Text(I18n.ban24hBtn(currentLanguage), fontSize = 12.sp)
                     }
 
                     // 6. BAN FOREVER
@@ -306,14 +308,14 @@ fun GroupMembersDialog(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
                     ) {
-                        Text(I18n.banForeverBtn(context), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(I18n.banForeverBtn(currentLanguage), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { selectedMemberForModeration = null }) {
-                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                    Text(I18n.cancel(currentLanguage), color = TelegramTextSecondary)
                 }
             },
             containerColor = TelegramDarkSurface

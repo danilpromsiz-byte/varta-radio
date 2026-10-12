@@ -38,14 +38,14 @@ fun PhotoReportDialog(
     onLaunchCamera: () -> Unit,
     onDismiss: () -> Unit,
     onConfirmReport: (type: AlertType, description: String) -> Unit,
-    onHapticTick: () -> Unit = {}
+    onHapticTick: () -> Unit = {},
+    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
     var selectedType by remember { mutableStateOf(AlertType.OTHER) }
     var description by remember { mutableStateOf("") }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -69,13 +69,17 @@ fun PhotoReportDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = com.safecomm.app.ui.i18n.I18n.photoFixationTitle(context),
+                        text = com.safecomm.app.ui.i18n.I18n.photoFixationTitle(currentLanguage),
                         style = MaterialTheme.typography.titleMedium,
                         color = PhotoActionBlue,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = com.safecomm.app.ui.i18n.I18n.close(context), tint = TelegramTextSecondary)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = com.safecomm.app.ui.i18n.I18n.close(currentLanguage),
+                            tint = TelegramTextSecondary
+                        )
                     }
                 }
 
@@ -108,7 +112,7 @@ fun PhotoReportDialog(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = com.safecomm.app.ui.i18n.I18n.tapToTakePhoto(context),
+                                text = com.safecomm.app.ui.i18n.I18n.tapToTakePhoto(currentLanguage),
                                 color = TelegramTextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
@@ -121,7 +125,7 @@ fun PhotoReportDialog(
 
                 // Danger Type Selection
                 Text(
-                    text = com.safecomm.app.ui.i18n.I18n.photoHazardTypeLabel(context),
+                    text = com.safecomm.app.ui.i18n.I18n.photoHazardTypeLabel(currentLanguage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TelegramTextSecondary,
                     modifier = Modifier.fillMaxWidth()
@@ -155,7 +159,7 @@ fun PhotoReportDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    placeholder = { Text(com.safecomm.app.ui.i18n.I18n.photoDetailsHint(context), color = TelegramTextSecondary, fontSize = 13.sp) },
+                    placeholder = { Text(com.safecomm.app.ui.i18n.I18n.photoDetailsHint(currentLanguage), color = TelegramTextSecondary, fontSize = 13.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -215,7 +219,7 @@ fun PhotoReportDialog(
 
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (isHolding) com.safecomm.app.ui.i18n.I18n.holdingProgress(context, (holdProgress * 100).toInt()) else com.safecomm.app.ui.i18n.I18n.holdToSendPhotoPrompt(context),
+                            text = if (isHolding) com.safecomm.app.ui.i18n.I18n.holdingProgress(currentLanguage, (holdProgress * 100).toInt()) else com.safecomm.app.ui.i18n.I18n.holdToSendPhotoPrompt(currentLanguage),
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
@@ -226,7 +230,7 @@ fun PhotoReportDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TextButton(onClick = onDismiss) {
-                    Text(com.safecomm.app.ui.i18n.I18n.cancel(context), color = TelegramTextSecondary)
+                    Text(com.safecomm.app.ui.i18n.I18n.cancel(currentLanguage), color = TelegramTextSecondary)
                 }
             }
         }

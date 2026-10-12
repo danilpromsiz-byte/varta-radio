@@ -31,9 +31,9 @@ fun VoiceHistoryDialog(
     isPlaying: Boolean,
     onPlayVoice: (VoiceMessage) -> Unit,
     onStopVoice: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     var currentlyPlayingId by remember { mutableStateOf<Long?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -57,13 +57,17 @@ fun VoiceHistoryDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = com.safecomm.app.ui.i18n.I18n.voiceHistoryTitle(context),
+                        text = com.safecomm.app.ui.i18n.I18n.voiceHistoryTitle(currentLanguage),
                         style = MaterialTheme.typography.titleMedium,
                         color = TelegramBlue,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = com.safecomm.app.ui.i18n.I18n.close(context), tint = TelegramTextSecondary)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = com.safecomm.app.ui.i18n.I18n.close(currentLanguage),
+                            tint = TelegramTextSecondary
+                        )
                     }
                 }
 
@@ -72,7 +76,7 @@ fun VoiceHistoryDialog(
                 if (voiceMessages.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = com.safecomm.app.ui.i18n.I18n.noVoiceMessages(context),
+                            text = com.safecomm.app.ui.i18n.I18n.noVoiceMessages(currentLanguage),
                             color = TelegramTextSecondary,
                             fontSize = 14.sp
                         )
@@ -139,9 +143,39 @@ fun VoiceHistoryDialog(
                                         )
                                     }
 
+                                    val displayTime = remember(msg.createdAt) {
+                                        val raw = msg.createdAt.trim()
+                                        when {
+                                            raw.isEmpty() || raw == "Только что" -> {
+                                                java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                                            }
+                                            raw.length <= 5 && raw.contains(":") -> raw
+                                            raw.contains("T") -> {
+                                                try {
+                                                    raw.substringAfter("T").take(5)
+                                                } catch (_: Exception) {
+                                                    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                                                }
+                                            }
+                                            raw.contains(":") -> {
+                                                try {
+                                                    val parts = raw.split(":")
+                                                    if (parts.size >= 2) {
+                                                        val h = parts[0].takeLast(2)
+                                                        val m = parts[1].take(2)
+                                                        "$h:$m"
+                                                    } else raw
+                                                } catch (_: Exception) {
+                                                    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                                                }
+                                            }
+                                            else -> java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                                        }
+                                    }
+
                                     Text(
-                                        text = msg.createdAt.takeLast(8).take(5), // HH:mm
-                                        fontSize = 11.sp,
+                                        text = displayTime,
+                                        fontSize = 12.sp,
                                         color = TelegramTextSecondary
                                     )
                                 }

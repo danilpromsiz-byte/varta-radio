@@ -40,12 +40,42 @@ class WalkieTalkieManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var amplitudeJob: Job? = null
 
+    // --- Audio Cues (Start Chirp & Roger Beep) ---
+
+    fun playPttStartChirp() {
+        scope.launch {
+            try {
+                val toneGen = android.media.ToneGenerator(AudioManager.STREAM_MUSIC, 70)
+                toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 70)
+                delay(90)
+                toneGen.release()
+            } catch (e: Exception) {
+                Log.e("WalkieTalkie", "Start chirp failed", e)
+            }
+        }
+    }
+
+    fun playRogerBeep() {
+        scope.launch {
+            try {
+                val toneGen = android.media.ToneGenerator(AudioManager.STREAM_MUSIC, 75)
+                toneGen.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 120)
+                delay(150)
+                toneGen.release()
+            } catch (e: Exception) {
+                Log.e("WalkieTalkie", "Roger beep failed", e)
+            }
+        }
+    }
+
     // --- Recording (Push-to-Talk) ---
 
     fun startRecording(): Boolean {
         if (_isRecording.value) return false
 
         try {
+            playPttStartChirp()
+
             val cacheDir = context.cacheDir
             val file = File(cacheDir, "ptt_${System.currentTimeMillis()}.m4a")
             currentRecordFile = file
@@ -109,6 +139,8 @@ class WalkieTalkieManager(private val context: Context) {
             _isRecording.value = false
         }
 
+        playRogerBeep()
+
         val file = currentRecordFile
         val durationMs = System.currentTimeMillis() - recordStartTime
         val durationSec = (durationMs / 1000).toInt().coerceAtLeast(1)
@@ -126,6 +158,9 @@ class WalkieTalkieManager(private val context: Context) {
 
     fun playLiveVoiceMessage(audioUrl: String, senderNick: String) {
         scope.launch {
+            playPttStartChirp()
+            delay(100)
+
             withContext(Dispatchers.Main) {
                 stopPlayback()
 
@@ -146,6 +181,7 @@ class WalkieTalkieManager(private val context: Context) {
                         )
                         setDataSource(context, Uri.parse(audioUrl))
                         setOnCompletionListener {
+                            playRogerBeep()
                             stopPlayback()
                         }
                         setOnErrorListener { _, _, _ ->
@@ -178,6 +214,7 @@ class WalkieTalkieManager(private val context: Context) {
                 )
                 setDataSource(context, Uri.parse(urlOrPath))
                 setOnCompletionListener {
+                    playRogerBeep()
                     stopPlayback()
                     onComplete()
                 }

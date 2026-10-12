@@ -159,7 +159,8 @@ class MainActivity : ComponentActivity() {
         var voiceMessages by remember { mutableStateOf<List<VoiceMessage>>(emptyList()) }
 
         val mainPrefs = remember { getSharedPreferences("varta_main_prefs", android.content.Context.MODE_PRIVATE) }
-        var isMuted by remember { mutableStateOf(mainPrefs.getBoolean("is_muted", false)) }
+        val audioModeString = mainPrefs.getString("audio_mode", AudioMode.SOUND.name) ?: AudioMode.SOUND.name
+        var audioMode by remember { mutableStateOf(try { AudioMode.valueOf(audioModeString) } catch (e: Exception) { AudioMode.SOUND }) }
 
         val isConnected by telegramClient.isSectorConnected.collectAsState()
         val connectionStatusText by telegramClient.connectionStatusText.collectAsState()
@@ -177,6 +178,15 @@ class MainActivity : ComponentActivity() {
         val isPlayingVoice by walkieTalkieManager.isPlaying.collectAsState()
         val currentSpeaker by walkieTalkieManager.currentSpeaker.collectAsState()
         val amplitude by walkieTalkieManager.amplitude.collectAsState()
+
+        // Auto-prune expired alerts periodically
+        LaunchedEffect(Unit) {
+            while (true) {
+                val now = System.currentTimeMillis()
+                alerts = alerts.filter { it.expiresAt <= 0L || it.expiresAt > now }
+                kotlinx.coroutines.delay(30 * 1000L)
+            }
+        }
 
         // Auto-check GitHub updates on launch and periodically every 10 minutes when NOT in a room
         LaunchedEffect(authState) {
@@ -196,30 +206,40 @@ class MainActivity : ComponentActivity() {
                         // Handled directly via isSectorConnected StateFlow
                     }
                     is TelegramLiveEvent.LiveVoice -> {
-                        // Play loud over loudspeaker unless muted!
-                        if (!isMuted) {
-                            walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick)
-                        } else {
-                            Toast.makeText(this@MainActivity, "🎙 Голосовое от ${event.senderNick} (Без звука)", Toast.LENGTH_SHORT).show()
+                        when (audioMode) {
+                            AudioMode.SOUND -> {
+                                walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick)
+                            }
+                            AudioMode.VIBRATE -> {
+                                alertNotificationManager.triggerHapticAlert()
+                                Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeVibrate(appLanguage) + ")", Toast.LENGTH_SHORT).show()
+                            }
+                            AudioMode.SILENT -> {
+                                Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeSilent(appLanguage) + ")", Toast.LENGTH_SHORT).show()
+                            }
                         }
                         val newVoice = VoiceMessage(
                             id = event.messageId,
                             senderNick = event.senderNick,
                             filePath = event.fileUrl,
                             durationSec = event.durationSec,
-                            createdAt = "Только что"
+                            createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
                         )
                         voiceMessages = listOf(newVoice) + voiceMessages.filter { it.id != event.messageId }
                     }
                     is TelegramLiveEvent.LiveAlert -> {
-                        // Sound siren check & vibration
-                        alertNotificationManager.checkAndNotify(
-                            alert = event.alert,
-                            userLat = userLat,
-                            userLng = userLng,
-                            radiusKm = alertRadiusKm,
-                            soundEnabled = soundEnabled
-                        )
+                        when (audioMode) {
+                            AudioMode.SOUND -> {
+                                alertNotificationManager.triggerRoomSiren()
+                                alertNotificationManager.triggerHapticAlert()
+                            }
+                            AudioMode.VIBRATE -> {
+                                alertNotificationManager.triggerHapticAlert()
+                            }
+                            AudioMode.SILENT -> {
+                                // Visual alert only
+                            }
+                        }
                         alerts = listOf(event.alert) + alerts.filter { it.id != event.alert.id }
                     }
                     is TelegramLiveEvent.LiveAlertResolved -> {
@@ -337,11 +357,19 @@ class MainActivity : ComponentActivity() {
                     members = currentMembers,
                     userAvatar = telegramClient.userAvatar,
                     onChangeAvatar = { telegramClient.userAvatar = it },
-                    isMuted = isMuted,
-                    onToggleMute = {
-                        isMuted = !isMuted
-                        mainPrefs.edit().putBoolean("is_muted", isMuted).apply()
-                        val msg = if (isMuted) "🔇 Режим «Без звука» включён" else "🔊 Громкий эфир рации включён"
+                    audioMode = audioMode,
+                    onToggleAudioMode = {
+                        audioMode = when (audioMode) {
+                            AudioMode.SOUND -> AudioMode.VIBRATE
+                            AudioMode.VIBRATE -> AudioMode.SILENT
+                            AudioMode.SILENT -> AudioMode.SOUND
+                        }
+                        mainPrefs.edit().putString("audio_mode", audioMode.name).apply()
+                        val msg = when (audioMode) {
+                            AudioMode.SOUND -> "🔊 " + I18n.audioModeSound(appLanguage)
+                            AudioMode.VIBRATE -> "📳 " + I18n.audioModeVibrate(appLanguage)
+                            AudioMode.SILENT -> "🔇 " + I18n.audioModeSilent(appLanguage)
+                        }
                         Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
                     },
                     alerts = alerts,
@@ -437,12 +465,12 @@ class MainActivity : ComponentActivity() {
                     onLaunchCamera = {
                         launchCameraCapture { uri -> capturedUri = uri }
                     },
-                    onConfirmAlert = { type, desc ->
+                    onConfirmAlert = { type, desc, durationMinutes ->
                         alertNotificationManager.triggerHapticFeedback(isLong = true)
                         coroutineScope.launch {
                             val alertLat = if (userLat != 0.0) userLat else (locationHelper.currentLocation.value?.latitude ?: 50.4501)
                             val alertLng = if (userLng != 0.0) userLng else (locationHelper.currentLocation.value?.longitude ?: 30.5234)
-                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, null)
+                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, null, durationMinutes)
                                 .onSuccess { alert ->
                                     alerts = listOf(alert) + alerts.filter { it.id != alert.id }
                                     Toast.makeText(this@MainActivity, "Метка объявлена в эфире!", Toast.LENGTH_SHORT).show()
@@ -458,7 +486,7 @@ class MainActivity : ComponentActivity() {
                             val alertLat = if (userLat != 0.0) userLat else (locationHelper.currentLocation.value?.latitude ?: 50.4501)
                             val alertLng = if (userLng != 0.0) userLng else (locationHelper.currentLocation.value?.longitude ?: 30.5234)
                             val photoToSend = currentPhotoFile
-                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, photoToSend)
+                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, photoToSend, 30)
                                 .onSuccess { alert ->
                                     alerts = listOf(alert) + alerts.filter { it.id != alert.id }
                                     capturedUri = null
@@ -475,7 +503,7 @@ class MainActivity : ComponentActivity() {
                             telegramClient.resolveAlert(alert.id)
                                 .onSuccess {
                                     alerts = alerts.filter { it.id != alert.id }
-                                    Toast.makeText(this@MainActivity, "Метка снята", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, I18n.threatResolvedToast(appLanguage), Toast.LENGTH_SHORT).show()
                                 }
                         }
                     },

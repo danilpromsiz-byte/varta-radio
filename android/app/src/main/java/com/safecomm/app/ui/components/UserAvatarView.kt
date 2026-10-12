@@ -43,6 +43,7 @@ data class PresetAvatar(
 )
 
 val PRESET_AVATARS = listOf(
+    // 1. Tactical & Recon
     PresetAvatar("shield", "Варта", "🛡️", Color(0xFF1976D2), Color(0xFF0D47A1)),
     PresetAvatar("eagle", "Сокол", "🦅", Color(0xFFF57C00), Color(0xFFE65100)),
     PresetAvatar("wolf", "Волк", "🐺", Color(0xFF546E7A), Color(0xFF263238)),
@@ -50,11 +51,41 @@ val PRESET_AVATARS = listOf(
     PresetAvatar("lightning", "Молния", "⚡", Color(0xFFFBC02D), Color(0xFFF57F17)),
     PresetAvatar("target", "Дозор", "🎯", Color(0xFFD32F2F), Color(0xFFB71C1C)),
     PresetAvatar("compass", "Штурман", "🧭", Color(0xFF0097A7), Color(0xFF006064)),
+    PresetAvatar("drone", "Дрон", "🚁", Color(0xFF7B1FA2), Color(0xFF4A148C)),
+    PresetAvatar("star", "Гвардеец", "🎖️", Color(0xFFC2185B), Color(0xFF880E4F)),
+
+    // 2. Predators & Stealth
     PresetAvatar("lion", "Лев", "🦁", Color(0xFFFFA000), Color(0xFFFF6F00)),
     PresetAvatar("bear", "Медведь", "🐻", Color(0xFF795548), Color(0xFF3E2723)),
-    PresetAvatar("star", "Гвардеец", "🎖️", Color(0xFFC2185B), Color(0xFF880E4F)),
-    PresetAvatar("drone", "Дрон", "🚁", Color(0xFF7B1FA2), Color(0xFF4A148C)),
-    PresetAvatar("tiger", "Тигр", "🐯", Color(0xFFFF5722), Color(0xFFBF360C))
+    PresetAvatar("tiger", "Тигр", "🐯", Color(0xFFFF5722), Color(0xFFBF360C)),
+    PresetAvatar("panther", "Пантера", "🐆", Color(0xFF37474F), Color(0xFF212121)),
+    PresetAvatar("fox", "Лис", "🦊", Color(0xFFFF7043), Color(0xFFD84315)),
+    PresetAvatar("cobra", "Кобра", "🐍", Color(0xFF2E7D32), Color(0xFF1B5E20)),
+    PresetAvatar("shark", "Акула", "🦈", Color(0xFF0277BD), Color(0xFF01579B)),
+    PresetAvatar("dragon", "Дракон", "🐉", Color(0xFFC62828), Color(0xFF880E4F)),
+    PresetAvatar("badger", "Барсук", "🦡", Color(0xFF455A64), Color(0xFF263238)),
+
+    // 3. Special Ops & Combat
+    PresetAvatar("ghost", "Призрак", "👻", Color(0xFF607D8B), Color(0xFF37474F)),
+    PresetAvatar("skull", "Череп", "💀", Color(0xFF424242), Color(0xFF212121)),
+    PresetAvatar("sniper", "Снайпер", "🔭", Color(0xFF4E342E), Color(0xFF3E2723)),
+    PresetAvatar("paratrooper", "Десант", "🪂", Color(0xFF1565C0), Color(0xFF0D47A1)),
+    PresetAvatar("swords", "Мечи", "⚔️", Color(0xFF6A1B9A), Color(0xFF4A148C)),
+    PresetAvatar("ninja", "Ниндзя", "🥷", Color(0xFF212121), Color(0xFF000000)),
+    PresetAvatar("knight", "Рыцарь", "🛡️", Color(0xFF5C6BC0), Color(0xFF283593)),
+    PresetAvatar("dagger", "Кинжал", "🗡️", Color(0xFFAD1457), Color(0xFF6A1B9A)),
+    PresetAvatar("samurai", "Самурай", "🥋", Color(0xFFB71C1C), Color(0xFF880E4F)),
+
+    // 4. Tech & High-Tech Radio
+    PresetAvatar("cyber", "Киборг", "🤖", Color(0xFF00ACC1), Color(0xFF006064)),
+    PresetAvatar("satellite", "Спутник", "🛰️", Color(0xFF3949AB), Color(0xFF1A237E)),
+    PresetAvatar("radar", "Радар", "📡", Color(0xFF00897B), Color(0xFF004D40)),
+    PresetAvatar("hacker", "Хакер", "💻", Color(0xFF43A047), Color(0xFF1B5E20)),
+    PresetAvatar("fire", "Пламя", "🔥", Color(0xFFFF3D00), Color(0xFFDD2C00)),
+    PresetAvatar("meteor", "Метеор", "☄️", Color(0xFFFF6D00), Color(0xFFE65100)),
+    PresetAvatar("rocket", "Ракета", "🚀", Color(0xFFD50000), Color(0xFFB71C1C)),
+    PresetAvatar("energy", "Энергия", "🔋", Color(0xFF7CB342), Color(0xFF33691E)),
+    PresetAvatar("crown", "Корона", "👑", Color(0xFFFFB300), Color(0xFFFF6F00))
 )
 
 fun getPresetAvatar(id: String): PresetAvatar {
@@ -121,7 +152,8 @@ fun UserAvatarView(
 fun AvatarSelectionDialog(
     currentAvatar: String,
     onSelectAvatar: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
     var selectedId by remember { mutableStateOf(currentAvatar) }
 
@@ -157,13 +189,17 @@ fun AvatarSelectionDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "👤 ВЫБОР АВАТАРА",
+                        text = "👤 ${com.safecomm.app.ui.i18n.I18n.avatarPresetTitle(currentLanguage)}",
                         style = MaterialTheme.typography.titleMedium,
                         color = TelegramTextPrimary,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть", tint = TelegramTextSecondary)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = com.safecomm.app.ui.i18n.I18n.close(currentLanguage),
+                            tint = TelegramTextSecondary
+                        )
                     }
                 }
 
@@ -189,7 +225,7 @@ fun AvatarSelectionDialog(
 
                 // Presets Grid
                 Text(
-                    text = "Тактические позывные значки:",
+                    text = "Тактические позывные значки (36):",
                     fontSize = 12.sp,
                     color = TelegramTextSecondary,
                     modifier = Modifier.fillMaxWidth()
@@ -201,7 +237,7 @@ fun AvatarSelectionDialog(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
+                        .height(240.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -245,7 +281,11 @@ fun AvatarSelectionDialog(
                 ) {
                     Icon(imageVector = Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Выбрать фото из галереи", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        com.safecomm.app.ui.i18n.I18n.avatarCustomPhoto(currentLanguage),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

@@ -71,6 +71,7 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    var selectedLang by remember(currentLanguage) { mutableStateOf(currentLanguage) }
     var selectedRadius by remember { mutableDoubleStateOf(currentRadius) }
     var isSoundOn by remember { mutableStateOf(soundEnabled) }
     var tokenInput by remember { mutableStateOf(botToken) }
@@ -81,7 +82,7 @@ fun SettingsDialog(
     var isTelegramBridgeEnabled by remember { mutableStateOf(initialTelegramBridgeEnabled) }
     var redirectionMessageInput by remember { mutableStateOf(initialRedirectionMessage) }
 
-    var isSuperAdminActive by remember { mutableStateOf(isSuperAdmin) }
+    var isSuperAdminActive by remember { mutableStateOf(false) }
     var showSuperAdminSecretDialog by remember { mutableStateOf(false) }
     var superAdminKeyInput by remember { mutableStateOf("") }
 
@@ -93,7 +94,13 @@ fun SettingsDialog(
 
     val scrollState = rememberScrollState()
 
-    Dialog(onDismissRequest = onDismiss) {
+    val handleDismiss = {
+        isSuperAdminActive = false
+        superAdminKeyInput = ""
+        onDismiss()
+    }
+
+    Dialog(onDismissRequest = handleDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -115,13 +122,13 @@ fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "⚙️ ${I18n.settingsTitle(context)}",
+                        text = "⚙️ ${I18n.settingsTitle(selectedLang)}",
                         style = MaterialTheme.typography.titleMedium,
                         color = TelegramTextPrimary,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = I18n.close(context), tint = TelegramTextSecondary)
+                    IconButton(onClick = handleDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = I18n.close(selectedLang), tint = TelegramTextSecondary)
                     }
                 }
 
@@ -131,7 +138,7 @@ fun SettingsDialog(
                 // 1. LANGUAGE SELECTOR (Order: EN, UK, RU)
                 // =====================================================================
                 Text(
-                    text = "🌍 ${I18n.languageSection(context)}",
+                    text = "🌍 ${I18n.languageSection(selectedLang)}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
@@ -142,7 +149,7 @@ fun SettingsDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     AppLanguage.entries.forEach { lang ->
-                        val isSelected = currentLanguage == lang
+                        val isSelected = selectedLang == lang
                         Card(
                             modifier = Modifier
                                 .weight(1f)
@@ -153,7 +160,10 @@ fun SettingsDialog(
                                     color = if (isSelected) TelegramBlue else TelegramDivider,
                                     shape = RoundedCornerShape(10.dp)
                                 )
-                                .clickable { onLanguageChange(lang) },
+                                .clickable {
+                                    selectedLang = lang
+                                    onLanguageChange(lang)
+                                },
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isSelected) TelegramBlue.copy(alpha = 0.2f) else TelegramDarkCard
                             ),
@@ -183,7 +193,7 @@ fun SettingsDialog(
                 // 2. APP UPDATES SECTION (Restored & Enhanced)
                 // =====================================================================
                 Text(
-                    text = I18n.updatesSection(context),
+                    text = I18n.updatesSection(selectedLang),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
@@ -201,7 +211,7 @@ fun SettingsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = I18n.currentVersionLabel(context, appVersion),
+                                text = I18n.currentVersionLabel(selectedLang, appVersion),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TelegramTextPrimary
@@ -239,7 +249,7 @@ fun SettingsDialog(
                                 trackColor = TelegramDarkBg
                             )
                             Text(
-                                text = I18n.downloadingUpdateStatus(context, downloadProgress),
+                                text = I18n.downloadingUpdateStatus(selectedLang, downloadProgress),
                                 fontSize = 11.sp,
                                 color = TelegramTextSecondary,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -260,7 +270,7 @@ fun SettingsDialog(
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(I18n.checkForUpdatesBtn(context), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(I18n.checkForUpdatesBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
 
                             if (isUpdateAvailable) {
@@ -272,7 +282,7 @@ fun SettingsDialog(
                                 ) {
                                     Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(I18n.installUpdateBtn(context), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(I18n.installUpdateBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -285,7 +295,7 @@ fun SettingsDialog(
                 // 3. AUDIO & LOUDSPEAKER
                 // =====================================================================
                 Text(
-                    text = "🔊 ${I18n.audioSection(context)}",
+                    text = "🔊 ${I18n.audioSection(selectedLang)}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
@@ -304,14 +314,14 @@ fun SettingsDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = I18n.muteSpeakerTitle(context),
+                                    text = I18n.muteSpeakerTitle(selectedLang),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TelegramTextPrimary
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = I18n.muteSpeakerDesc(context),
+                                    text = I18n.muteSpeakerDesc(selectedLang),
                                     fontSize = 11.sp,
                                     color = TelegramTextSecondary
                                 )
@@ -336,7 +346,7 @@ fun SettingsDialog(
                 // 4. SECURITY & STORAGE (Auto-Delete 24h & Redirection)
                 // =====================================================================
                 Text(
-                    text = "🛡️ ${I18n.storageSection(context)}",
+                    text = "🛡️ ${I18n.storageSection(selectedLang)}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
@@ -356,14 +366,14 @@ fun SettingsDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = I18n.autoDeleteToggle(context),
+                                    text = I18n.autoDeleteToggle(selectedLang),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TelegramTextPrimary
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = I18n.ephemeralDesc(context),
+                                    text = I18n.ephemeralDesc(selectedLang),
                                     fontSize = 11.sp,
                                     color = TelegramTextSecondary
                                 )
@@ -387,7 +397,7 @@ fun SettingsDialog(
 
                         // Redirection Announcement note for empty room visitors
                         Text(
-                            text = I18n.redirectionSection(context),
+                            text = I18n.redirectionSection(selectedLang),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TelegramTextPrimary
@@ -396,7 +406,7 @@ fun SettingsDialog(
                         OutlinedTextField(
                             value = redirectionMessageInput,
                             onValueChange = { redirectionMessageInput = it },
-                            placeholder = { Text(I18n.redirectionHint(context), fontSize = 11.sp, color = TelegramTextSecondary) },
+                            placeholder = { Text(I18n.redirectionHint(selectedLang), fontSize = 11.sp, color = TelegramTextSecondary) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -418,7 +428,7 @@ fun SettingsDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text(I18n.saveRedirectionBtn(context), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(I18n.saveRedirectionBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -429,7 +439,7 @@ fun SettingsDialog(
                 if (bannedUsers.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = I18n.bannedMembersSection(context),
+                        text = I18n.bannedMembersSection(selectedLang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlertShellingRed
@@ -458,7 +468,7 @@ fun SettingsDialog(
                                         modifier = Modifier.height(34.dp),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
-                                        Text(I18n.unbanBtn(context), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(I18n.unbanBtn(selectedLang), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -477,7 +487,7 @@ fun SettingsDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(I18n.save(context), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(I18n.save(selectedLang), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -491,14 +501,14 @@ fun SettingsDialog(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            onDismiss()
+                            handleDismiss()
                             onLeaveRoom()
                         },
                         modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
                     ) {
-                        Text(I18n.leaveRoomBtn(context), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(I18n.leaveRoomBtn(selectedLang), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Only Chief Admin / Creator (or unlocked Superadmin) can delete room
@@ -509,7 +519,7 @@ fun SettingsDialog(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
                         ) {
-                            Text(I18n.deleteRoomBtn(context), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(I18n.deleteRoomBtn(selectedLang), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -552,26 +562,26 @@ fun SettingsDialog(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
             title = {
-                Text(I18n.deleteRoomConfirmTitle(context), fontWeight = FontWeight.Bold, color = AlertShellingRed)
+                Text(I18n.deleteRoomConfirmTitle(selectedLang), fontWeight = FontWeight.Bold, color = AlertShellingRed)
             },
             text = {
-                Text(I18n.deleteRoomConfirmText(context), color = TelegramTextPrimary, fontSize = 14.sp)
+                Text(I18n.deleteRoomConfirmText(selectedLang), color = TelegramTextPrimary, fontSize = 14.sp)
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteConfirmDialog = false
-                        onDismiss()
+                        handleDismiss()
                         onDeleteRoom?.invoke()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
                 ) {
-                    Text(I18n.deleteRoomConfirmAction(context), fontWeight = FontWeight.Bold)
+                    Text(I18n.deleteRoomConfirmAction(selectedLang), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                    Text(I18n.cancel(selectedLang), color = TelegramTextSecondary)
                 }
             },
             containerColor = TelegramDarkSurface
@@ -580,23 +590,29 @@ fun SettingsDialog(
 
     // Modal Secret Easter Egg: Super Admin Master Terminal
     if (showSuperAdminSecretDialog) {
+        val closeSuperAdminModal = {
+            showSuperAdminSecretDialog = false
+            isSuperAdminActive = false
+            superAdminKeyInput = ""
+        }
+
         AlertDialog(
-            onDismissRequest = { showSuperAdminSecretDialog = false },
+            onDismissRequest = closeSuperAdminModal,
             title = {
-                Text(I18n.superAdminSection(context), fontWeight = FontWeight.Bold, color = Color(0xFFFFD600))
+                Text(I18n.superAdminSection(selectedLang), fontWeight = FontWeight.Bold, color = Color(0xFFFFD600))
             },
             text = {
                 Column {
                     if (isSuperAdminActive) {
                         Text(
-                            text = I18n.superAdminStatusActive(context),
+                            text = I18n.superAdminStatusActive(selectedLang),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFFFD600)
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = I18n.superAdminDesc(context),
+                            text = I18n.superAdminDesc(selectedLang),
                             fontSize = 12.sp,
                             color = TelegramTextSecondary
                         )
@@ -610,11 +626,11 @@ fun SettingsDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text(I18n.wipeAllRoomsBtn(context), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(I18n.wipeAllRoomsBtn(selectedLang), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     } else {
                         Text(
-                            text = "Введите мастер-пароль суперадмина для активации:",
+                            text = I18n.superAdminPrompt(selectedLang),
                             fontSize = 12.sp,
                             color = TelegramTextSecondary
                         )
@@ -622,7 +638,7 @@ fun SettingsDialog(
                         OutlinedTextField(
                             value = superAdminKeyInput,
                             onValueChange = { superAdminKeyInput = it },
-                            placeholder = { Text(I18n.superAdminKeyPlaceholder(context), fontSize = 12.sp, color = TelegramTextSecondary) },
+                            placeholder = { Text(I18n.superAdminKeyPlaceholder(selectedLang), fontSize = 12.sp, color = TelegramTextSecondary) },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
@@ -653,13 +669,13 @@ fun SettingsDialog(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
                     ) {
-                        Text(I18n.superAdminActivateBtn(context), fontWeight = FontWeight.Bold)
+                        Text(I18n.superAdminActivateBtn(selectedLang), fontWeight = FontWeight.Bold)
                     }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSuperAdminSecretDialog = false }) {
-                    Text(I18n.close(context), color = TelegramTextSecondary)
+                TextButton(onClick = closeSuperAdminModal) {
+                    Text(I18n.close(selectedLang), color = TelegramTextSecondary)
                 }
             },
             containerColor = TelegramDarkSurface
@@ -668,28 +684,34 @@ fun SettingsDialog(
 
     // Modal Confirmation: Wipe ALL rooms
     if (showWipeConfirmDialog) {
+        val closeWipeModal = {
+            showWipeConfirmDialog = false
+            isSuperAdminActive = false
+            superAdminKeyInput = ""
+        }
+
         AlertDialog(
-            onDismissRequest = { showWipeConfirmDialog = false },
+            onDismissRequest = closeWipeModal,
             title = {
-                Text(I18n.wipeAllRoomsConfirmTitle(context), fontWeight = FontWeight.Bold, color = AlertShellingRed)
+                Text(I18n.wipeAllRoomsConfirmTitle(selectedLang), fontWeight = FontWeight.Bold, color = AlertShellingRed)
             },
             text = {
-                Text(I18n.wipeAllRoomsConfirmText(context), color = TelegramTextPrimary, fontSize = 14.sp)
+                Text(I18n.wipeAllRoomsConfirmText(selectedLang), color = TelegramTextPrimary, fontSize = 14.sp)
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        showWipeConfirmDialog = false
+                        closeWipeModal()
                         onWipeAllRooms?.invoke()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
                 ) {
-                    Text(I18n.wipeAllRoomsConfirmAction(context), fontWeight = FontWeight.Bold)
+                    Text(I18n.wipeAllRoomsConfirmAction(selectedLang), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showWipeConfirmDialog = false }) {
-                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                TextButton(onClick = closeWipeModal) {
+                    Text(I18n.cancel(selectedLang), color = TelegramTextSecondary)
                 }
             },
             containerColor = TelegramDarkSurface

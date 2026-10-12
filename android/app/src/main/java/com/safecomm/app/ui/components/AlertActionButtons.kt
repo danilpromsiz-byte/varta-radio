@@ -35,10 +35,9 @@ import com.safecomm.app.ui.i18n.I18n
 fun AlertActionButtons(
     onTriggerAlarm: () -> Unit,
     onTriggerPhoto: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
-    val context = LocalContext.current
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -75,14 +74,14 @@ fun AlertActionButtons(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Warning,
-                        contentDescription = I18n.dangerBtn(context),
+                        contentDescription = I18n.dangerBtn(currentLanguage),
                         tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = I18n.dangerBtn(context),
+                    text = I18n.dangerBtn(currentLanguage),
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
@@ -123,14 +122,14 @@ fun AlertActionButtons(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
-                        contentDescription = I18n.photoBtn(context),
+                        contentDescription = I18n.photoBtn(currentLanguage),
                         tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = I18n.photoBtn(context),
+                    text = I18n.photoBtn(currentLanguage),
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,

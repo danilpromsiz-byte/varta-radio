@@ -250,8 +250,8 @@ fun AuthCommunityScreen(
                 OutlinedTextField(
                     value = callSign,
                     onValueChange = { callSign = it },
-                    label = { Text("Ваш позывной в эфире *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                    placeholder = { Text("Комбат, Дозор-1...", color = TelegramTextSecondary) },
+                    label = { Text(I18n.callSignFieldLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 12.sp) },
+                    placeholder = { Text(I18n.callSignFieldPlaceholder(currentLanguage), color = TelegramTextSecondary) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -270,7 +270,7 @@ fun AuthCommunityScreen(
         Spacer(modifier = Modifier.height(14.dp))
 
         // =========================================================================
-        // BLOCK 2: ROOM SELECTION (TABS: ВОЙТИ В КОМНАТУ / СОЗДАТЬ КОМНАТУ)
+        // BLOCK 2: ROOM SELECTION (TABS: JOIN ROOM / CREATE ROOM)
         // =========================================================================
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -296,7 +296,7 @@ fun AuthCommunityScreen(
                         onClick = { selectedTab = 0 },
                         text = {
                             Text(
-                                text = "Войти в комнату",
+                                text = I18n.tabJoinRoom(currentLanguage),
                                 fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
                                 fontSize = 13.sp,
                                 color = if (selectedTab == 0) TelegramBlue else TelegramTextSecondary
@@ -308,7 +308,7 @@ fun AuthCommunityScreen(
                         onClick = { selectedTab = 1 },
                         text = {
                             Text(
-                                text = "Создать комнату",
+                                text = I18n.tabCreateRoom(currentLanguage),
                                 fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
                                 fontSize = 13.sp,
                                 color = if (selectedTab == 1) TelegramBlue else TelegramTextSecondary
@@ -322,7 +322,7 @@ fun AuthCommunityScreen(
                 if (selectedTab == 0) {
                     // --- TAB 0: JOIN EXISTING ROOM ---
                     Text(
-                        text = "Введите название или номер комнаты, созданной командиром:",
+                        text = I18n.joinRoomPrompt(currentLanguage),
                         fontSize = 11.sp,
                         color = TelegramTextSecondary
                     )
@@ -332,8 +332,8 @@ fun AuthCommunityScreen(
                     OutlinedTextField(
                         value = channelNameInput,
                         onValueChange = { channelNameInput = it },
-                        label = { Text("Номер или название комнаты *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                        placeholder = { Text("102 или Сектор-3", color = TelegramTextSecondary) },
+                        label = { Text(I18n.roomFieldLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 12.sp) },
+                        placeholder = { Text(I18n.roomFieldPlaceholder(currentLanguage), color = TelegramTextSecondary) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -352,8 +352,8 @@ fun AuthCommunityScreen(
                     OutlinedTextField(
                         value = groupPassword,
                         onValueChange = { groupPassword = it },
-                        label = { Text("Секретный пароль комнаты *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                        placeholder = { Text("Пароль для доступа в эфир", color = TelegramTextSecondary) },
+                        label = { Text(I18n.passwordFieldLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 12.sp) },
+                        placeholder = { Text(I18n.passwordFieldPlaceholder(currentLanguage), color = TelegramTextSecondary) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
@@ -381,7 +381,7 @@ fun AuthCommunityScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), color = TelegramBlue, strokeWidth = 2.dp)
-                            Text("Поиск комнаты в эфире...", fontSize = 11.sp, color = TelegramTextSecondary)
+                            Text(I18n.searchingRoomStatus(currentLanguage), fontSize = 11.sp, color = TelegramTextSecondary)
                         }
                     } else if (existingChannelDescriptor != null) {
                         val descriptor = existingChannelDescriptor!!
@@ -398,14 +398,14 @@ fun AuthCommunityScreen(
                                 ) {
                                     Text("🟢", fontSize = 14.sp)
                                     Text(
-                                        text = "Комната «${descriptor.channelName}» найдена!",
+                                        text = I18n.roomFoundBanner(currentLanguage, descriptor.channelName),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
                                         color = Color(0xFF4CAF50)
                                     )
                                     Spacer(modifier = Modifier.weight(1f))
                                     Text(
-                                        text = "Создатель: ${descriptor.ownerCallSign}",
+                                        text = I18n.roomCreatorLabel(currentLanguage, descriptor.ownerCallSign),
                                         fontSize = 10.sp,
                                         color = TelegramTextSecondary
                                     )
@@ -424,7 +424,7 @@ fun AuthCommunityScreen(
                                                 Text("📢", fontSize = 14.sp)
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "Записка от создателя комнаты:",
+                                                    text = I18n.creatorNoteTitle(currentLanguage),
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 12.sp,
                                                     color = AlertFireOrange
@@ -444,7 +444,7 @@ fun AuthCommunityScreen(
                                 if (descriptor.isAbandoned) {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "⚠️ В комнате сейчас никого нет (создатель вышел). Доступ открыт по общему паролю.",
+                                        text = I18n.roomAbandonedWarning(currentLanguage),
                                         fontSize = 11.sp,
                                         color = Color(0xFFFFD600)
                                     )
@@ -458,15 +458,15 @@ fun AuthCommunityScreen(
                     Button(
                         onClick = {
                             if (callSign.isBlank()) {
-                                Toast.makeText(context, "Укажите ваш позывной", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.callSignRequiredToast(currentLanguage), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             if (channelNameInput.isBlank()) {
-                                Toast.makeText(context, "Укажите номер или название комнаты", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.roomNameRequiredToast(currentLanguage), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             if (groupPassword.isBlank()) {
-                                Toast.makeText(context, "Введите пароль комнаты", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.passwordRequiredToast(currentLanguage), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
 
@@ -484,13 +484,13 @@ fun AuthCommunityScreen(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
                     ) {
-                        Text("📻 ВОЙТИ В ЭФИР", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(I18n.enterAirBtn(currentLanguage), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
 
                 } else {
                     // --- TAB 1: CREATE NEW ROOM ---
                     Text(
-                        text = "Создайте новую закрытую комнату и станьте её владельцем:",
+                        text = I18n.createRoomPrompt(currentLanguage),
                         fontSize = 11.sp,
                         color = TelegramTextSecondary
                     )
@@ -505,8 +505,8 @@ fun AuthCommunityScreen(
                         OutlinedTextField(
                             value = channelNameInput,
                             onValueChange = { channelNameInput = it },
-                            label = { Text("Название или номер комнаты *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                            placeholder = { Text("102, Дозор-1...", color = TelegramTextSecondary) },
+                            label = { Text(I18n.newRoomFieldLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 12.sp) },
+                            placeholder = { Text(I18n.newRoomFieldPlaceholder(currentLanguage), color = TelegramTextSecondary) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -528,7 +528,7 @@ fun AuthCommunityScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
                         ) {
-                            Text("🎲 Номер", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(I18n.randomNumberBtn(currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -537,8 +537,8 @@ fun AuthCommunityScreen(
                     OutlinedTextField(
                         value = groupPassword,
                         onValueChange = { groupPassword = it },
-                        label = { Text("Секретный пароль для комнаты *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                        placeholder = { Text("Придумайте пароль", color = TelegramTextSecondary) },
+                        label = { Text(I18n.newPasswordFieldLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 12.sp) },
+                        placeholder = { Text(I18n.newPasswordFieldPlaceholder(currentLanguage), color = TelegramTextSecondary) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
@@ -571,9 +571,9 @@ fun AuthCommunityScreen(
                                 Text(if (isOwner) "👑" else "ℹ️", fontSize = 16.sp)
                                 Text(
                                     text = if (isOwner) {
-                                        "Это ваша созданная ранее комната. При вводе правильного пароля её настройки будут обновлены, и вы войдете как владелец."
+                                        I18n.yourExistingRoomNote(currentLanguage)
                                     } else {
-                                        "Комната «${desc.channelName}» уже зарегистрирована в сети. Если это ваша комната, введите её пароль для восстановления управления."
+                                        I18n.roomRegisteredNote(currentLanguage, desc.channelName)
                                     },
                                     fontSize = 11.sp,
                                     color = TelegramTextPrimary
@@ -600,13 +600,13 @@ fun AuthCommunityScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "⏳ Временные сообщения (Автоудаление 24ч)",
+                                text = I18n.ephemeralTitle(currentLanguage),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TelegramTextPrimary
                             )
                             Text(
-                                text = "Все сообщения и метки удаляются через 24 часа для безопасности.",
+                                text = I18n.ephemeralDesc(currentLanguage),
                                 fontSize = 10.sp,
                                 color = TelegramTextSecondary
                             )
@@ -631,13 +631,13 @@ fun AuthCommunityScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "✈️ Трансляция в Telegram (Закрытый канал)",
+                                text = I18n.telegramBridgeTitle(currentLanguage),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TelegramTextPrimary
                             )
                             Text(
-                                text = if (telegramBridgeEnabled) "Включено: транслировать в Telegram" else "Dark Room: общение абсолютно невидимо снаружи (только в Varta GO)",
+                                text = if (telegramBridgeEnabled) I18n.telegramBridgeEnabledDesc(currentLanguage) else I18n.telegramBridgeDisabledDesc(currentLanguage),
                                 fontSize = 10.sp,
                                 color = if (telegramBridgeEnabled) TelegramBlue else Color(0xFFFFD600)
                             )
@@ -649,15 +649,15 @@ fun AuthCommunityScreen(
                     Button(
                         onClick = {
                             if (callSign.isBlank()) {
-                                Toast.makeText(context, "Укажите ваш позывной", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.callSignRequiredToast(currentLanguage), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             if (channelNameInput.isBlank()) {
-                                Toast.makeText(context, "Укажите название комнаты", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.roomNameRequiredToast(currentLanguage), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             if (groupPassword.isBlank()) {
-                                Toast.makeText(context, "Укажите секретный пароль комнаты", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, I18n.passwordRequiredToast(currentLanguage), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
 
@@ -675,7 +675,7 @@ fun AuthCommunityScreen(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
                     ) {
-                        Text("🛡️ СОЗДАТЬ И ВОЙТИ В ЭФИР", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(I18n.createAndEnterBtn(currentLanguage), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
@@ -963,13 +963,13 @@ fun AuthCommunityScreen(
                         Text(text = "✈️", fontSize = 18.sp)
                         Column {
                             Text(
-                                text = "Подключение аккаунта Telegram (Опционально)",
+                                text = I18n.telegramSectionTitle(currentLanguage),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TelegramTextPrimary
                             )
                             Text(
-                                text = if (isAuthenticated) "✅ Авторизован в Telegram" else "Не требуется для автономного радиоэфира",
+                                text = if (isAuthenticated) I18n.telegramAuthorizedBadge(currentLanguage) else I18n.telegramNotRequiredBadge(currentLanguage),
                                 fontSize = 10.sp,
                                 color = if (isAuthenticated) Color(0xFF4CAF50) else TelegramTextSecondary
                             )
@@ -1001,13 +1001,13 @@ fun AuthCommunityScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = "Сессия активна: @${state.user.usernames?.activeUsernames?.firstOrNull() ?: state.user.firstName}",
+                                            text = I18n.telegramSessionActive(currentLanguage, state.user.usernames?.activeUsernames?.firstOrNull() ?: state.user.firstName),
                                             fontSize = 11.sp,
                                             color = Color(0xFF4CAF50),
                                             fontWeight = FontWeight.Bold
                                         )
                                         TextButton(onClick = onLogOutTelegram) {
-                                            Text("Выйти", color = AlertShellingRed, fontSize = 11.sp)
+                                            Text(I18n.telegramLogoutBtn(currentLanguage), color = AlertShellingRed, fontSize = 11.sp)
                                         }
                                     }
                                 }
@@ -1015,7 +1015,7 @@ fun AuthCommunityScreen(
 
                             is TdAuthState.WaitPhoneNumber, is TdAuthState.Initializing -> {
                                 Text(
-                                    text = "Если вы хотите управлять каналами через Telegram с ПК, укажите номер телефона:",
+                                    text = I18n.telegramPhonePrompt(currentLanguage),
                                     fontSize = 11.sp,
                                     color = TelegramTextSecondary
                                 )
@@ -1024,7 +1024,7 @@ fun AuthCommunityScreen(
                                 OutlinedTextField(
                                     value = inputPhone,
                                     onValueChange = { inputPhone = it.trim() },
-                                    label = { Text("Номер телефона (0... или +380...)", color = TelegramTextSecondary, fontSize = 11.sp) },
+                                    label = { Text(I18n.telegramPhoneLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 11.sp) },
                                     placeholder = { Text("099 779 98 80", color = TelegramTextSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     singleLine = true,
@@ -1050,13 +1050,13 @@ fun AuthCommunityScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
                                 ) {
-                                    Text("Получить код подтверждения", fontSize = 12.sp)
+                                    Text(I18n.telegramSendCodeBtn(currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
                             is TdAuthState.WaitCode -> {
                                 Text(
-                                    text = "Введите 5-значный код из Telegram для номера ${state.phoneNumber}:",
+                                    text = I18n.telegramCodePrompt(currentLanguage),
                                     fontSize = 11.sp,
                                     color = Color(0xFFFFD600)
                                 )
@@ -1067,7 +1067,7 @@ fun AuthCommunityScreen(
                                         inputCode = it.filter { ch -> ch.isDigit() }.take(5)
                                         if (inputCode.length == 5) onCheckAuthCode(inputCode)
                                     },
-                                    label = { Text("Код из Telegram", color = TelegramTextSecondary, fontSize = 11.sp) },
+                                    label = { Text(I18n.codeLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 11.sp) },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -1084,7 +1084,7 @@ fun AuthCommunityScreen(
 
                             is TdAuthState.WaitPassword -> {
                                 Text(
-                                    text = "Введите облачный пароль двухфакторной защиты 2FA Telegram:",
+                                    text = I18n.telegram2faPrompt(currentLanguage),
                                     fontSize = 11.sp,
                                     color = Color(0xFFFFD600)
                                 )
@@ -1092,7 +1092,7 @@ fun AuthCommunityScreen(
                                 OutlinedTextField(
                                     value = input2faPassword,
                                     onValueChange = { input2faPassword = it },
-                                    label = { Text("Облачный пароль 2FA", color = TelegramTextSecondary, fontSize = 11.sp) },
+                                    label = { Text(I18n.password2faLabel(currentLanguage), color = TelegramTextSecondary, fontSize = 11.sp) },
                                     singleLine = true,
                                     visualTransformation = PasswordVisualTransformation(),
                                     modifier = Modifier.fillMaxWidth(),
@@ -1113,7 +1113,7 @@ fun AuthCommunityScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
                                 ) {
-                                    Text(I18n.confirmPasswordBtn(context), fontSize = 12.sp)
+                                    Text(I18n.telegramConfirmBtn(currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -1129,7 +1129,7 @@ fun AuthCommunityScreen(
                                     modifier = Modifier.fillMaxWidth().height(36.dp),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text(I18n.logOutTelegram(context), fontSize = 11.sp, color = TelegramTextSecondary)
+                                    Text(I18n.logOutTelegram(currentLanguage), fontSize = 11.sp, color = TelegramTextSecondary)
                                 }
                             }
                         }

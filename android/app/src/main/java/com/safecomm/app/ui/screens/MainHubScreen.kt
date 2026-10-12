@@ -58,15 +58,15 @@ fun MainHubScreen(
     onStartPtt: () -> Unit,
     onStopPtt: () -> Unit,
     onLaunchCamera: () -> Unit,
-    onConfirmAlert: (type: AlertType, description: String) -> Unit,
+    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int) -> Unit,
     onConfirmPhotoReport: (type: AlertType, description: String) -> Unit,
     onResolveAlert: (Alert) -> Unit,
     onPlayHistoryVoice: (VoiceMessage) -> Unit,
     onStopHistoryVoice: () -> Unit,
     userAvatar: String = "shield",
     onChangeAvatar: (String) -> Unit = {},
-    isMuted: Boolean = false,
-    onToggleMute: () -> Unit = {},
+    audioMode: AudioMode = AudioMode.SOUND,
+    onToggleAudioMode: () -> Unit = {},
     onKickMember: (GroupMember) -> Unit,
     onBanMember: (GroupMember, Long) -> Unit = { _, _ -> },
     onDelegateAdmin: (GroupMember, Boolean) -> Unit = { _, _ -> },
@@ -123,6 +123,7 @@ fun MainHubScreen(
             userLng = userLng,
             alerts = alerts,
             onAlertClick = { selectedAlertForDetail = it },
+            currentLanguage = currentLanguage,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -152,7 +153,7 @@ fun MainHubScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
-                color = TelegramDarkSurface.copy(alpha = 0.94f),
+                color = TelegramDarkSurface.copy(alpha = 0.68f),
                 shadowElevation = 10.dp,
                 border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.6f))
             ) {
@@ -183,7 +184,7 @@ fun MainHubScreen(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = group?.name ?: I18n.appTitle(context),
+                                    text = group?.name ?: I18n.appTitle(currentLanguage),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TelegramTextPrimary,
@@ -193,35 +194,59 @@ fun MainHubScreen(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     imageVector = Icons.Default.SwapHoriz,
-                                    contentDescription = I18n.switchRoomTooltip(context),
+                                    contentDescription = I18n.switchRoomTooltip(currentLanguage),
                                     tint = Color(0xFFFFD600),
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
+                            val audioStatusText = when (audioMode) {
+                                AudioMode.SOUND -> I18n.audioModeSound(currentLanguage)
+                                AudioMode.VIBRATE -> I18n.audioModeVibrate(currentLanguage)
+                                AudioMode.SILENT -> I18n.audioModeSilent(currentLanguage)
+                            }
                             Text(
                                 text = if (isConnected) {
-                                    "${members.size} " + I18n.online(context) + (if (isMuted) " • ${I18n.silentModeBadge(context)}" else " • ${I18n.loudspeakerBadge(context)}")
-                                } else I18n.connecting(context),
+                                    "${members.size} " + I18n.online(currentLanguage) + " • " + audioStatusText
+                                } else I18n.connecting(currentLanguage),
                                 fontSize = 11.sp,
-                                color = if (isConnected) (if (isMuted) Color(0xFFFFD600) else TelegramTextSecondary) else AlertShellingRed
+                                color = if (isConnected) {
+                                    when (audioMode) {
+                                        AudioMode.SOUND -> Color(0xFFFFD600)
+                                        AudioMode.VIBRATE -> Color(0xFF64B5F6)
+                                        AudioMode.SILENT -> Color(0xFFFF5252)
+                                    }
+                                } else AlertShellingRed
                             )
                         }
                     }
 
-                    // Right: Quick Tactical Actions (Mute, Radio History, Members, Settings)
+                    // Right: Quick Tactical Actions (Audio Mode, Radio History, Members, Settings)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Speaker / Mute Toggle Button
+                        // 3-State Audio Mode Toggle Button (Sound 🔊 / Vibrate 📳 / Silent 🔇)
+                        val audioStatusDesc = when (audioMode) {
+                            AudioMode.SOUND -> I18n.audioModeSound(currentLanguage)
+                            AudioMode.VIBRATE -> I18n.audioModeVibrate(currentLanguage)
+                            AudioMode.SILENT -> I18n.audioModeSilent(currentLanguage)
+                        }
                         IconButton(
-                            onClick = onToggleMute,
+                            onClick = onToggleAudioMode,
                             modifier = Modifier.size(38.dp)
                         ) {
                             Icon(
-                                imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                                contentDescription = if (isMuted) "Unmute" else "Mute",
-                                tint = if (isMuted) Color(0xFFFF5252) else Color(0xFFFFD600),
+                                imageVector = when (audioMode) {
+                                    AudioMode.SOUND -> Icons.Default.VolumeUp
+                                    AudioMode.VIBRATE -> Icons.Default.Vibration
+                                    AudioMode.SILENT -> Icons.Default.VolumeOff
+                                },
+                                contentDescription = audioStatusDesc,
+                                tint = when (audioMode) {
+                                    AudioMode.SOUND -> Color(0xFFFFD600)
+                                    AudioMode.VIBRATE -> Color(0xFF64B5F6)
+                                    AudioMode.SILENT -> Color(0xFFFF5252)
+                                },
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -233,7 +258,7 @@ fun MainHubScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.History,
-                                contentDescription = I18n.voiceHistoryTooltip(context),
+                                contentDescription = I18n.voiceHistoryTooltip(currentLanguage),
                                 tint = TelegramBlue,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -246,7 +271,7 @@ fun MainHubScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Group,
-                                contentDescription = I18n.membersTooltip(context),
+                                contentDescription = I18n.membersTooltip(currentLanguage),
                                 tint = TelegramTextSecondary,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -259,7 +284,7 @@ fun MainHubScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = I18n.settingsTooltip(context),
+                                contentDescription = I18n.settingsTooltip(currentLanguage),
                                 tint = TelegramTextSecondary,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -274,7 +299,8 @@ fun MainHubScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, bottom = 22.dp),
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -317,9 +343,9 @@ fun MainHubScreen(
 
                     Text(
                         text = when {
-                            isPlayingVoice -> I18n.activeSpeakerVoice(context, currentSpeaker ?: "User")
-                            isRecordingVoice -> I18n.youAreTransmitting(context)
-                            else -> I18n.channelClear(context)
+                            isPlayingVoice -> I18n.activeSpeakerVoice(currentLanguage, currentSpeaker ?: "User")
+                            isRecordingVoice -> I18n.youAreTransmitting(currentLanguage)
+                            else -> I18n.channelClear(currentLanguage)
                         },
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
@@ -332,7 +358,7 @@ fun MainHubScreen(
 
                     if (isPlayingVoice || isRecordingVoice) {
                         Text(
-                            text = I18n.activeSpeakerBadge(context),
+                            text = I18n.activeSpeakerBadge(currentLanguage),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -356,7 +382,8 @@ fun MainHubScreen(
                 onTriggerPhoto = {
                     onLaunchCamera()
                     showPhotoDialog = true
-                }
+                },
+                currentLanguage = currentLanguage
             )
         }
     }
@@ -367,11 +394,12 @@ fun MainHubScreen(
     if (showDangerDialog) {
         DangerReportDialog(
             onDismiss = { showDangerDialog = false },
-            onConfirmAlert = { type, desc ->
+            onConfirmAlert = { type, desc, dur ->
                 showDangerDialog = false
-                onConfirmAlert(type, desc)
+                onConfirmAlert(type, desc, dur)
             },
-            onHapticTick = onHapticTick
+            onHapticTick = onHapticTick,
+            currentLanguage = currentLanguage
         )
     }
 
@@ -384,7 +412,8 @@ fun MainHubScreen(
                 showPhotoDialog = false
                 onConfirmPhotoReport(type, desc)
             },
-            onHapticTick = onHapticTick
+            onHapticTick = onHapticTick,
+            currentLanguage = currentLanguage
         )
     }
 
@@ -394,7 +423,8 @@ fun MainHubScreen(
             isPlaying = isPlayingVoice,
             onPlayVoice = onPlayHistoryVoice,
             onStopVoice = onStopHistoryVoice,
-            onDismiss = { showHistoryDialog = false }
+            onDismiss = { showHistoryDialog = false },
+            currentLanguage = currentLanguage
         )
     }
 
@@ -405,6 +435,7 @@ fun MainHubScreen(
             currentUserId = currentUserId,
             isChiefAdmin = isChiefAdmin,
             isAdmin = isCurrentAdmin,
+            currentLanguage = currentLanguage,
             onDelegateAdmin = onDelegateAdmin,
             onKickMember = onKickMember,
             onBanMember = onBanMember,
@@ -459,14 +490,14 @@ fun MainHubScreen(
             onDismissRequest = { showLeaveRoomConfirm = false },
             title = {
                 Text(
-                    text = I18n.switchRoomConfirmTitle(context),
+                    text = I18n.switchRoomConfirmTitle(currentLanguage),
                     fontWeight = FontWeight.Bold,
                     color = TelegramTextPrimary
                 )
             },
             text = {
                 Text(
-                    text = I18n.switchRoomConfirmDesc(context, group?.name ?: I18n.appTitle(context)),
+                    text = I18n.switchRoomConfirmDesc(currentLanguage, group?.name ?: I18n.appTitle(currentLanguage)),
                     color = TelegramTextSecondary,
                     fontSize = 14.sp
                 )
@@ -479,12 +510,12 @@ fun MainHubScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
                 ) {
-                    Text(I18n.switchRoomConfirmAction(context), fontWeight = FontWeight.Bold)
+                    Text(I18n.switchRoomConfirmAction(currentLanguage), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLeaveRoomConfirm = false }) {
-                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                    Text(I18n.cancel(currentLanguage), color = TelegramTextSecondary)
                 }
             },
             containerColor = TelegramDarkSurface
@@ -500,7 +531,8 @@ fun MainHubScreen(
                 selectedAlertForDetail = null
                 onResolveAlert(it)
             },
-            onDismiss = { selectedAlertForDetail = null }
+            onDismiss = { selectedAlertForDetail = null },
+            currentLanguage = currentLanguage
         )
     }
 
@@ -511,7 +543,8 @@ fun MainHubScreen(
                 showAvatarDialog = false
                 onChangeAvatar(it)
             },
-            onDismiss = { showAvatarDialog = false }
+            onDismiss = { showAvatarDialog = false },
+            currentLanguage = currentLanguage
         )
     }
 }

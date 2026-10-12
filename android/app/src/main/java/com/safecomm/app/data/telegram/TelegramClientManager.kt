@@ -261,7 +261,8 @@ class TelegramClientManager(private val context: Context) {
                             description = tdEvent.desc,
                             photoPath = tdEvent.photoPath,
                             isActive = true,
-                            createdAt = "Только что"
+                            createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+                            expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
                         )
                         membersSeen[tdEvent.senderNick] = PeerPresence(tdEvent.senderNick, tdEvent.senderNick, "shield", System.currentTimeMillis())
                         pruneInactiveMembers()
@@ -1460,7 +1461,8 @@ class TelegramClientManager(private val context: Context) {
                         description = packet.desc,
                         photoPath = photoPath,
                         isActive = true,
-                        createdAt = "Только что"
+                        createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+                        expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
                     )
 
                     Log.d("VartaNetwork", "Received live alert from ${packet.senderNick}: ${packet.alertType}")
@@ -1541,7 +1543,7 @@ class TelegramClientManager(private val context: Context) {
             senderNick = "$callSign (Вы)",
             filePath = audioFile.absolutePath,
             durationSec = durationSec,
-            createdAt = "Только что"
+            createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
         )
         Result.success(voiceMsg)
     }
@@ -1553,7 +1555,8 @@ class TelegramClientManager(private val context: Context) {
         lat: Double,
         lng: Double,
         desc: String,
-        photoFile: File? = null
+        photoFile: File? = null,
+        durationMinutes: Int = 30
     ): Result<Alert> = withContext(Dispatchers.IO) {
         var tgSuccess = false
         var alertId = System.currentTimeMillis()
@@ -1623,7 +1626,8 @@ class TelegramClientManager(private val context: Context) {
             description = desc,
             photoPath = photoFile?.absolutePath ?: "",
             isActive = true,
-            createdAt = "Только что"
+            createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+            expiresAt = System.currentTimeMillis() + durationMinutes * 60 * 1000L
         )
         Result.success(alert)
     }

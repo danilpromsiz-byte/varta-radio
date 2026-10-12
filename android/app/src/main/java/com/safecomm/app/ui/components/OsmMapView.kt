@@ -15,12 +15,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.createBitmap
 import com.safecomm.app.data.model.Alert
+import com.safecomm.app.ui.i18n.AppLanguage
+import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.theme.TelegramBlue
 import com.safecomm.app.ui.theme.TelegramDarkSurface
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -28,6 +29,15 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
+
+data class AlertCluster(
+    val primaryAlert: Alert,
+    val count: Int,
+    val latitude: Double,
+    val longitude: Double,
+    val allAlerts: List<Alert>
+)
 
 @Composable
 fun OsmMapView(
@@ -35,7 +45,8 @@ fun OsmMapView(
     userLng: Double,
     alerts: List<Alert>,
     onAlertClick: (Alert) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    currentLanguage: AppLanguage = AppLanguage.EN
 ) {
     val context = LocalContext.current
     var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
@@ -60,8 +71,8 @@ fun OsmMapView(
             if (userMarkerInstance == null) {
                 val newMarker = Marker(map).apply {
                     position = userPoint
-                    title = com.safecomm.app.ui.i18n.I18n.myLocationTooltip(context)
-                    icon = createCircleDrawable(context, AndroidColor.parseColor("#2AABEE"), "📍")
+                    title = I18n.myLocationTooltip(currentLanguage)
+                    icon = createCleanMarkerDrawable(context, "📍", 1)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 }
                 map.overlays.add(newMarker)
@@ -73,38 +84,49 @@ fun OsmMapView(
         }
     }
 
-    // 3. Update Alert Danger Markers when alerts list changes
-    LaunchedEffect(alerts) {
+    // 3. Update Alert Danger Markers with Clustering & Radar Waves
+    LaunchedEffect(alerts, currentLanguage) {
         val map = mapViewInstance ?: return@LaunchedEffect
 
-        // Remove all markers except user marker
+        // Remove all overlays except user marker
         val userMarker = userMarkerInstance
         map.overlays.clear()
         if (userMarker != null) {
             map.overlays.add(userMarker)
         }
 
-        for (alert in alerts) {
-            // Ignore (0.0, 0.0) invalid coordinates
-            if (alert.latitude == 0.0 && alert.longitude == 0.0) continue
+        val validAlerts = alerts.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+        if (validAlerts.isEmpty()) {
+            map.invalidate()
+            return@LaunchedEffect
+        }
 
-            val point = GeoPoint(alert.latitude, alert.longitude)
-            val color = when (alert.typedCategory.rawValue) {
-                "shelling" -> AndroidColor.parseColor("#E53935")
-                "fire" -> AndroidColor.parseColor("#FF9800")
-                "medical" -> AndroidColor.parseColor("#4CAF50")
-                "police" -> AndroidColor.parseColor("#2196F3")
-                "military" -> AndroidColor.parseColor("#FFC107")
-                else -> AndroidColor.parseColor("#9E9E9E")
-            }
+        // Clustering: Group markers within ~60 meters
+        val clusters = clusterAlerts(validAlerts, thresholdMeters = 60.0)
 
-            val catLabel = com.safecomm.app.ui.i18n.I18n.alertTypeName(context, alert.typedCategory.rawValue)
+        // Identify the newest alert for pulsing radar waves
+        val newestAlert = validAlerts.maxByOrNull { it.id }
+        if (newestAlert != null) {
+            val pulseOverlay = RadarPulseOverlay(GeoPoint(newestAlert.latitude, newestAlert.longitude))
+            map.overlays.add(pulseOverlay)
+        }
+
+        for (cluster in clusters) {
+            val alert = cluster.primaryAlert
+            val point = GeoPoint(cluster.latitude, cluster.longitude)
+            val catLabel = I18n.alertTypeName(currentLanguage, alert.typedCategory.rawValue)
+
             val marker = Marker(map).apply {
                 position = point
-                title = "${alert.typedCategory.icon} $catLabel"
-                snippet = alert.description.ifBlank { "${com.safecomm.app.ui.i18n.I18n.reportedByLabel(context)}: ${alert.senderNick}" }
-                icon = createCircleDrawable(context, color, alert.typedCategory.icon)
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = if (cluster.count > 1) {
+                    "${alert.typedCategory.icon} $catLabel (x${cluster.count})"
+                } else {
+                    "${alert.typedCategory.icon} $catLabel"
+                }
+                snippet = alert.description.ifBlank { "${I18n.reportedByLabel(currentLanguage)}: ${alert.senderNick}" }
+                // Clean icon without circle background, with count badge if clustered
+                icon = createCleanMarkerDrawable(context, alert.typedCategory.icon, cluster.count)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 setOnMarkerClickListener { _, _ ->
                     onAlertClick(alert)
                     true
@@ -137,7 +159,7 @@ fun OsmMapView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Floating Action Button: "Моё местоположение" (Manual smooth re-centering)
+        // Floating Action Button: "Моё местоположение" (elevated above bottom dock)
         FloatingActionButton(
             onClick = {
                 val map = mapViewInstance ?: return@FloatingActionButton
@@ -147,53 +169,130 @@ fun OsmMapView(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(12.dp)
-                .size(44.dp),
+                .navigationBarsPadding()
+                .padding(bottom = 140.dp, end = 16.dp)
+                .size(46.dp),
             shape = CircleShape,
             containerColor = TelegramDarkSurface,
             contentColor = TelegramBlue
         ) {
             Icon(
                 imageVector = Icons.Default.MyLocation,
-                contentDescription = "Моё местоположение",
-                modifier = Modifier.size(22.dp)
+                contentDescription = I18n.myLocationTooltip(currentLanguage),
+                modifier = Modifier.size(24.dp)
             )
         }
     }
 }
 
 /**
- * Creates custom circular colored marker icon with danger emoji
+ * Animated radiating radar wave circles expanding outward from the latest alert.
  */
-private fun createCircleDrawable(context: Context, color: Int, emoji: String): Drawable {
-    val size = 96
+class RadarPulseOverlay(private val point: GeoPoint) : Overlay() {
+    private var phase = 0f
+    private val ringPaint = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        color = AndroidColor.parseColor("#E53935")
+    }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val pj = mapView.projection
+        val screenPoint = android.graphics.Point()
+        pj.toPixels(point, screenPoint)
+
+        val maxRadius = 120f
+        for (i in 0..2) {
+            val progress = ((phase + i * 0.33f) % 1.0f)
+            val radius = 18f + progress * maxRadius
+            val alpha = ((1.0f - progress) * 220).toInt().coerceIn(0, 255)
+            ringPaint.strokeWidth = 3.5f * (1.0f - progress * 0.5f)
+            ringPaint.alpha = alpha
+            canvas.drawCircle(screenPoint.x.toFloat(), screenPoint.y.toFloat(), radius, ringPaint)
+        }
+
+        phase = (phase + 0.025f) % 1.0f
+        mapView.postInvalidateDelayed(40)
+    }
+}
+
+/**
+ * Clusters nearby alerts within [thresholdMeters] into a single cluster.
+ */
+private fun clusterAlerts(rawAlerts: List<Alert>, thresholdMeters: Double = 60.0): List<AlertCluster> {
+    val clusters = mutableListOf<AlertCluster>()
+    val visited = BooleanArray(rawAlerts.size)
+
+    for (i in rawAlerts.indices) {
+        if (visited[i]) continue
+        visited[i] = true
+        val current = rawAlerts[i]
+        val clusterGroup = mutableListOf(current)
+
+        for (j in (i + 1) until rawAlerts.size) {
+            if (!visited[j]) {
+                val other = rawAlerts[j]
+                val dist = com.safecomm.app.util.GeoUtils.distanceKm(current.latitude, current.longitude, other.latitude, other.longitude) * 1000.0
+                if (dist <= thresholdMeters) {
+                    visited[j] = true
+                    clusterGroup.add(other)
+                }
+            }
+        }
+
+        val avgLat = clusterGroup.map { it.latitude }.average()
+        val avgLng = clusterGroup.map { it.longitude }.average()
+        clusters.add(AlertCluster(clusterGroup.first(), clusterGroup.size, avgLat, avgLng, clusterGroup))
+    }
+    return clusters
+}
+
+/**
+ * Creates clean marker icon without colored background circle, with badge count if clustered.
+ */
+private fun createCleanMarkerDrawable(context: Context, emoji: String, clusterCount: Int = 1): Drawable {
+    val size = 110
     val bitmap = createBitmap(size, size)
     val canvas = Canvas(bitmap)
 
-    val paint = Paint().apply {
-        isAntiAlias = true
-        this.color = color
-        style = Paint.Style.FILL
-    }
-    // Outer shadow circle
-    canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4, paint)
-
-    // White border
-    val strokePaint = Paint().apply {
-        isAntiAlias = true
-        this.color = AndroidColor.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = 6f
-    }
-    canvas.drawCircle(size / 2f, size / 2f, size / 2f - 6, strokePaint)
-
-    // Emoji text
+    // Emoji icon directly with subtle shadow
     val textPaint = Paint().apply {
         isAntiAlias = true
-        textSize = 42f
+        textSize = 52f
         textAlign = Paint.Align.CENTER
+        setShadowLayer(8f, 0f, 4f, AndroidColor.argb(200, 0, 0, 0))
     }
-    canvas.drawText(emoji, size / 2f, size / 2f + 14, textPaint)
+    canvas.drawText(emoji, size / 2f, size / 2f + 18, textPaint)
+
+    // If cluster count > 1, draw crisp count badge in top-right corner
+    if (clusterCount > 1) {
+        val badgePaint = Paint().apply {
+            isAntiAlias = true
+            color = AndroidColor.parseColor("#E53935")
+            style = Paint.Style.FILL
+        }
+        val badgeStroke = Paint().apply {
+            isAntiAlias = true
+            color = AndroidColor.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        val badgeRadius = 20f
+        val badgeX = size - badgeRadius - 4f
+        val badgeY = badgeRadius + 4f
+        canvas.drawCircle(badgeX, badgeY, badgeRadius, badgePaint)
+        canvas.drawCircle(badgeX, badgeY, badgeRadius, badgeStroke)
+
+        val badgeTextPaint = Paint().apply {
+            isAntiAlias = true
+            color = AndroidColor.WHITE
+            textSize = 22f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(clusterCount.toString(), badgeX, badgeY + 8f, badgeTextPaint)
+    }
 
     return BitmapDrawable(context.resources, bitmap)
 }
