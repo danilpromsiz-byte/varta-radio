@@ -114,7 +114,8 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
     // --- Authentication Actions ---
 
     fun sendPhoneNumber(phoneNumber: String) {
-        pendingPhone = phoneNumber.trim()
+        val normalized = normalizePhoneNumber(phoneNumber)
+        pendingPhone = normalized
         val c = client ?: return
         val settings = TdApi.PhoneNumberAuthenticationSettings().apply {
             allowFlashCall = false
@@ -122,7 +123,45 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             isCurrentPhoneNumber = true
             allowSmsRetrieverApi = false
         }
-        c.send(TdApi.SetAuthenticationPhoneNumber(pendingPhone, settings), this)
+        c.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings), this)
+    }
+
+    companion object {
+        fun normalizePhoneNumber(raw: String): String {
+            val digits = raw.filter { it.isDigit() }
+            if (digits.isBlank()) return raw.trim()
+
+            if (raw.trim().startsWith("+")) {
+                return "+$digits"
+            }
+
+            // Ukrainian domestic 10 digits starting with 0: 0997799880 -> +380997799880
+            if (digits.length == 10 && digits.startsWith("0")) {
+                return "+38$digits"
+            }
+
+            // Ukrainian 12 digits with 380: 380997799880 -> +380997799880
+            if (digits.length == 12 && digits.startsWith("380")) {
+                return "+$digits"
+            }
+
+            // 9 digits without leading 0: 997799880 -> +380997799880
+            if (digits.length == 9) {
+                return "+380$digits"
+            }
+
+            // 11 digits starting with 80 (legacy 80...): -> +380...
+            if (digits.length == 11 && digits.startsWith("80")) {
+                return "+3$digits"
+            }
+
+            // Any number starting with 0:
+            if (digits.startsWith("0")) {
+                return "+38$digits"
+            }
+
+            return "+$digits"
+        }
     }
 
     fun checkAuthCode(code: String) {
@@ -193,7 +232,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     systemLanguageCode = "ru"
                     deviceModel = "Android"
                     systemVersion = Build.VERSION.RELEASE
-                    applicationVersion = "1.1.0"
+                    applicationVersion = "1.1.1"
                 }
                 client?.send(params, this)
             }

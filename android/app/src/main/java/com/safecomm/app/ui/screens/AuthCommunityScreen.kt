@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safecomm.app.data.telegram.TdAuthState
+import com.safecomm.app.data.telegram.TdlibEngine
 import com.safecomm.app.ui.components.AvatarSelectionDialog
 import com.safecomm.app.ui.components.UserAvatarView
 import com.safecomm.app.ui.theme.*
@@ -47,6 +49,27 @@ import org.drinkless.tdlib.TdApi
  * 2. Closed Channel (Supergroup): Create a new closed group or enter an existing one by invite link / ID.
  * 3. MANDATORY Channel Password: Encrypts and authenticates every voice transmission via HMAC-SHA256.
  */
+private fun mapTelegramError(raw: String): String {
+    val upper = raw.uppercase()
+    return when {
+        upper.contains("PHONE_NUMBER_INVALID") ->
+            "Некорректный номер телефона. Введите номер в формате 099 779 98 80 или +380997799880."
+        upper.contains("PHONE_CODE_INVALID") ->
+            "Неверный 5-значный код. Проверьте сообщение в приложении Telegram."
+        upper.contains("PHONE_CODE_EXPIRED") ->
+            "Срок действия кода истёк. Нажмите «Назад» и запросите новый код."
+        upper.contains("PASSWORD_HASH_INVALID") ->
+            "Неверный облачный пароль 2FA Telegram. Попробуйте снова."
+        upper.contains("PHONE_NUMBER_BANNED") ->
+            "Этот номер телефона заблокирован в Telegram."
+        upper.contains("FLOOD_WAIT") ->
+            "Слишком много запросов к Telegram. Пожалуйста, подождите несколько минут."
+        upper.contains("PHONE_NUMBER_UNREGISTERED") ->
+            "Этот номер не зарегистрирован в Telegram. Сначала создайте аккаунт в Telegram."
+        else -> "Ошибка Telegram: $raw"
+    }
+}
+
 @Composable
 fun AuthCommunityScreen(
     tdAuthState: TdAuthState,
@@ -172,11 +195,49 @@ fun AuthCommunityScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        // Quick Country Selector
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val countryOptions = listOf(
+                                Pair("🇺🇦 +380", "+380"),
+                                Pair("🇵🇱 +48", "+48"),
+                                Pair("🇩🇪 +49", "+49"),
+                                Pair("🇺🇸 +1", "+1")
+                            )
+                            countryOptions.forEach { (label, prefix) ->
+                                val isSelected = inputPhone.startsWith(prefix) || (prefix == "+380" && (inputPhone.startsWith("0") || !inputPhone.startsWith("+")))
+                                Surface(
+                                    modifier = Modifier.clickable {
+                                        inputPhone = if (prefix == "+380") {
+                                            if (inputPhone.startsWith("+")) inputPhone.replaceFirst(Regex("^\\+\\d+"), "0") else inputPhone
+                                        } else {
+                                            prefix + inputPhone.filter { it.isDigit() }.trimStart('0')
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) Color(0x3326A5E4) else TelegramDarkCard,
+                                    border = if (isSelected) BorderStroke(1.dp, TelegramBlue) else null
+                                ) {
+                                    Text(
+                                        text = label,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) Color.White else TelegramTextSecondary,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         OutlinedTextField(
                             value = inputPhone,
                             onValueChange = { inputPhone = it.trim() },
-                            label = { Text("Номер телефона (+380... / +7... / +1...)", color = TelegramTextSecondary, fontSize = 12.sp) },
-                            placeholder = { Text("+380991234567", color = TelegramTextSecondary) },
+                            label = { Text("Номер телефона (🇺🇦 Украина: 0... или +380...)", color = TelegramTextSecondary, fontSize = 12.sp) },
+                            placeholder = { Text("099 779 98 80 или +380991234567", color = TelegramTextSecondary) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -191,15 +252,25 @@ fun AuthCommunityScreen(
                             shape = RoundedCornerShape(12.dp)
                         )
 
+                        val normalizedPreview = TdlibEngine.normalizePhoneNumber(inputPhone)
+                        if (inputPhone.isNotBlank() && normalizedPreview.length >= 6) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Формат для Telegram: $normalizedPreview",
+                                fontSize = 11.sp,
+                                color = Color(0xFFFFD600)
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Button(
                             onClick = {
                                 if (inputPhone.isNotBlank()) {
-                                    onSendPhoneNumber(inputPhone)
+                                    onSendPhoneNumber(normalizedPreview)
                                 }
                             },
-                            enabled = inputPhone.length >= 8,
+                            enabled = inputPhone.filter { it.isDigit() }.length >= 7,
                             modifier = Modifier.fillMaxWidth().height(48.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
@@ -393,19 +464,131 @@ fun AuthCommunityScreen(
                     }
 
                     is TdAuthState.Error -> {
-                        Text(
-                            text = "⚠️ Ошибка авторизации: ${state.message}",
-                            fontSize = 12.sp,
-                            color = Color(0xFFFF5252),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = { onLogOutTelegram() },
+                        Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0x26FF5252)),
+                            border = BorderStroke(1.dp, Color(0xFFFF5252))
                         ) {
-                            Text("Попробовать снова", color = TelegramTextPrimary, fontSize = 12.sp)
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("⚠️", fontSize = 16.sp)
+                                    Text(
+                                        text = "Ошибка Telegram",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFFFF5252)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = mapTelegramError(state.message),
+                                    fontSize = 12.sp,
+                                    color = Color.White,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Quick Country Selector
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val countryOptions = listOf(
+                                Pair("🇺🇦 +380", "+380"),
+                                Pair("🇵🇱 +48", "+48"),
+                                Pair("🇩🇪 +49", "+49"),
+                                Pair("🇺🇸 +1", "+1")
+                            )
+                            countryOptions.forEach { (label, prefix) ->
+                                val isSelected = inputPhone.startsWith(prefix) || (prefix == "+380" && (inputPhone.startsWith("0") || !inputPhone.startsWith("+")))
+                                Surface(
+                                    modifier = Modifier.clickable {
+                                        inputPhone = if (prefix == "+380") {
+                                            if (inputPhone.startsWith("+")) inputPhone.replaceFirst(Regex("^\\+\\d+"), "0") else inputPhone
+                                        } else {
+                                            prefix + inputPhone.filter { it.isDigit() }.trimStart('0')
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) Color(0x3326A5E4) else TelegramDarkCard,
+                                    border = if (isSelected) BorderStroke(1.dp, TelegramBlue) else null
+                                ) {
+                                    Text(
+                                        text = label,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) Color.White else TelegramTextSecondary,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = inputPhone,
+                            onValueChange = { inputPhone = it.trim() },
+                            label = { Text("Номер телефона (🇺🇦 Украина: 0... или +380...)", color = TelegramTextSecondary, fontSize = 12.sp) },
+                            placeholder = { Text("099 779 98 80 или +380991234567", color = TelegramTextSecondary) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TelegramTextPrimary,
+                                unfocusedTextColor = TelegramTextPrimary,
+                                focusedBorderColor = TelegramBlue,
+                                unfocusedBorderColor = TelegramDivider,
+                                focusedContainerColor = TelegramDarkCard,
+                                unfocusedContainerColor = TelegramDarkCard
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        val normalizedPreview = TdlibEngine.normalizePhoneNumber(inputPhone)
+                        if (inputPhone.isNotBlank() && normalizedPreview.length >= 6) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Формат для Telegram: $normalizedPreview",
+                                fontSize = 11.sp,
+                                color = Color(0xFFFFD600)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { onLogOutTelegram() },
+                                modifier = Modifier.weight(1f).height(46.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Сброс", color = TelegramTextSecondary, fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (inputPhone.isNotBlank()) {
+                                        onSendPhoneNumber(normalizedPreview)
+                                    }
+                                },
+                                enabled = inputPhone.filter { it.isDigit() }.length >= 7,
+                                modifier = Modifier.weight(2f).height(46.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
+                            ) {
+                                Text("📲 Повторить", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

@@ -5,153 +5,221 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Radio Waves radiating from Antenna (Top Waves) -->
+    <!-- SPHERICAL RADIO BROADCAST SIGNAL ICON -->
+    <!-- Concentric Spherical Radio Waves radiating 360° in Tactical Yellow (#FFD600 / #FFEA00) -->
+
+    <!-- Deep Horizon Spherical Horizon Wave (Radius 43, Center 54,54) -->
     <path
-        android:strokeColor="#FFD600"
+        android:strokeColor="#44FFD600"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M23.6,23.6 A43,43 0 0,1 84.4,23.6" />
+    <path
+        android:strokeColor="#44FFD600"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M84.4,84.4 A43,43 0 0,1 23.6,84.4" />
+    <path
+        android:strokeColor="#44FFD600"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M11,54 A43,43 0 0,1 23.6,23.6" />
+    <path
+        android:strokeColor="#44FFD600"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M23.6,84.4 A43,43 0 0,1 11,54" />
+    <path
+        android:strokeColor="#44FFD600"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M97,54 A43,43 0 0,0 84.4,23.6" />
+    <path
+        android:strokeColor="#44FFD600"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M84.4,84.4 A43,43 0 0,0 97,54" />
+
+    <!-- Spherical Radio Wave Layer 3 (Radius 33, Center 54,54) -->
+    <!-- Top Arc -->
+    <path
+        android:strokeColor="#88FFD600"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M30.7,30.7 A33,33 0 0,1 77.3,30.7" />
+    <!-- Bottom Arc -->
+    <path
+        android:strokeColor="#88FFD600"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M77.3,77.3 A33,33 0 0,1 30.7,77.3" />
+    <!-- Left Arc -->
+    <path
+        android:strokeColor="#B8FFD600"
         android:strokeWidth="2.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M32,18 C36,12 44,10 50,10" />
+        android:pathData="M21,54 A33,33 0 0,1 30.7,30.7" />
     <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M24,24 C30,14 42,12 52,12" />
-
-    <!-- Lateral Radio Broadcast Waves (Left Side) -->
-    <path
-        android:strokeColor="#FFD600"
+        android:strokeColor="#B8FFD600"
         android:strokeWidth="2.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M20,48 C16,55 16,65 20,72" />
+        android:pathData="M30.7,77.3 A33,33 0 0,1 21,54" />
+    <!-- Right Arc -->
     <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M14,42 C8,52 8,72 14,82" />
-
-    <!-- Lateral Radio Broadcast Waves (Right Side) -->
-    <path
-        android:strokeColor="#FFD600"
+        android:strokeColor="#B8FFD600"
         android:strokeWidth="2.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M88,48 C92,55 92,65 88,72" />
+        android:pathData="M87,54 A33,33 0 0,0 77.3,30.7" />
     <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.0"
+        android:strokeColor="#B8FFD600"
+        android:strokeWidth="2.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M94,42 C100,52 100,72 94,82" />
+        android:pathData="M77.3,77.3 A33,33 0 0,0 87,54" />
 
-    <!-- Tactical Rubber Antenna (Top Left) -->
+    <!-- Spherical Radio Wave Layer 2 (Radius 23, Center 54,54) -->
+    <!-- Top Arc -->
     <path
-        android:fillColor="#37474F"
-        android:pathData="M40,26 h5 v8 h-5 z" />
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M37.7,37.7 A23,23 0 0,1 70.3,37.7" />
+    <!-- Bottom Arc -->
     <path
-        android:fillColor="#263238"
-        android:pathData="M41,12 h3 v14 h-3 z" />
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M70.3,70.3 A23,23 0 0,1 37.7,70.3" />
+    <!-- Left Arc -->
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="3.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M31,54 A23,23 0 0,1 37.7,37.7" />
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="3.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M37.7,70.3 A23,23 0 0,1 31,54" />
+    <!-- Right Arc -->
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="3.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M77,54 A23,23 0 0,0 70.3,37.7" />
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="3.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M70.3,70.3 A23,23 0 0,0 77,54" />
+
+    <!-- Spherical Radio Wave Layer 1 (Radius 13, Center 54,54 - Intense High Frequency Wave) -->
+    <!-- Top Arc -->
+    <path
+        android:strokeColor="#FFF59D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M44.8,44.8 A13,13 0 0,1 63.2,44.8" />
+    <!-- Bottom Arc -->
+    <path
+        android:strokeColor="#FFF59D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M63.2,63.2 A13,13 0 0,1 44.8,63.2" />
+    <!-- Left Arc -->
+    <path
+        android:strokeColor="#FFF59D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M41,54 A13,13 0 0,1 44.8,44.8" />
+    <path
+        android:strokeColor="#FFF59D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M44.8,63.2 A13,13 0 0,1 41,54" />
+    <!-- Right Arc -->
+    <path
+        android:strokeColor="#FFF59D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M67,54 A13,13 0 0,0 63.2,44.8" />
+    <path
+        android:strokeColor="#FFF59D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M63.2,63.2 A13,13 0 0,0 67,54" />
+
+    <!-- Cardinal Pulse Beacon Nodes (North, South, East, West) -->
     <path
         android:fillColor="#FFD600"
-        android:pathData="M40.5,9 h4 v4 h-4 z" />
-
-    <!-- Volume / Channel Control Knob (Top Right) -->
-    <path
-        android:fillColor="#455A64"
-        android:pathData="M63,26 h8 v8 h-8 z" />
-    <path
-        android:fillColor="#263238"
-        android:pathData="M64,23 h6 v3 h-6 z" />
-    <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="1.2"
-        android:fillColor="#00000000"
-        android:pathData="M67,24 v6" />
-
-    <!-- PTT (Push-To-Talk) Side Button on Left -->
+        android:pathData="M54,8.5 A2.5,2.5 0 1,1 53.9,8.5 Z" />
     <path
         android:fillColor="#FFD600"
-        android:pathData="M30,46 h4 v18 h-4 c-1.5,0 -2.5,-1.2 -2.5,-2.5 v-13 c0,-1.3 1,-2.5 2.5,-2.5 z" />
-
-    <!-- Side Grip Texture Ribs (Right side) -->
-    <path
-        android:fillColor="#37474F"
-        android:pathData="M74,48 h3 v4 h-3 z M74,54 h3 v4 h-3 z M74,60 h3 v4 h-3 z" />
-
-    <!-- Main Walkie-Talkie Chassis (Handheld Radio Body) -->
-    <path
-        android:fillColor="#1A2634"
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.6"
-        android:strokeLineJoin="round"
-        android:pathData="M37,34 h34 c3,0 5,2 5,5 v45 c0,3.5 -2.5,6 -6,6 h-28 c-3.5,0 -6,-2.5 -6,-6 v-45 c0,-3 2,-5 5,-5 z" />
-
-    <!-- Beveled Front Face Plate -->
-    <path
-        android:fillColor="#223244"
-        android:pathData="M39,37 h30 c2,0 3.5,1.5 3.5,3.5 v43 c0,2.5 -2,4.5 -4.5,4.5 h-24 c-2.5,0 -4.5,-2 -4.5,-4.5 v-43 c0,-2 1.5,-3.5 3.5,-3.5 z" />
-
-    <!-- Status LED Indicator (Above Screen) -->
-    <path
-        android:fillColor="#00E5FF"
-        android:pathData="M54,39 A1.8,1.8 0 1,1 53.9,39 Z" />
-
-    <!-- Tactical LCD Screen Display -->
-    <path
-        android:fillColor="#0B131C"
-        android:strokeColor="#FFD600"
-        android:strokeWidth="1.2"
-        android:pathData="M43,43 h22 c1.2,0 2,0.8 2,2 v9 c0,1.2 -0.8,2 -2,2 h-22 c-1.2,0 -2,-0.8 -2,-2 v-9 c0,-1.2 0.8,-2 2,-2 z" />
-
-    <!-- LCD Frequency / Signal Glyphs on Screen -->
+        android:pathData="M54,99.5 A2.5,2.5 0 1,1 53.9,99.5 Z" />
     <path
         android:fillColor="#FFD600"
-        android:pathData="M46,47 h2 v5 h-2 z M49,49 h2 v3 h-2 z M52,46 h2 v6 h-2 z" />
+        android:pathData="M8.5,54 A2.5,2.5 0 1,1 8.4,54 Z" />
     <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="1.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M56,49 h7" />
+        android:fillColor="#FFD600"
+        android:pathData="M99.5,54 A2.5,2.5 0 1,1 99.4,54 Z" />
 
-    <!-- Central Tactical Speaker Grille Slits -->
+    <!-- Tactical Axis Pulse Beams -->
     <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.4"
+        android:strokeColor="#55FFD600"
+        android:strokeWidth="1.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M44,61 h20" />
+        android:pathData="M54,12 L54,20" />
     <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.4"
+        android:strokeColor="#55FFD600"
+        android:strokeWidth="1.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M42,66 h24" />
+        android:pathData="M54,88 L54,96" />
     <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.4"
+        android:strokeColor="#55FFD600"
+        android:strokeWidth="1.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M42,71 h24" />
+        android:pathData="M12,54 L20,54" />
     <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.4"
+        android:strokeColor="#55FFD600"
+        android:strokeWidth="1.4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M45,76 h18" />
-    <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M48,81 h12" />
+        android:pathData="M88,54 L96,54" />
 
-    <!-- Bottom Lanyard Mount Loop -->
+    <!-- Central Glowing Spherical Beacon Emitter Core -->
     <path
-        android:fillColor="#37474F"
-        android:pathData="M50,90 h8 v3 c0,1 -0.8,1.8 -1.8,1.8 h-4.4 c-1,0 -1.8,-0.8 -1.8,-1.8 z" />
+        android:fillColor="#FFD600"
+        android:pathData="M54,48 A6,6 0 1,1 53.9,48 Z" />
+
+    <!-- High-Intensity White Plasma Center -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,51.5 A2.5,2.5 0 1,1 53.9,51.5 Z" />
 
 </vector>

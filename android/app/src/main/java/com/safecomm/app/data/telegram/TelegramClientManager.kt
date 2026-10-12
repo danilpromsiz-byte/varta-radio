@@ -156,8 +156,8 @@ class TelegramClientManager(private val context: Context) {
     private var currentTopicBase: String = ""
 
     init {
-        // One-time forced migration v110: ensure clean login to Telegram MTProto and evict from cached rooms
-        val isMigrated = prefs.getBoolean("tdlib_migrated_v110", false)
+        // One-time forced migration v111: ensure clean channel selection in Telegram MTProto and evict from cached rooms
+        val isMigrated = prefs.getBoolean("tdlib_migrated_v111", false)
         if (!isMigrated) {
             prefs.edit()
                 .remove("session_token")
@@ -165,7 +165,7 @@ class TelegramClientManager(private val context: Context) {
                 .remove("active_invite_link")
                 .remove("community_link")
                 .remove("community_password")
-                .putBoolean("tdlib_migrated_v110", true)
+                .putBoolean("tdlib_migrated_v111", true)
                 .apply()
         }
 
