@@ -287,6 +287,24 @@ class MainActivity : ComponentActivity() {
                                 }
                         }
                     },
+                    onForceUpdate = { repo ->
+                        appUpdateManager.githubRepo = repo
+                        coroutineScope.launch {
+                            Toast.makeText(this@MainActivity, "Принудительный запрос релиза...", Toast.LENGTH_SHORT).show()
+                            appUpdateManager.checkForUpdates(force = true)
+                                .onSuccess { available ->
+                                    if (available) {
+                                        (appUpdateManager.updateStatus.value as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
+                                            Toast.makeText(this@MainActivity, "Загрузка последней сборки APK (${updateInfo.newVersion})...", Toast.LENGTH_SHORT).show()
+                                            appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
+                                        }
+                                    }
+                                }
+                                .onFailure { err ->
+                                    Toast.makeText(this@MainActivity, err.message ?: "Ошибка обновления", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
                     onInstallUpdate = {
                         (updateStatus as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
                             coroutineScope.launch {

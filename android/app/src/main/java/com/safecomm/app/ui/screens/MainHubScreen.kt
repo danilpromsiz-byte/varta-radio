@@ -49,6 +49,7 @@ fun MainHubScreen(
     isDownloadingUpdate: Boolean = false,
     downloadProgress: Int = 0,
     onCheckUpdate: (String) -> Unit = {},
+    onForceUpdate: (String) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     onStartPtt: () -> Unit,
     onStopPtt: () -> Unit,
@@ -315,6 +316,7 @@ fun MainHubScreen(
             isDownloadingUpdate = isDownloadingUpdate,
             downloadProgress = downloadProgress,
             onCheckUpdate = onCheckUpdate,
+            onForceUpdate = onForceUpdate,
             onInstallUpdate = onInstallUpdate,
             onSaveTelegramConfig = { r, s, t, c, p ->
                 showSettingsDialog = false

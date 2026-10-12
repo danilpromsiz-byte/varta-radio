@@ -78,7 +78,7 @@ class AppUpdateManager(private val context: Context) {
     private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
     val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
 
-    suspend fun checkForUpdates(): Result<Boolean> = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(force: Boolean = false): Result<Boolean> = withContext(Dispatchers.IO) {
         _updateStatus.value = UpdateStatus.Checking
         try {
             val repo = githubRepo
@@ -119,15 +119,15 @@ class AppUpdateManager(private val context: Context) {
             val remoteTag = release.tagName.removePrefix("v").trim()
             val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").trim()
 
-            Log.d("AppUpdater", "Current: $currentVersion, Latest on GitHub: $remoteTag")
+            Log.d("AppUpdater", "Current: $currentVersion, Latest on GitHub: $remoteTag, Force=$force")
 
             val isNewer = isVersionNewer(remoteTag, currentVersion)
-            if (isNewer) {
+            if (isNewer || force) {
                 val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
                 if (apkAsset != null) {
                     _updateStatus.value = UpdateStatus.UpdateAvailable(
                         newVersion = release.tagName,
-                        releaseNotes = release.body ?: "",
+                        releaseNotes = release.body ?: (if (force) "Принудительное обновление/переустановка с GitHub" else ""),
                         downloadUrl = apkAsset.downloadUrl
                     )
                     Result.success(true)

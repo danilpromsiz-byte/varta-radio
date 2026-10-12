@@ -46,6 +46,7 @@ fun SettingsDialog(
     isDownloadingUpdate: Boolean = false,
     downloadProgress: Int = 0,
     onCheckUpdate: (String) -> Unit = {},
+    onForceUpdate: (String) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     onSaveTelegramConfig: (radiusKm: Double, soundEnabled: Boolean, token: String, chat: String, pass: String) -> Unit,
     onDismiss: () -> Unit
@@ -335,15 +336,25 @@ fun SettingsDialog(
                         Text("Проверить", fontSize = 12.sp)
                     }
 
-                    if (isUpdateAvailable) {
-                        Button(
-                            onClick = onInstallUpdate,
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Установить", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                    Button(
+                        onClick = { onForceUpdate(repoInput) },
+                        modifier = Modifier.weight(1.3f).height(44.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("⚡ Принудительно", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                    }
+                }
+
+                if (isUpdateAvailable) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onInstallUpdate,
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("📦 Скачать и установить обновление", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
 
