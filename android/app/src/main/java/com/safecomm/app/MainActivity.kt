@@ -240,14 +240,16 @@ class MainActivity : ComponentActivity() {
                 // Screen 1: Enter custom call-sign and exact community sector (no chat listing)
                 AuthCommunityScreen(
                     currentCallSign = telegramClient.callSign,
+                    currentAvatar = telegramClient.userAvatar,
                     initialCommunity = telegramClient.communityLinkOrTag,
                     initialPassword = telegramClient.communityPassword,
                     googleAccountEmail = googleAccountEmail,
                     onGoogleSignInClick = { signInWithGoogle() },
                     onGoogleSignOutClick = { signOutGoogle() },
-                    onEnterCommunity = { callSign, communityTarget, groupPassword ->
+                    onEnterCommunity = { callSign, communityTarget, groupPassword, avatar ->
                         coroutineScope.launch {
                             telegramClient.callSign = callSign
+                            telegramClient.userAvatar = avatar
                             telegramClient.verifyCodeAndSignIn("OK", communityTarget, groupPassword)
                                 .onSuccess {
                                     VartaRadioService.start(this@MainActivity, communityTarget, callSign)
@@ -270,6 +272,7 @@ class MainActivity : ComponentActivity() {
                         GroupMember(
                             userId = 1L,
                             nickname = "${telegramClient.callSign} (Вы)",
+                            avatarUrl = telegramClient.userAvatar,
                             role = "admin"
                         )
                     )
@@ -278,6 +281,8 @@ class MainActivity : ComponentActivity() {
                 MainHubScreen(
                     group = activeGroup,
                     members = currentMembers,
+                    userAvatar = telegramClient.userAvatar,
+                    onChangeAvatar = { telegramClient.userAvatar = it },
                     alerts = alerts,
                     voiceMessages = voiceMessages,
                     userLat = userLat,

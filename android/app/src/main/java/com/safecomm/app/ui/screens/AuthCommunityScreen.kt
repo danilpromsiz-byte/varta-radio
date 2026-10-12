@@ -2,6 +2,7 @@ package com.safecomm.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,15 +28,18 @@ import com.safecomm.app.ui.theme.*
 @Composable
 fun AuthCommunityScreen(
     currentCallSign: String,
+    currentAvatar: String = "shield",
     initialCommunity: String,
     initialPassword: String,
     googleAccountEmail: String? = null,
     onGoogleSignInClick: () -> Unit = {},
     onGoogleSignOutClick: () -> Unit = {},
-    onEnterCommunity: (callSign: String, communityTarget: String, groupPassword: String) -> Unit,
+    onEnterCommunity: (callSign: String, communityTarget: String, groupPassword: String, avatar: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var callSign by remember { mutableStateOf(currentCallSign.ifBlank { "Позывной-" + (100..999).random() }) }
+    var userAvatar by remember { mutableStateOf(currentAvatar) }
+    var showAvatarPicker by remember { mutableStateOf(false) }
     var communityTarget by remember { mutableStateOf(initialCommunity) }
     var groupPassword by remember { mutableStateOf(initialPassword) }
 
@@ -153,35 +157,68 @@ fun AuthCommunityScreen(
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
-                // 1. Call-sign (Independent tactical nickname)
+                // 1. Call-sign and Avatar Picker
                 Text(
-                    text = "1. Ваш оперативный позывной:",
+                    text = "1. Ваш оперативный позывной и аватар:",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = TelegramTextPrimary
                 )
                 Text(
-                    text = "Позывной в эфире рации (уникален для сектора, защищён от дубликатов)",
+                    text = "Нажмите на круглый аватар, чтобы выбрать тактический значок или своё фото",
                     fontSize = 11.sp,
                     color = TelegramTextSecondary
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = callSign,
-                    onValueChange = { callSign = it },
-                    placeholder = { Text("Напр. Сокол, Дозор-3, Волна", color = TelegramTextSecondary) },
-                    singleLine = true,
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        focusedBorderColor = TelegramBlue,
-                        unfocusedBorderColor = TelegramDivider,
-                        focusedContainerColor = TelegramDarkCard,
-                        unfocusedContainerColor = TelegramDarkCard
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Clickable Avatar Circle
+                    Box(
+                        modifier = Modifier
+                            .clickable { showAvatarPicker = true },
+                        contentAlignment = Alignment.BottomEnd
+                    ) {
+                        com.safecomm.app.ui.components.UserAvatarView(
+                            avatarString = userAvatar,
+                            size = 56.dp,
+                            borderWidth = 2.dp,
+                            borderColor = TelegramBlue
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .background(Color(0xFFFF9800), RoundedCornerShape(10.dp))
+                                .padding(2.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("✏️", fontSize = 10.sp)
+                        }
+                    }
+
+                    // Callsign input field
+                    OutlinedTextField(
+                        value = callSign,
+                        onValueChange = { callSign = it },
+                        label = { Text("Позывной", color = TelegramTextSecondary, fontSize = 12.sp) },
+                        placeholder = { Text("Напр. Сокол, Дозор", color = TelegramTextSecondary) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = TelegramBlue,
+                            unfocusedBorderColor = TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -257,7 +294,7 @@ fun AuthCommunityScreen(
                 Button(
                     onClick = {
                         if (callSign.isNotBlank() && communityTarget.isNotBlank() && groupPassword.isNotBlank()) {
-                            onEnterCommunity(callSign.trim(), communityTarget.trim(), groupPassword.trim())
+                            onEnterCommunity(callSign.trim(), communityTarget.trim(), groupPassword.trim(), userAvatar)
                         }
                     },
                     enabled = callSign.isNotBlank() && communityTarget.isNotBlank() && groupPassword.isNotBlank(),
@@ -270,6 +307,14 @@ fun AuthCommunityScreen(
                     Text("Войти в защищённый эфир", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
+        }
+
+        if (showAvatarPicker) {
+            com.safecomm.app.ui.components.AvatarSelectionDialog(
+                currentAvatar = userAvatar,
+                onSelectAvatar = { userAvatar = it },
+                onDismiss = { showAvatarPicker = false }
+            )
         }
     }
 }

@@ -140,20 +140,12 @@ fun GroupMembersDialog(
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(if (member.role == "admin") TelegramBlue else TelegramDarkSurface),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                                com.safecomm.app.ui.components.UserAvatarView(
+                                    avatarString = member.avatarUrl,
+                                    size = 40.dp,
+                                    borderWidth = 1.5.dp,
+                                    borderColor = if (member.role == "admin") TelegramBlue else TelegramDivider
+                                )
 
                                 Spacer(modifier = Modifier.width(10.dp))
 

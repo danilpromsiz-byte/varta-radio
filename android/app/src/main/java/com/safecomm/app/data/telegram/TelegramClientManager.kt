@@ -38,9 +38,10 @@ sealed class TelegramAuthState {
 
 @Serializable
 data class VartaPacket(
-    val type: String, // "HEARTBEAT", "VOICE", "ALERT", "RESOLVE"
+    val type: String, // "JOIN", "HEARTBEAT", "VOICE", "ALERT", "RESOLVE"
     val senderId: String,
     val senderNick: String,
+    val avatar: String = "shield",
     val timestamp: Long = System.currentTimeMillis(),
     val durationSec: Int = 0,
     val audioBase64: String = "",
@@ -93,6 +94,10 @@ class TelegramClientManager(private val context: Context) {
         get() = prefs.getString("community_password", "") ?: ""
         set(value) = prefs.edit().putString("community_password", value).apply()
 
+    var userAvatar: String
+        get() = prefs.getString("user_avatar", "shield") ?: "shield"
+        set(value) = prefs.edit().putString("user_avatar", value.trim()).apply()
+
     var userPhoneNumber: String
         get() = prefs.getString("phone_number", "") ?: ""
         set(value) = prefs.edit().putString("phone_number", value.trim()).apply()
@@ -117,7 +122,7 @@ class TelegramClientManager(private val context: Context) {
     private val _activeMembers = MutableStateFlow<List<GroupMember>>(emptyList())
     val activeMembers: StateFlow<List<GroupMember>> = _activeMembers.asStateFlow()
 
-    private val membersSeen = ConcurrentHashMap<String, Pair<String, Long>>() // senderId -> (callSign, lastSeenMs)
+    private val membersSeen = ConcurrentHashMap<String, Triple<String, String, Long>>() // senderId -> Triple(callSign, avatar, lastSeenMs)
     private val processedPacketIds: MutableSet<String> = java.util.Collections.synchronizedSet(
         object : java.util.LinkedHashMap<String, Boolean>(100, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>): Boolean = size > 250
@@ -158,7 +163,9 @@ class TelegramClientManager(private val context: Context) {
     }
 
     private fun deriveTopicHash(sector: String, password: String): String {
-        val raw = "$sector:$password:VARTA_SECURE_SALT_2026"
+        val cleanSector = sector.trim().lowercase()
+        val cleanPass = password.trim()
+        val raw = "$cleanSector:$cleanPass:VARTA_SECURE_SALT_2026"
         val md = MessageDigest.getInstance("SHA-256")
         val bytes = md.digest(raw.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }.take(16)
@@ -228,6 +235,7 @@ class TelegramClientManager(private val context: Context) {
                         }
                         subscribeToSectorTopics()
                         startPresenceHeartbeat()
+                        sendJoinBroadcast()
                     }
 
                     override fun connectionLost(cause: Throwable?) {
@@ -248,6 +256,12 @@ class TelegramClientManager(private val context: Context) {
                 client.connect(connOpts, null, object : IMqttActionListener {
                     override fun onSuccess(asyncActionToken: IMqttToken?) {
                         Log.d("VartaNetwork", "Connected successfully to broker")
+                        scope.launch {
+                            _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
+                        }
+                        subscribeToSectorTopics()
+                        startPresenceHeartbeat()
+                        sendJoinBroadcast()
                     }
 
                     override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -280,6 +294,7 @@ class TelegramClientManager(private val context: Context) {
                 client.connect(connOpts).waitForCompletion(10000)
                 subscribeToSectorTopics()
                 startPresenceHeartbeat()
+                sendJoinBroadcast()
                 _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире (резервный шлюз)"))
             } catch (e: Exception) {
                 Log.e("VartaNetwork", "Backup connect also failed", e)
@@ -338,40 +353,54 @@ class TelegramClientManager(private val context: Context) {
         }
     }
 
+    private fun sendJoinBroadcast() {
+        val packet = VartaPacket(
+            type = "JOIN",
+            senderId = deviceId,
+            senderNick = callSign,
+            avatar = userAvatar,
+            sig = generateSignature("JOIN:$deviceId:$callSign", communityPassword)
+        )
+        publishPacket("$currentTopicBase/presence", packet, qos = 1)
+    }
+
     private fun sendHeartbeat() {
         val packet = VartaPacket(
             type = "HEARTBEAT",
             senderId = deviceId,
             senderNick = callSign,
+            avatar = userAvatar,
             sig = generateSignature("HEARTBEAT:$deviceId:$callSign", communityPassword)
         )
-        publishPacket("$currentTopicBase/presence", packet, qos = 0)
+        publishPacket("$currentTopicBase/presence", packet, qos = 1)
     }
 
     private fun pruneInactiveMembers() {
         val now = System.currentTimeMillis()
-        val timeout = 12000L // 12 seconds inactivity threshold
+        val timeout = 35000L // 35 seconds inactivity threshold for resilient mobile connectivity
 
         // Always include self
         val activeList = mutableListOf(
             GroupMember(
                 userId = 1L,
                 nickname = "$callSign (Вы)",
+                avatarUrl = userAvatar,
                 role = "admin"
             )
         )
 
-        membersSeen.entries.removeIf { (id, pair) ->
-            id == deviceId || (now - pair.second) > timeout
+        membersSeen.entries.removeIf { (id, triple) ->
+            id == deviceId || (now - triple.third) > timeout
         }
 
         var counterId = 2L
-        membersSeen.forEach { (id, pair) ->
+        membersSeen.forEach { (id, triple) ->
             if (id != deviceId) {
                 activeList.add(
                     GroupMember(
                         userId = counterId++,
-                        nickname = pair.first,
+                        nickname = triple.first,
+                        avatarUrl = triple.second,
                         role = "member"
                     )
                 )
@@ -397,7 +426,20 @@ class TelegramClientManager(private val context: Context) {
                 return
             }
 
+            // Immediately register or refresh member presence & avatar on ANY received packet!
+            membersSeen[packet.senderId] = Triple(
+                packet.senderNick,
+                packet.avatar.ifBlank { "shield" },
+                System.currentTimeMillis()
+            )
+            pruneInactiveMembers()
+
             when (packet.type) {
+                "JOIN" -> {
+                    // A peer just joined! Announce ourselves immediately back so they discover us in <100ms
+                    sendHeartbeat()
+                }
+
                 "HEARTBEAT" -> {
                     // Callsign duplicate collision check:
                     if (packet.senderNick.equals(callSign, ignoreCase = true) && packet.senderId != deviceId) {
@@ -405,9 +447,6 @@ class TelegramClientManager(private val context: Context) {
                         val suffix = (10..99).random()
                         callSign = "$callSign-$suffix"
                     }
-                    // Update member presence
-                    membersSeen[packet.senderId] = Pair(packet.senderNick, System.currentTimeMillis())
-                    pruneInactiveMembers()
                 }
 
                 "VOICE" -> {
@@ -498,6 +537,7 @@ class TelegramClientManager(private val context: Context) {
                 type = "VOICE",
                 senderId = deviceId,
                 senderNick = callSign,
+                avatar = userAvatar,
                 timestamp = System.currentTimeMillis(),
                 durationSec = durationSec,
                 audioBase64 = base64Audio,
@@ -543,6 +583,7 @@ class TelegramClientManager(private val context: Context) {
                 type = "ALERT",
                 senderId = deviceId,
                 senderNick = callSign,
+                avatar = userAvatar,
                 timestamp = alertId,
                 alertId = alertId,
                 alertType = type.rawValue,

@@ -2,6 +2,7 @@ package com.safecomm.app.ui.screens
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +58,8 @@ fun MainHubScreen(
     onResolveAlert: (Alert) -> Unit,
     onPlayHistoryVoice: (VoiceMessage) -> Unit,
     onStopHistoryVoice: () -> Unit,
+    userAvatar: String = "shield",
+    onChangeAvatar: (String) -> Unit = {},
     onKickMember: (GroupMember) -> Unit,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
     onHapticTick: () -> Unit
@@ -66,6 +69,7 @@ fun MainHubScreen(
     var showHistoryDialog by remember { mutableStateOf(false) }
     var showMembersDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showAvatarDialog by remember { mutableStateOf(false) }
     var selectedAlertForDetail by remember { mutableStateOf<Alert?>(null) }
 
     val isAdmin = members.any { it.userId == currentUserId && it.role == "admin" }
@@ -75,6 +79,16 @@ fun MainHubScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // User Avatar in Circle (tappable to change avatar)
+                        com.safecomm.app.ui.components.UserAvatarView(
+                            avatarString = userAvatar,
+                            size = 36.dp,
+                            borderWidth = 1.5.dp,
+                            borderColor = if (isConnected) AlertMedicalGreen else TelegramDivider,
+                            modifier = Modifier.clickable { showAvatarDialog = true }
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+
                         // Connection Indicator Dot
                         Box(
                             modifier = Modifier
@@ -174,18 +188,27 @@ fun MainHubScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            isPlayingVoice -> AlertFireOrange
-                                            isRecordingVoice -> AlertShellingRed
-                                            else -> Color(0xFF4CAF50)
-                                        }
-                                    )
-                            )
+                            val activeSpeakerAvatar = when {
+                                isRecordingVoice -> userAvatar
+                                isPlayingVoice -> members.firstOrNull { it.nickname == currentSpeaker || it.nickname.startsWith(currentSpeaker ?: "") }?.avatarUrl ?: "radio"
+                                else -> null
+                            }
+
+                            if (activeSpeakerAvatar != null) {
+                                com.safecomm.app.ui.components.UserAvatarView(
+                                    avatarString = activeSpeakerAvatar,
+                                    size = 24.dp,
+                                    borderWidth = 1.dp,
+                                    borderColor = if (isPlayingVoice) AlertFireOrange else AlertShellingRed
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF4CAF50))
+                                )
+                            }
                             Text(
                                 text = when {
                                     isPlayingVoice -> "ГОЛОС В ЭФИРЕ: ${currentSpeaker ?: "Собеседник"}"
@@ -311,6 +334,17 @@ fun MainHubScreen(
                 onResolveAlert(it)
             },
             onDismiss = { selectedAlertForDetail = null }
+        )
+    }
+
+    if (showAvatarDialog) {
+        com.safecomm.app.ui.components.AvatarSelectionDialog(
+            currentAvatar = userAvatar,
+            onSelectAvatar = {
+                showAvatarDialog = false
+                onChangeAvatar(it)
+            },
+            onDismiss = { showAvatarDialog = false }
         )
     }
 }
