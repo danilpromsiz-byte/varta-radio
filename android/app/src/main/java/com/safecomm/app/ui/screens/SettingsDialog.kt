@@ -39,7 +39,7 @@ fun SettingsDialog(
     botToken: String,
     chatId: String,
     groupPassword: String,
-    githubRepo: String = "your-repo/varta-radio",
+    githubRepo: String = "danilpromsiz-byte/varta-radio",
     appVersion: String = "1.0.0",
     updateStatusText: String = "",
     isUpdateAvailable: Boolean = false,
