@@ -51,7 +51,12 @@ fun SettingsDialog(
     isRoomOwner: Boolean = false,
     initialVerificationEnabled: Boolean = true,
     initialVerificationQuestion: String = "",
+    initialAutoDeleteEnabled: Boolean = true,
+    initialTelegramBridgeEnabled: Boolean = false,
     onSaveRoomModeration: ((enabled: Boolean, question: String) -> Unit)? = null,
+    onChangeRoomPassword: ((String) -> Unit)? = null,
+    onToggleAutoDelete: ((Boolean) -> Unit)? = null,
+    onToggleTelegramBridge: ((Boolean) -> Unit)? = null,
     onSaveTelegramConfig: (radiusKm: Double, soundEnabled: Boolean, token: String, chat: String, pass: String) -> Unit,
     onLeaveRoom: () -> Unit = {},
     onLogOutTelegram: () -> Unit = {},
@@ -64,6 +69,9 @@ fun SettingsDialog(
     var passwordInput by remember { mutableStateOf(groupPassword) }
     var isVerificationEnabled by remember { mutableStateOf(initialVerificationEnabled) }
     var verificationQuestionInput by remember { mutableStateOf(initialVerificationQuestion) }
+    var newRoomPasswordInput by remember { mutableStateOf("") }
+    var isAutoDeleteEnabled by remember { mutableStateOf(initialAutoDeleteEnabled) }
+    var isTelegramBridgeEnabled by remember { mutableStateOf(initialTelegramBridgeEnabled) }
 
     val scrollState = rememberScrollState()
 
@@ -267,22 +275,65 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // --- ROOM MODERATION SECTION ---
+                // --- ROOM SETTINGS & SECURITY (FOR OWNER) ---
                 if (isRoomOwner || onSaveRoomModeration != null) {
                     Text(
-                        text = "🛡️ МОДЕРАЦИЯ ВХОДА В КОМНАТУ",
+                        text = "🛡️ НАСТРОЙКИ КОМНАТЫ (СОЗДАТЕЛЬ)",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TelegramTextPrimary
                     )
                     Text(
-                        text = "Управление проверочным вопросом и ручным допуском гостей в эфир.",
+                        text = "Управление безопасностью, временными сообщениями и шлюзом Telegram.",
                         fontSize = 11.sp,
                         color = TelegramTextSecondary
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
+                    // 1. Смена пароля комнаты
+                    Text(
+                        text = "🔑 Смена пароля комнаты",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TelegramTextPrimary
+                    )
+                    OutlinedTextField(
+                        value = newRoomPasswordInput,
+                        onValueChange = { newRoomPasswordInput = it },
+                        label = { Text("Новый секретный пароль", color = TelegramTextSecondary, fontSize = 12.sp) },
+                        placeholder = { Text("Введите новый пароль", color = TelegramTextSecondary) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = TelegramBlue,
+                            unfocusedBorderColor = TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    if (newRoomPasswordInput.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                onChangeRoomPassword?.invoke(newRoomPasswordInput)
+                                newRoomPasswordInput = ""
+                            },
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
+                        ) {
+                            Text("🔑 Сохранить новый пароль", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 2. Временные сообщения (Автоудаление 24ч) - по умолчанию ВКЛЮЧЕНО
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -290,7 +341,75 @@ fun SettingsDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                             Text(
-                                text = "Требовать подтверждение входа",
+                                text = "⏳ Временные сообщения (24 часа)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TelegramTextPrimary
+                            )
+                            Text(
+                                text = if (isAutoDeleteEnabled) "Включено: автоудаление через 24 часа" else "Выключено: история бессрочна",
+                                fontSize = 11.sp,
+                                color = if (isAutoDeleteEnabled) Color(0xFF4CAF50) else TelegramTextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = isAutoDeleteEnabled,
+                            onCheckedChange = {
+                                isAutoDeleteEnabled = it
+                                onToggleAutoDelete?.invoke(it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = TelegramBlue
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 3. Трансляция в Telegram (Закрытый канал) - по умолчанию ВЫКЛЮЧЕНО
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = "✈️ Трансляция в Telegram",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TelegramTextPrimary
+                            )
+                            Text(
+                                text = if (isTelegramBridgeEnabled) "Включено: канал виден в Telegram" else "Выключено: Dark Room — общение только в Varta GO",
+                                fontSize = 11.sp,
+                                color = if (isTelegramBridgeEnabled) TelegramBlue else Color(0xFFFFD600)
+                            )
+                        }
+                        Switch(
+                            checked = isTelegramBridgeEnabled,
+                            onCheckedChange = {
+                                isTelegramBridgeEnabled = it
+                                onToggleTelegramBridge?.invoke(it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = TelegramBlue
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 4. Проверочный вопрос
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = "Проверочный вопрос для гостей",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TelegramTextPrimary

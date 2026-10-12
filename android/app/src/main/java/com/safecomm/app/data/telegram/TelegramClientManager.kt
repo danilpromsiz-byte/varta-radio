@@ -190,29 +190,19 @@ class TelegramClientManager(private val context: Context) {
             tdlibEngine.setActiveChatId(activeChatId)
         }
 
-        // Keep app state in sync with TDLib authentication
+        // Keep app state in sync with TDLib authentication (without kicking user out of autonomous rooms)
         scope.launch {
             tdlibEngine.authState.collect { tdState ->
                 when (tdState) {
                     is TdAuthState.WaitPhoneNumber, is TdAuthState.WaitCode, is TdAuthState.WaitPassword, is TdAuthState.Error, is TdAuthState.Initializing -> {
-                        if (_authState.value !is TelegramAuthState.Unauthenticated) {
+                        // Do NOT kick user out if they are already connected to a room!
+                        if (!_isSectorConnected.value && communityLinkOrTag.isBlank()) {
                             _authState.value = TelegramAuthState.Unauthenticated
                         }
                     }
                     is TdAuthState.Authenticated -> {
                         if (activeChatId != 0L) {
-                            val userTitle = tdState.user.let { u ->
-                                listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
-                                    u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
-                                }
-                            } ?: callSign
-                            _authState.value = TelegramAuthState.Ready(userTitle, communityLinkOrTag)
                             tdlibEngine.setActiveChatId(activeChatId)
-                            _isSectorConnected.value = true
-                            _connectionStatusText.value = "В эфире (Telegram)"
-                            connectToSector(communityLinkOrTag.ifBlank { activeChatId.toString() }, communityPassword.ifBlank { "varta_default" })
-                        } else {
-                            _authState.value = TelegramAuthState.Unauthenticated
                         }
                     }
                 }
@@ -347,7 +337,9 @@ class TelegramClientManager(private val context: Context) {
         password: String,
         verificationAnswer: String = "",
         enableVerification: Boolean = true,
-        newQuestion: String = ""
+        newQuestion: String = "",
+        telegramBridgeEnabled: Boolean = false,
+        autoDeleteEnabled: Boolean = true
     ): Result<Pair<Long, String>> = withContext(Dispatchers.IO) {
         val cleanName = ChannelSecurity.normalizeChannelName(channelName)
         val pass = password.trim()
@@ -391,58 +383,69 @@ class TelegramClientManager(private val context: Context) {
                 }
             }
 
-            if (decryptedLink.isNullOrBlank()) {
+            if (decryptedLink.isNullOrBlank() && existing.encryptedInviteLink.isNotBlank()) {
                 decryptedLink = ChannelSecurity.decryptInviteLink(existing.encryptedInviteLink, pass)
             }
 
-            if (decryptedLink.isNullOrBlank()) {
-                return@withContext Result.failure(IllegalStateException("Ошибка расшифровки ссылки доступа к группе Telegram"))
+            _currentChannelDescriptor.value = existing
+            communityLinkOrTag = cleanName
+            communityPassword = pass
+            sessionToken = "varta_$cleanName"
+
+            // Join Telegram channel if bridged AND TDLib is authenticated
+            if (existing.telegramBridgeEnabled && !decryptedLink.isNullOrBlank() && tdlibEngine.authState.value is TdAuthState.Authenticated) {
+                try {
+                    val chatRes = tdlibEngine.joinOrOpenChannel(decryptedLink)
+                    val chat = chatRes.getOrNull()
+                    if (chat != null) {
+                        activeChatId = chat.id
+                        activeInviteLink = VartaChannelToken.encode(chat.id, decryptedLink, chat.title)
+                    }
+                } catch (e: Exception) {
+                    Log.w("VartaNetwork", "Telegram channel join skipped/failed: ${e.message}")
+                }
             }
 
-            _currentChannelDescriptor.value = existing
-
-            // Join the exact same Telegram channel
-            val chatRes = tdlibEngine.joinOrOpenChannel(decryptedLink)
-            val chat = chatRes.getOrThrow()
-            activeChatId = chat.id
-            communityLinkOrTag = chat.title
-            communityPassword = pass
-            sessionToken = "tdlib_${chat.id}"
-
-            val secureToken = VartaChannelToken.encode(chat.id, decryptedLink, chat.title)
-            activeInviteLink = secureToken
-
-            val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
-                listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
-                    u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
-                }
-            } ?: callSign
-
             _isSectorConnected.value = true
-            _connectionStatusText.value = "Канал «${chat.title}» в эфире"
-            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «${chat.title}» в эфире"))
+            _connectionStatusText.value = "Комната «$cleanName» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
 
-            _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
+            _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
             connectToSector(cleanName, pass)
 
-            Result.success(Pair(chat.id, secureToken))
+            Result.success(Pair(activeChatId.takeIf { it != 0L } ?: 1L, activeInviteLink.ifBlank { "varta_$cleanName" }))
         } else {
             Log.d("VartaNetwork", "Channel '$cleanName' does not exist. Creating new channel as owner...")
 
-            val chatRes = tdlibEngine.createRadioChannel(channelName.trim(), "Защищённая рация Varta PTT")
-            val chat = chatRes.getOrThrow()
-            activeChatId = chat.id
-            communityLinkOrTag = chat.title
+            var newChatId = 0L
+            var rawInviteLink = ""
+            var secureToken = "varta_$cleanName"
+
+            // If creator explicitly enabled Telegram bridge AND TDLib is authenticated:
+            if (telegramBridgeEnabled && tdlibEngine.authState.value is TdAuthState.Authenticated) {
+                try {
+                    val chatRes = tdlibEngine.createRadioChannel(channelName.trim(), "Защищённая рация Varta GO")
+                    val chat = chatRes.getOrNull()
+                    if (chat != null) {
+                        newChatId = chat.id
+                        activeChatId = chat.id
+                        val linkRes = tdlibEngine.getInviteLink(chat.id)
+                        rawInviteLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
+                        secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
+                        activeInviteLink = secureToken
+                    }
+                } catch (e: Exception) {
+                    Log.w("VartaNetwork", "Telegram channel creation skipped: ${e.message}")
+                }
+            }
+
+            communityLinkOrTag = cleanName
             communityPassword = pass
-            sessionToken = "tdlib_${chat.id}"
+            sessionToken = "varta_$cleanName"
+            if (activeInviteLink.isBlank()) activeInviteLink = secureToken
 
-            val linkRes = tdlibEngine.getInviteLink(chat.id)
-            val rawInviteLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
-            val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
-            activeInviteLink = secureToken
-
-            // Register channel in distributed registry
+            // Register channel in distributed registry (Dark Room by default!)
             val descriptor = ChannelDescriptor(
                 channelName = cleanName,
                 ownerCallSign = callSign,
@@ -451,28 +454,24 @@ class TelegramClientManager(private val context: Context) {
                 authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
                 verificationQuestion = if (enableVerification) newQuestion.trim() else "",
                 verificationAnswerHash = "",
-                telegramChatId = chat.id,
-                encryptedInviteLink = ChannelSecurity.encryptInviteLink(rawInviteLink, pass),
+                telegramBridgeEnabled = telegramBridgeEnabled,
+                telegramChatId = newChatId,
+                encryptedInviteLink = if (rawInviteLink.isNotBlank()) ChannelSecurity.encryptInviteLink(rawInviteLink, pass) else "",
+                autoDeleteTtl = if (autoDeleteEnabled) 86400 else 0,
                 createdAt = System.currentTimeMillis()
             )
             channelRegistry.registerChannel(descriptor)
             _currentChannelDescriptor.value = descriptor
 
-            val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
-                listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
-                    u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
-                }
-            } ?: callSign
-
             _isSectorConnected.value = true
-            _connectionStatusText.value = "Канал «${chat.title}» в эфире"
-            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «${chat.title}» в эфире"))
+            _connectionStatusText.value = "Комната «$cleanName» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
 
-            _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
+            _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
             connectToSector(cleanName, pass)
 
-            Result.success(Pair(chat.id, secureToken))
+            Result.success(Pair(newChatId.takeIf { it != 0L } ?: 1L, secureToken))
         }
     }
 
@@ -520,6 +519,92 @@ class TelegramClientManager(private val context: Context) {
         )
         _currentChannelDescriptor.value = updated
         channelRegistry.registerChannel(updated)
+    }
+
+    suspend fun changeRoomPassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val cleanPass = newPassword.trim()
+        if (cleanPass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль не может быть пустым"))
+        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+        val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
+            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+
+        var newEncryptedLink = existing.encryptedInviteLink
+        if (existing.encryptedInviteLink.isNotBlank()) {
+            val oldRaw = ChannelSecurity.decryptInviteLink(existing.encryptedInviteLink, communityPassword)
+            if (!oldRaw.isNullOrBlank()) {
+                newEncryptedLink = ChannelSecurity.encryptInviteLink(oldRaw, cleanPass)
+            }
+        }
+
+        val updated = existing.copy(
+            passwordHash = ChannelSecurity.hashString(cleanPass),
+            encryptedInviteLink = newEncryptedLink
+        )
+        _currentChannelDescriptor.value = updated
+        channelRegistry.registerChannel(updated)
+        communityPassword = cleanPass
+        connectToSector(clean, cleanPass)
+        Result.success(Unit)
+    }
+
+    suspend fun updateAutoDeleteTtl(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+        val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
+            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+
+        val ttl = if (enabled) 86400 else 0
+        val updated = existing.copy(autoDeleteTtl = ttl)
+        _currentChannelDescriptor.value = updated
+        channelRegistry.registerChannel(updated)
+
+        if (activeChatId != 0L) {
+            tdlibEngine.setChatMessageTtl(activeChatId, ttl)
+        }
+        Result.success(Unit)
+    }
+
+    suspend fun updateTelegramBridge(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+        val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
+            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+
+        var tgChatId = existing.telegramChatId
+        var encLink = existing.encryptedInviteLink
+
+        if (enabled && tgChatId == 0L && tdlibEngine.authState.value is TdAuthState.Authenticated) {
+            val chatRes = tdlibEngine.createRadioChannel(clean, "Varta GO: $clean")
+            val chat = chatRes.getOrNull()
+            if (chat != null) {
+                tgChatId = chat.id
+                activeChatId = chat.id
+                val linkRes = tdlibEngine.getInviteLink(chat.id)
+                val rawLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
+                encLink = ChannelSecurity.encryptInviteLink(rawLink, communityPassword)
+                activeInviteLink = VartaChannelToken.encode(chat.id, rawLink, chat.title)
+            }
+        }
+
+        val updated = existing.copy(
+            telegramBridgeEnabled = enabled,
+            telegramChatId = tgChatId,
+            encryptedInviteLink = encLink
+        )
+        _currentChannelDescriptor.value = updated
+        channelRegistry.registerChannel(updated)
+        Result.success(Unit)
+    }
+
+    fun leaveRoom() {
+        disconnectFromSector()
+        _isSectorConnected.value = false
+        _connectionStatusText.value = "Не подключено"
+        sessionToken = ""
+        communityLinkOrTag = ""
+        communityPassword = ""
+        activeChatId = 0L
+        activeInviteLink = ""
+        _currentChannelDescriptor.value = null
+        _authState.value = TelegramAuthState.Unauthenticated
     }
 
     suspend fun verifyCodeAndSignIn(code: String, targetCommunity: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -605,18 +690,6 @@ class TelegramClientManager(private val context: Context) {
             Log.e("VartaNetwork", "Failed to join Telegram channel", e)
             Result.failure(e)
         }
-    }
-
-    fun leaveRoom() {
-        disconnectFromSector()
-        _isSectorConnected.value = false
-        _connectionStatusText.value = "Не подключено"
-        sessionToken = ""
-        communityLinkOrTag = ""
-        communityPassword = ""
-        activeChatId = 0L
-        activeInviteLink = ""
-        _authState.value = TelegramAuthState.Unauthenticated
     }
 
     fun logout() {
@@ -913,23 +986,33 @@ class TelegramClientManager(private val context: Context) {
             )
         )
 
+        // Remove self or expired members
         membersSeen.entries.removeIf { (id, triple) ->
-            id == mySenderId || (now - triple.third) > timeout
+            id == mySenderId ||
+            triple.first.equals(callSign, ignoreCase = true) ||
+            triple.first.startsWith("$callSign (", ignoreCase = true) ||
+            (now - triple.third) > timeout
         }
 
+        // Deduplicate strictly by normalized nickname (no duplicate entries from PC + phone or MQTT + TDLib)
+        val seenNicks = mutableSetOf(callSign.trim().lowercase())
         var counterId = 2L
-        membersSeen.forEach { (id, triple) ->
-            if (id != mySenderId) {
-                activeList.add(
-                    GroupMember(
-                        userId = counterId++,
-                        nickname = triple.first,
-                        avatarUrl = triple.second,
-                        role = "member"
+
+        membersSeen.values
+            .sortedByDescending { it.third }
+            .forEach { triple ->
+                val normNick = triple.first.trim().lowercase()
+                if (normNick.isNotBlank() && seenNicks.add(normNick)) {
+                    activeList.add(
+                        GroupMember(
+                            userId = counterId++,
+                            nickname = triple.first.trim(),
+                            avatarUrl = triple.second,
+                            role = "member"
+                        )
                     )
-                )
+                }
             }
-        }
 
         _activeMembers.value = activeList
     }
@@ -1055,19 +1138,22 @@ class TelegramClientManager(private val context: Context) {
     suspend fun transmitVoice(audioFile: File, durationSec: Int): Result<VoiceMessage> = withContext(Dispatchers.IO) {
         var tgSuccess = false
         var msgId = System.currentTimeMillis()
+        val isTelegramBridged = _currentChannelDescriptor.value?.telegramBridgeEnabled == true
 
-        // 1. Transmit via genuine Telegram MTProto Client (TDLib)
-        val tdRes = tdlibEngine.transmitVoiceNote(audioFile, durationSec, callSign)
-        if (tdRes.isSuccess) {
-            tgSuccess = true
-            msgId = tdRes.getOrNull() ?: msgId
-            Log.d("VartaNetwork", "Voice message sent successfully via TDLib MTProto! id=$msgId")
-        } else {
-            Log.w("VartaNetwork", "TDLib transmitVoiceNote skipped/failed: ${tdRes.exceptionOrNull()?.message}")
+        // 1. Transmit via Telegram MTProto Client (TDLib) only if Telegram bridge is explicitly enabled
+        if (isTelegramBridged && activeChatId != 0L && tdlibEngine.authState.value is TdAuthState.Authenticated) {
+            val tdRes = tdlibEngine.transmitVoiceNote(audioFile, durationSec, callSign)
+            if (tdRes.isSuccess) {
+                tgSuccess = true
+                msgId = tdRes.getOrNull() ?: msgId
+                Log.d("VartaNetwork", "Voice message sent successfully via TDLib MTProto! id=$msgId")
+            } else {
+                Log.w("VartaNetwork", "TDLib transmitVoiceNote skipped/failed: ${tdRes.exceptionOrNull()?.message}")
+            }
         }
 
-        // 2. Transmit directly to Telegram group if bot & chat configured
-        if (telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
+        // 2. Transmit directly to Telegram group if bot & chat configured and bridged
+        if (isTelegramBridged && telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
             val tgRes = telegramDirectClient.sendVoice(audioFile, durationSec)
             if (tgRes.isSuccess) {
                 tgSuccess = true
@@ -1078,7 +1164,7 @@ class TelegramClientManager(private val context: Context) {
             }
         }
 
-        // 3. Also transmit via MQTT mesh packet
+        // 3. Always transmit via secure real-time encrypted mesh packet
         try {
             val audioBytes = audioFile.readBytes()
             val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
@@ -1099,7 +1185,7 @@ class TelegramClientManager(private val context: Context) {
             Log.d("VartaNetwork", "Transmitted voice message to sector mesh")
         } catch (e: Exception) {
             Log.e("VartaNetwork", "MQTT transmit voice failed", e)
-            if (!tgSuccess) return@withContext Result.failure(e)
+            if (!tgSuccess && isTelegramBridged) return@withContext Result.failure(e)
         }
 
         val voiceMsg = VoiceMessage(
@@ -1123,19 +1209,22 @@ class TelegramClientManager(private val context: Context) {
     ): Result<Alert> = withContext(Dispatchers.IO) {
         var tgSuccess = false
         var alertId = System.currentTimeMillis()
+        val isTelegramBridged = _currentChannelDescriptor.value?.telegramBridgeEnabled == true
 
-        // 1. Transmit via genuine Telegram MTProto Client (TDLib)
-        val tdRes = tdlibEngine.broadcastAlert(type.rawValue, lat, lng, desc, photoFile, callSign)
-        if (tdRes.isSuccess) {
-            tgSuccess = true
-            alertId = tdRes.getOrNull() ?: alertId
-            Log.d("VartaNetwork", "Alert broadcasted via TDLib MTProto! id=$alertId")
-        } else {
-            Log.w("VartaNetwork", "TDLib broadcastAlert skipped/failed: ${tdRes.exceptionOrNull()?.message}")
+        // 1. Transmit via genuine Telegram MTProto Client (TDLib) only if Telegram bridge is enabled
+        if (isTelegramBridged && activeChatId != 0L && tdlibEngine.authState.value is TdAuthState.Authenticated) {
+            val tdRes = tdlibEngine.broadcastAlert(type.rawValue, lat, lng, desc, photoFile, callSign)
+            if (tdRes.isSuccess) {
+                tgSuccess = true
+                alertId = tdRes.getOrNull() ?: alertId
+                Log.d("VartaNetwork", "Alert broadcasted via TDLib MTProto! id=$alertId")
+            } else {
+                Log.w("VartaNetwork", "TDLib broadcastAlert skipped/failed: ${tdRes.exceptionOrNull()?.message}")
+            }
         }
 
-        // 2. Transmit directly to Telegram group if bot & chat configured
-        if (telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
+        // 2. Transmit directly to Telegram group if bot & chat configured and bridged
+        if (isTelegramBridged && telegramDirectClient.botToken.isNotBlank() && telegramDirectClient.chatId.isNotBlank()) {
             val tgRes = telegramDirectClient.sendAlert(type, lat, lng, desc, photoFile)
             if (tgRes.isSuccess) {
                 tgSuccess = true

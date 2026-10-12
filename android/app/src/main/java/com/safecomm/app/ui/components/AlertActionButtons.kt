@@ -58,13 +58,13 @@ fun AlertActionButtons(
             ) {
                 Icon(
                     imageVector = Icons.Default.Warning,
-                    contentDescription = "Тревога",
+                    contentDescription = "Метка",
                     tint = Color.White,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "ТРЕВОГА",
+                    text = "МЕТКА",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,

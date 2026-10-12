@@ -72,7 +72,7 @@ fun DangerReportDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "🚨 ОБЪЯВИТЬ ТРЕВОГУ",
+                        text = "📍 ПОСТАВИТЬ МЕТКУ",
                         style = MaterialTheme.typography.titleLarge,
                         color = AlertShellingRed,
                         fontWeight = FontWeight.Bold
@@ -91,7 +91,7 @@ fun DangerReportDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Выберите тип опасности для оповещения всех участников группы:",
+                    text = "Выберите тип метки для оповещения всех участников группы:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TelegramTextSecondary,
                     textAlign = TextAlign.Start,
@@ -227,7 +227,7 @@ fun DangerReportDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isHolding) "УДЕРЖИВАЙТЕ (${(holdProgress * 100).toInt()}%)" else "УДЕРЖИВАЙТЕ 2 сек ДЛЯ ТРЕВОГИ",
+                            text = if (isHolding) "УДЕРЖИВАЙТЕ (${(holdProgress * 100).toInt()}%)" else "УДЕРЖИВАЙТЕ 2 сек ДЛЯ ОТПРАВКИ МЕТКИ",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,

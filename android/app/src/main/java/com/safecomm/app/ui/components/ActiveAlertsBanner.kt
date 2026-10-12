@@ -1,6 +1,5 @@
 package com.safecomm.app.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,8 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safecomm.app.data.model.Alert
@@ -33,7 +32,7 @@ fun ActiveAlertsBanner(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -41,7 +40,7 @@ fun ActiveAlertsBanner(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "АКТИВНЫЕ ТРЕВОГИ (${alerts.size})",
+                text = "АКТИВНЫЕ МЕТКИ (${alerts.size})",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = TelegramTextSecondary,
@@ -69,30 +68,82 @@ fun ActiveAlertsBanner(
 
                 Card(
                     modifier = Modifier
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, catColor.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .width(230.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, catColor.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
                         .clickable { onAlertClick(alert) },
                     colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
-                        Text(text = alert.typedCategory.icon, fontSize = 18.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column {
+                        // Top Row: Icon + Label + Author Callsign
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Text(text = alert.typedCategory.icon, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = alert.typedCategory.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = catColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             Text(
-                                text = alert.typedCategory.label,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = catColor
+                                text = alert.senderNick.ifBlank { "Аноним" },
+                                fontSize = 10.sp,
+                                color = TelegramTextSecondary,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 4.dp)
                             )
+                        }
+
+                        // Description preview (wrapped, readable)
+                        if (alert.description.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = distText,
+                                text = alert.description,
+                                fontSize = 11.sp,
+                                color = TelegramTextPrimary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 14.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Bottom Row: Distance badge + Time
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "📍 ", fontSize = 10.sp)
+                                Text(
+                                    text = distText,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (distance in 0.0..2.0) AlertShellingRed else TelegramBlue
+                                )
+                            }
+                            Text(
+                                text = alert.createdAt.ifBlank { "Только что" },
                                 fontSize = 10.sp,
                                 color = TelegramTextSecondary
                             )

@@ -29,7 +29,7 @@ class VartaRadioService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "varta_ptt_channel"
-        private const val CHANNEL_NAME = "Varta Radio PTT - Активный эфир"
+        private const val CHANNEL_NAME = "Varta GO - Активный эфир"
 
         const val ACTION_START = "com.safecomm.app.service.START"
         const val ACTION_STOP = "com.safecomm.app.service.STOP"
@@ -140,7 +140,7 @@ class VartaRadioService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("🛡️ Varta Radio PTT: $sector")
+            .setContentTitle("🛡️ Varta GO: $sector")
             .setContentText("Позывной: $callSign • Рация на связи (Экран выкл. активен)")
             .setSmallIcon(android.R.drawable.stat_sys_speakerphone)
             .setOngoing(true)

@@ -68,7 +68,12 @@ fun MainHubScreen(
     isRoomOwner: Boolean = false,
     initialVerificationEnabled: Boolean = true,
     initialVerificationQuestion: String = "",
+    initialAutoDeleteEnabled: Boolean = true,
+    initialTelegramBridgeEnabled: Boolean = false,
     onSaveRoomModeration: ((enabled: Boolean, question: String) -> Unit)? = null,
+    onChangeRoomPassword: ((String) -> Unit)? = null,
+    onToggleAutoDelete: ((Boolean) -> Unit)? = null,
+    onToggleTelegramBridge: ((Boolean) -> Unit)? = null,
     onLeaveRoom: () -> Unit = {},
     onLogOutTelegram: () -> Unit = {},
     onHapticTick: () -> Unit
@@ -115,7 +120,7 @@ fun MainHubScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = group?.name ?: "SafeComm",
+                                    text = group?.name ?: "Varta GO",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TelegramTextPrimary
@@ -362,7 +367,12 @@ fun MainHubScreen(
             isRoomOwner = isRoomOwner,
             initialVerificationEnabled = initialVerificationEnabled,
             initialVerificationQuestion = initialVerificationQuestion,
+            initialAutoDeleteEnabled = initialAutoDeleteEnabled,
+            initialTelegramBridgeEnabled = initialTelegramBridgeEnabled,
             onSaveRoomModeration = onSaveRoomModeration,
+            onChangeRoomPassword = onChangeRoomPassword,
+            onToggleAutoDelete = onToggleAutoDelete,
+            onToggleTelegramBridge = onToggleTelegramBridge,
             onSaveTelegramConfig = { r, s, t, c, p ->
                 showSettingsDialog = false
                 onSaveSettings(r, s, t, c, p)

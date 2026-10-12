@@ -227,14 +227,16 @@ class MainActivity : ComponentActivity() {
                     onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
                     onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
                     onLogOutTelegram = { telegramClient.logout() },
-                    onSmartConnect = { channelName, password, answer, enableVerif, question ->
+                    onSmartConnect = { channelName, password, answer, enableVerif, question, telegramBridge, autoDelete ->
                         coroutineScope.launch {
                             telegramClient.enterOrJoinSmartChannel(
                                 channelName = channelName,
                                 password = password,
                                 verificationAnswer = answer,
                                 enableVerification = enableVerif,
-                                newQuestion = question
+                                newQuestion = question,
+                                telegramBridgeEnabled = telegramBridge,
+                                autoDeleteEnabled = autoDelete
                             ).onSuccess { (chatId, inviteLink) ->
                                 VartaRadioService.start(this@MainActivity, channelName, telegramClient.callSign)
                                 Toast.makeText(this@MainActivity, "Подключено к эфиру «$channelName»!", Toast.LENGTH_SHORT).show()
@@ -383,7 +385,7 @@ class MainActivity : ComponentActivity() {
                             telegramClient.broadcastAlert(type, alertLat, alertLng, desc, null)
                                 .onSuccess { alert ->
                                     alerts = listOf(alert) + alerts.filter { it.id != alert.id }
-                                    Toast.makeText(this@MainActivity, "Тревога объявлена в эфире!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Метка объявлена в эфире!", Toast.LENGTH_SHORT).show()
                                 }
                                 .onFailure { err ->
                                     Toast.makeText(this@MainActivity, "Ошибка тревоги: ${err.message}", Toast.LENGTH_SHORT).show()
@@ -413,7 +415,7 @@ class MainActivity : ComponentActivity() {
                             telegramClient.resolveAlert(alert.id)
                                 .onSuccess {
                                     alerts = alerts.filter { it.id != alert.id }
-                                    Toast.makeText(this@MainActivity, "Тревога снята", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Метка снята", Toast.LENGTH_SHORT).show()
                                 }
                         }
                     },
@@ -427,6 +429,8 @@ class MainActivity : ComponentActivity() {
                     isRoomOwner = currentDescriptor == null || currentDescriptor?.ownerId == telegramClient.mySenderId,
                     initialVerificationEnabled = currentDescriptor?.authMode == "QUESTION",
                     initialVerificationQuestion = currentDescriptor?.verificationQuestion ?: "",
+                    initialAutoDeleteEnabled = (currentDescriptor?.autoDeleteTtl ?: 86400) > 0,
+                    initialTelegramBridgeEnabled = currentDescriptor?.telegramBridgeEnabled ?: false,
                     onSaveRoomModeration = { enabled, question ->
                         coroutineScope.launch {
                             telegramClient.updateRoomSecurity(enabled, question)
@@ -435,6 +439,38 @@ class MainActivity : ComponentActivity() {
                                 }
                                 .onFailure {
                                     Toast.makeText(this@MainActivity, "Ошибка сохранения: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    onChangeRoomPassword = { newPass ->
+                        coroutineScope.launch {
+                            telegramClient.changeRoomPassword(newPass)
+                                .onSuccess {
+                                    Toast.makeText(this@MainActivity, "Пароль комнаты успешно изменён", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка смены пароля: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    onToggleAutoDelete = { enabled ->
+                        coroutineScope.launch {
+                            telegramClient.updateAutoDeleteTtl(enabled)
+                                .onSuccess {
+                                    val msg = if (enabled) "Временные сообщения (24ч) включены" else "Временные сообщения отключены"
+                                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    },
+                    onToggleTelegramBridge = { enabled ->
+                        coroutineScope.launch {
+                            telegramClient.updateTelegramBridge(enabled)
+                                .onSuccess {
+                                    val msg = if (enabled) "Трансляция в Telegram включена" else "Трансляция в Telegram отключена (Dark Room)"
+                                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
                                 }
                         }
                     },

@@ -34,7 +34,7 @@ class AlertNotificationManager(private val context: Context) {
         soundEnabled: Boolean
     ): Double {
         val distanceKm = GeoUtils.distanceKm(userLat, userLng, alert.latitude, alert.longitude)
-        val isWithinRadius = radiusKm >= 999.0 || distanceKm <= radiusKm
+        val isWithinRadius = radiusKm >= 999.0 || (distanceKm in 0.0..radiusKm)
 
         Log.d("AlertNotify", "Alert ${alert.id} (${alert.alertType}) dist=${distanceKm}km, limit=${radiusKm}km, inside=$isWithinRadius")
 

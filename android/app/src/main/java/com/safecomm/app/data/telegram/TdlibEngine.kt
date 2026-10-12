@@ -273,7 +273,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     systemLanguageCode = "ru"
                     deviceModel = "Android"
                     systemVersion = Build.VERSION.RELEASE
-                    applicationVersion = "1.1.5"
+                    applicationVersion = "1.1.6"
                 }
                 client?.send(params, this)
             }
@@ -434,7 +434,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                 this.isChannel = false
                 this.description = description
                 this.location = null
-                this.messageAutoDeleteTime = 0
+                this.messageAutoDeleteTime = 86400 // 24 hours ephemeral messages by default!
                 this.forImport = false
             }
             val newGroup = send<TdApi.Chat>(query)
@@ -443,6 +443,18 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             Result.success(newGroup)
         } catch (e: Exception) {
             Log.e("TDLib", "Failed to create radio channel", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun setChatMessageTtl(chatId: Long, ttlSeconds: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val query = TdApi.SetChatMessageAutoDeleteTime(chatId, ttlSeconds)
+            send<TdApi.Ok>(query)
+            Log.d("TDLib", "Chat $chatId auto delete time set to $ttlSeconds seconds")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w("TDLib", "Failed to set chat TTL: ${e.message}")
             Result.failure(e)
         }
     }
@@ -654,8 +666,15 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                 return@withContext Result.failure(IllegalStateException("Канал Telegram не выбран"))
             }
 
-            val text = "🚨 ТРЕВОГА: $type\nПозывной: $callSign\n$desc"
-            val caption = TdApi.FormattedText(text, null)
+            val alertText = buildString {
+                append("📍 МЕТКА: $type\n")
+                append("👤 Позывной: $callSign\n")
+                if (desc.isNotBlank()) append("📝 Описание: $desc\n")
+                if (lat != 0.0 && lng != 0.0) {
+                    append("🗺 Координаты: ${"%.5f".format(lat)}, ${"%.5f".format(lng)}")
+                }
+            }
+            val caption = TdApi.FormattedText(alertText, null)
 
             val content: TdApi.InputMessageContent = if (photoFile != null && photoFile.exists()) {
                 TdApi.InputMessagePhoto().apply {
@@ -663,8 +682,14 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     this.caption = caption
                 }
             } else if (lat != 0.0 && lng != 0.0) {
-                TdApi.InputMessageLocation().apply {
-                    this.location = TdApi.Location(lat, lng, 0.0)
+                // Send Venue so Telegram shows title and address/author right on the location preview!
+                TdApi.InputMessageVenue().apply {
+                    this.venue = TdApi.Venue().apply {
+                        this.location = TdApi.Location(lat, lng, 0.0)
+                        this.title = "📍 МЕТКА: $type"
+                        this.address = if (desc.isNotBlank()) "$desc • Позывной: $callSign" else "Позывной: $callSign"
+                        this.provider = "Varta GO"
+                    }
                 }
             } else {
                 TdApi.InputMessageText().apply {
@@ -678,6 +703,20 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             }
 
             val msg = send<TdApi.Message>(sendQuery)
+
+            // If we sent a Venue, also send detailed text message so description and author are crystal clear in chat
+            if (lat != 0.0 && lng != 0.0 && (photoFile == null || !photoFile.exists())) {
+                try {
+                    val textQuery = TdApi.SendMessage().apply {
+                        this.chatId = currentChatId
+                        this.inputMessageContent = TdApi.InputMessageText().apply {
+                            this.text = caption
+                        }
+                    }
+                    send<TdApi.Message>(textQuery)
+                } catch (_: Exception) {}
+            }
+
             Result.success(msg.id)
         } catch (e: Exception) {
             Log.e("TDLib", "Failed to send alert to Telegram", e)

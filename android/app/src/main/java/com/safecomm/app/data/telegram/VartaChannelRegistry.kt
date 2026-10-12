@@ -23,8 +23,10 @@ data class ChannelDescriptor(
     val authMode: String = "QUESTION", // "QUESTION" (manual approval) or "PASSWORD_ONLY"
     val verificationQuestion: String = "",
     val verificationAnswerHash: String = "",
+    val telegramBridgeEnabled: Boolean = false, // false = Dark room (invisible in Telegram), true = bridged
     val telegramChatId: Long = 0L,
     val encryptedInviteLink: String = "",
+    val autoDeleteTtl: Int = 86400, // 86400 = 24 hours (default ephemeral mode), 0 = disabled
     val createdAt: Long = System.currentTimeMillis()
 )
 
