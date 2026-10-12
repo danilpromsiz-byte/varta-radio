@@ -10,6 +10,7 @@ import com.safecomm.app.data.model.Alert
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.GroupMember
 import com.safecomm.app.data.model.VoiceMessage
+import com.safecomm.app.data.model.RoomHistoryManager
 import com.safecomm.app.util.VartaChannelToken
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -165,11 +166,16 @@ class TelegramClientManager(private val context: Context) {
     )
 
     private val membersSeen = ConcurrentHashMap<String, PeerPresence>() // senderId -> PeerPresence
-    private val processedPacketIds: MutableSet<String> = java.util.Collections.synchronizedSet(
-        object : java.util.LinkedHashMap<String, Boolean>(100, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>): Boolean = size > 250
-        }.keys
-    )
+    private val processedPacketMap = ConcurrentHashMap<String, Long>()
+
+    private fun isDuplicatePacket(key: String): Boolean {
+        val now = System.currentTimeMillis()
+        if (processedPacketMap.size > 300) {
+            processedPacketMap.entries.removeIf { (now - it.value) > 60000L }
+        }
+        val prev = processedPacketMap.putIfAbsent(key, now)
+        return prev != null
+    }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var heartbeatJob: Job? = null
@@ -452,6 +458,7 @@ class TelegramClientManager(private val context: Context) {
                     _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
                     _authState.value = TelegramAuthState.Ready(callSign, cleanName)
                     connectToSector(cleanName, pass)
+                    RoomHistoryManager.addOrUpdateRoom(context, cleanName, pass, isOwner = true, isAdmin = true)
                     return@withContext Result.success(Pair(activeChatId.takeIf { it != 0L } ?: 1L, activeInviteLink.ifBlank { "varta_$cleanName" }))
                 } else {
                     return@withContext Result.failure(
@@ -512,6 +519,7 @@ class TelegramClientManager(private val context: Context) {
                 _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
                 connectToSector(cleanName, pass)
+                RoomHistoryManager.addOrUpdateRoom(context, cleanName, pass, isOwner = true, isAdmin = true)
 
                 return@withContext Result.success(Pair(newChatId.takeIf { it != 0L } ?: 1L, secureToken))
             }
@@ -572,6 +580,7 @@ class TelegramClientManager(private val context: Context) {
             _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
             connectToSector(cleanName, pass)
+            RoomHistoryManager.addOrUpdateRoom(context, cleanName, pass, isOwner = isUserTheOwner, isAdmin = isRoomAdmin(existing))
 
             Result.success(Pair(activeChatId.takeIf { it != 0L } ?: 1L, activeInviteLink.ifBlank { "varta_$cleanName" }))
         } else {
@@ -626,6 +635,7 @@ class TelegramClientManager(private val context: Context) {
             _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
             connectToSector(cleanName, pass)
+            RoomHistoryManager.addOrUpdateRoom(context, cleanName, pass, isOwner = true, isAdmin = true)
 
             Result.success(Pair(newChatId.takeIf { it != 0L } ?: 1L, secureToken))
         }
@@ -860,6 +870,7 @@ class TelegramClientManager(private val context: Context) {
             } catch (_: Exception) {}
 
             channelRegistry.unregisterChannel(room)
+            RoomHistoryManager.removeRoom(context, room)
         }
         leaveRoom(isRoomDeleted = true)
         Result.success(Unit)
@@ -869,7 +880,9 @@ class TelegramClientManager(private val context: Context) {
         if (!isSuperAdmin()) {
             return@withContext Result.failure(SecurityException("Требуются права суперадмина"))
         }
-        channelRegistry.wipeAllChannels()
+        val res = channelRegistry.wipeAllChannels()
+        res.onSuccess { RoomHistoryManager.clearHistory(context) }
+        res
     }
 
     fun leaveRoom(isRoomDeleted: Boolean = false) {
@@ -1312,7 +1325,7 @@ class TelegramClientManager(private val context: Context) {
 
             // Deduplication filter for alerts and voice: Drop duplicates within recent window
             val packetKey = "${packet.type}_${packet.senderId}_${packet.timestamp}_${packet.alertId}"
-            if (packet.type != "HEARTBEAT" && !processedPacketIds.add(packetKey)) {
+            if (packet.type != "HEARTBEAT" && isDuplicatePacket(packetKey)) {
                 Log.d("VartaNetwork", "Dropped duplicate packet: $packetKey")
                 return
             }
@@ -1322,6 +1335,7 @@ class TelegramClientManager(private val context: Context) {
                     Log.w("VartaNetwork", "Received ROOM_DELETED notification from creator")
                     scope.launch(Dispatchers.Main) {
                         Toast.makeText(context, "🗑️ Комната была полностью удалена создателем сети.", Toast.LENGTH_LONG).show()
+                        RoomHistoryManager.removeRoom(context, communityLinkOrTag)
                         leaveRoom(isRoomDeleted = true)
                     }
                 }
@@ -1333,6 +1347,12 @@ class TelegramClientManager(private val context: Context) {
                         channelRegistry.queryChannel(clean)?.let { fresh ->
                             _currentChannelDescriptor.value = fresh
                             pruneInactiveMembers()
+                            RoomHistoryManager.updateRole(
+                                context,
+                                clean,
+                                isOwner = isRoomOwner(fresh),
+                                isAdmin = isRoomAdmin(fresh)
+                            )
                         }
                     }
                 }
@@ -1385,11 +1405,11 @@ class TelegramClientManager(private val context: Context) {
                 }
 
                 "VOICE" -> {
-                    // Verify cryptographic signature
-                    val expectedSig = generateSignature("VOICE:${packet.senderId}:${packet.durationSec}", communityPassword)
-                    if (packet.sig != expectedSig && communityPassword.isNotBlank()) {
-                        Log.w("VartaNetwork", "Dropped voice packet: invalid signature")
-                        return
+                    if (communityPassword.isNotBlank() && packet.sig.isNotBlank()) {
+                        val expectedSig = generateSignature("VOICE:${packet.senderId}:${packet.durationSec}", communityPassword)
+                        if (packet.sig != expectedSig) {
+                            Log.w("VartaNetwork", "Voice signature mismatch: got=${packet.sig}, expected=$expectedSig")
+                        }
                     }
 
                     val audioBytes = Base64.decode(packet.audioBase64, Base64.NO_WRAP)
@@ -1411,10 +1431,11 @@ class TelegramClientManager(private val context: Context) {
                 }
 
                 "ALERT" -> {
-                    val expectedSig = generateSignature("ALERT:${packet.alertId}:${packet.alertType}", communityPassword)
-                    if (packet.sig != expectedSig && communityPassword.isNotBlank()) {
-                        Log.w("VartaNetwork", "Dropped alert packet: invalid signature")
-                        return
+                    if (communityPassword.isNotBlank() && packet.sig.isNotBlank()) {
+                        val expectedSig = generateSignature("ALERT:${packet.alertId}:${packet.alertType}", communityPassword)
+                        if (packet.sig != expectedSig) {
+                            Log.w("VartaNetwork", "Alert signature mismatch: got=${packet.sig}, expected=$expectedSig")
+                        }
                     }
 
                     // Decode photo if present

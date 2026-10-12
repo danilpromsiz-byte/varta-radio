@@ -70,6 +70,23 @@ object I18n {
     )
     fun superAdminQuickBtn(c: Context) = t(c, "⚡ Суперадмин", "⚡ Суперадмін", "⚡ Super Admin")
 
+    // --- Room Entry History ---
+    fun historyRoomsTitle(c: Context) = t(c, "📜 Недавние комнаты", "📜 Нещодавні кімнати", "📜 Recent Rooms")
+    fun historyRoomsSubtitle(c: Context) = t(
+        c,
+        "Быстрый вход в 1 клик и ваши права",
+        "Швидкий вхід в 1 клік та ваші права",
+        "Quick 1-tap entry and your roles"
+    )
+    fun historyFilterAll(c: Context, count: Int) = t(c, "Все ($count)", "Всі ($count)", "All ($count)")
+    fun historyFilterAdmin(c: Context, count: Int) = t(c, "👑 Мои / Админ ($count)", "👑 Мої / Адмін ($count)", "👑 Mine / Admin ($count)")
+    fun historyEmpty(c: Context) = t(c, "История входа пуста", "Історія входів порожня", "No room history yet")
+    fun historyClearBtn(c: Context) = t(c, "Очистить историю", "Очистити історію", "Clear History")
+    fun historyRoleOwner(c: Context) = t(c, "👑 Создатель", "👑 Творець", "👑 Creator")
+    fun historyRoleAdmin(c: Context) = t(c, "🛡️ Админ", "🛡️ Адмін", "🛡️ Admin")
+    fun historyRoleMember(c: Context) = t(c, "👤 Участник", "👤 Учасник", "👤 Member")
+    fun historyQuickEnter(c: Context) = t(c, "Войти", "Увійти", "Enter")
+
     // --- Main Hub Screen ---
     fun tabRadio(c: Context) = t(c, "Рация", "Рація", "Radio")
     fun tabChat(c: Context) = t(c, "Чат", "Чат", "Chat")

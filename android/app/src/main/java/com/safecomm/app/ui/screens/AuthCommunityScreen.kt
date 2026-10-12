@@ -32,10 +32,16 @@ import com.safecomm.app.data.telegram.TdlibEngine
 import com.safecomm.app.ui.components.AvatarSelectionDialog
 import com.safecomm.app.ui.components.UserAvatarView
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.clip
+import com.safecomm.app.data.model.RoomHistoryItem
+import com.safecomm.app.data.model.RoomHistoryManager
 import com.safecomm.app.ui.i18n.AppLanguage
 import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.drinkless.tdlib.TdApi
@@ -122,6 +128,17 @@ fun AuthCommunityScreen(
     var isSuperAdminActive by remember { mutableStateOf(isSuperAdmin) }
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
 
+    var easterEggClicks by remember { mutableIntStateOf(0) }
+    var lastEasterEggClickTime by remember { mutableLongStateOf(0L) }
+
+    // Room History
+    var roomHistory by remember { mutableStateOf(RoomHistoryManager.getHistory(context)) }
+    var historyFilter by remember { mutableIntStateOf(0) } // 0 = All, 1 = My/Admin only
+
+    LaunchedEffect(Unit) {
+        roomHistory = RoomHistoryManager.getHistory(context)
+    }
+
     val isAuthenticated = tdAuthState is TdAuthState.Authenticated
     val scrollState = rememberScrollState()
 
@@ -147,10 +164,10 @@ fun AuthCommunityScreen(
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top control bar: Language and Super Admin
+        // Top control bar: Language selector
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Language selector chips
@@ -169,32 +186,32 @@ fun AuthCommunityScreen(
                     }
                 }
             }
-
-            // Super Admin quick access button
-            OutlinedButton(
-                onClick = { showSuperAdminModal = true },
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = if (isSuperAdminActive) Color(0xFFFFD600) else TelegramTextSecondary
-                )
-            ) {
-                Text(
-                    text = if (isSuperAdminActive) "⚡ ROOT" else "⚡ Admin",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // App Header
+        // App Header (Secret Easter Egg: 7 taps opens Super Admin mode)
         Text(
             text = "🛡️ ${I18n.appTitle(context)}",
             style = MaterialTheme.typography.headlineLarge,
             color = TelegramTextPrimary,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                val now = System.currentTimeMillis()
+                if (now - lastEasterEggClickTime > 1500L) {
+                    easterEggClicks = 1
+                } else {
+                    easterEggClicks++
+                    if (easterEggClicks >= 7) {
+                        easterEggClicks = 0
+                        showSuperAdminModal = true
+                    }
+                }
+                lastEasterEggClickTime = now
+            }
         )
         Text(
             text = I18n.appSubtitle(context) + "\nAES-256 Retained P2P",
@@ -674,6 +691,259 @@ fun AuthCommunityScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // =========================================================================
+        // BLOCK 2.5: ROOM ENTRY HISTORY & MY ADMIN ROOMS
+        // =========================================================================
+        if (roomHistory.isNotEmpty()) {
+            val adminCount = roomHistory.count { it.isOwner || it.isAdmin }
+            val displayedRooms = if (historyFilter == 1) {
+                roomHistory.filter { it.isOwner || it.isAdmin }
+            } else {
+                roomHistory
+            }
+            val dateFormat = remember { SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    // Header row: Title + Clear button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = I18n.historyRoomsTitle(context),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = TelegramTextPrimary
+                            )
+                            Text(
+                                text = I18n.historyRoomsSubtitle(context),
+                                fontSize = 10.sp,
+                                color = TelegramTextSecondary
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                RoomHistoryManager.clearHistory(context)
+                                roomHistory = emptyList()
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = I18n.historyClearBtn(context),
+                                fontSize = 10.sp,
+                                color = TelegramTextSecondary
+                            )
+                        }
+                    }
+
+                    // Filter tabs (if user has rooms with admin or owner privileges)
+                    if (adminCount > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Filter 0: All
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (historyFilter == 0) TelegramBlue.copy(alpha = 0.2f) else TelegramDarkCard)
+                                    .border(1.dp, if (historyFilter == 0) TelegramBlue else TelegramDivider, RoundedCornerShape(8.dp))
+                                    .clickable { historyFilter = 0 }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = I18n.historyFilterAll(context, roomHistory.size),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (historyFilter == 0) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (historyFilter == 0) TelegramBlue else TelegramTextSecondary
+                                )
+                            }
+
+                            // Filter 1: Admin / Owner only
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (historyFilter == 1) Color(0x33FFD600) else TelegramDarkCard)
+                                    .border(1.dp, if (historyFilter == 1) Color(0xFFFFD600) else TelegramDivider, RoundedCornerShape(8.dp))
+                                    .clickable { historyFilter = 1 }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = I18n.historyFilterAdmin(context, adminCount),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (historyFilter == 1) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (historyFilter == 1) Color(0xFFFFD600) else TelegramTextSecondary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (displayedRooms.isEmpty()) {
+                        Text(
+                            text = I18n.historyEmpty(context),
+                            fontSize = 11.sp,
+                            color = TelegramTextSecondary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            displayedRooms.forEach { item ->
+                                val isAdm = item.isOwner || item.isAdmin
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            channelNameInput = item.roomName
+                                            groupPassword = item.savedPassword
+                                            selectedTab = 0
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
+                                    border = BorderStroke(
+                                        width = if (isAdm) 1.5.dp else 1.dp,
+                                        color = when {
+                                            item.isOwner -> Color(0xFFFFD600)
+                                            item.isAdmin -> Color(0xFF4CAF50)
+                                            else -> TelegramDivider
+                                        }
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = item.roomName,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = TelegramTextPrimary
+                                                )
+
+                                                // Role Badge
+                                                val badgeText = when {
+                                                    item.isOwner -> I18n.historyRoleOwner(context)
+                                                    item.isAdmin -> I18n.historyRoleAdmin(context)
+                                                    else -> I18n.historyRoleMember(context)
+                                                }
+                                                val badgeColor = when {
+                                                    item.isOwner -> Color(0xFFFFD600)
+                                                    item.isAdmin -> Color(0xFF4CAF50)
+                                                    else -> TelegramTextSecondary
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                                        .border(0.5.dp, badgeColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = badgeText,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = badgeColor
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(3.dp))
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = dateFormat.format(Date(item.lastJoinedAt)),
+                                                    fontSize = 10.sp,
+                                                    color = TelegramTextSecondary
+                                                )
+                                                if (item.savedPassword.isNotBlank()) {
+                                                    Text(
+                                                        text = "• 🔑 Пароль сохранён",
+                                                        fontSize = 10.sp,
+                                                        color = TelegramBlue
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            // 1-Click Enter Button
+                                            Button(
+                                                onClick = {
+                                                    if (callSign.isBlank()) {
+                                                        Toast.makeText(context, "Укажите ваш позывной", Toast.LENGTH_SHORT).show()
+                                                    } else if (item.savedPassword.isBlank()) {
+                                                        channelNameInput = item.roomName
+                                                        groupPassword = ""
+                                                        selectedTab = 0
+                                                        Toast.makeText(context, "Введите пароль для комнаты «${item.roomName}»", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        channelNameInput = item.roomName
+                                                        groupPassword = item.savedPassword
+                                                        selectedTab = 0
+                                                        onSmartConnect(item.roomName, item.savedPassword, false, true, false)
+                                                    }
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(32.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
+                                            ) {
+                                                Text(
+                                                    text = I18n.historyQuickEnter(context),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            // Delete room from history
+                                            IconButton(
+                                                onClick = {
+                                                    RoomHistoryManager.removeRoom(context, item.roomName)
+                                                    roomHistory = RoomHistoryManager.getHistory(context)
+                                                },
+                                                modifier = Modifier.size(30.dp)
+                                            ) {
+                                                Text("✕", fontSize = 13.sp, color = TelegramTextSecondary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         // =========================================================================
         // BLOCK 3: OPTIONAL TELEGRAM ACCOUNT BRIDGE (COLLAPSIBLE / ACCORDION)
