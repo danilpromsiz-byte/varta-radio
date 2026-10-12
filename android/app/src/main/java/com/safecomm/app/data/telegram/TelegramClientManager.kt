@@ -130,11 +130,7 @@ class TelegramClientManager(private val context: Context) {
     val telegramDirectClient = TelegramDirectClient(context)
 
     private val _authState = MutableStateFlow<TelegramAuthState>(
-        if (sessionToken.isNotBlank() && communityLinkOrTag.isNotBlank()) {
-            TelegramAuthState.Ready(telegramUsername.ifBlank { userPhoneNumber }, communityLinkOrTag)
-        } else {
-            TelegramAuthState.Unauthenticated
-        }
+        TelegramAuthState.Unauthenticated
     )
     val authState: StateFlow<TelegramAuthState> = _authState.asStateFlow()
 
@@ -160,10 +156,51 @@ class TelegramClientManager(private val context: Context) {
     private var currentTopicBase: String = ""
 
     init {
+        // One-time forced migration: ensure clean login to Telegram MTProto and real closed channel
+        val isMigrated = prefs.getBoolean("tdlib_migrated_v109", false)
+        if (!isMigrated) {
+            prefs.edit()
+                .remove("session_token")
+                .remove("active_chat_id")
+                .remove("active_invite_link")
+                .remove("community_link")
+                .remove("community_password")
+                .putBoolean("tdlib_migrated_v109", true)
+                .apply()
+        }
+
         // Start genuine Telegram MTProto Client (TDLib)
         tdlibEngine.start()
         if (activeChatId != 0L) {
             tdlibEngine.setActiveChatId(activeChatId)
+        }
+
+        // Keep app state in sync with TDLib authentication
+        scope.launch {
+            tdlibEngine.authState.collect { tdState ->
+                when (tdState) {
+                    is TdAuthState.WaitPhoneNumber, is TdAuthState.WaitCode, is TdAuthState.WaitPassword, is TdAuthState.Error -> {
+                        if (_authState.value !is TelegramAuthState.Unauthenticated) {
+                            _authState.value = TelegramAuthState.Unauthenticated
+                        }
+                    }
+                    is TdAuthState.Authenticated -> {
+                        if (activeChatId != 0L && communityPassword.isNotBlank()) {
+                            val userTitle = tdState.user.let { u ->
+                                listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
+                                    u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
+                                }
+                            } ?: callSign
+                            _authState.value = TelegramAuthState.Ready(userTitle, communityLinkOrTag)
+                            tdlibEngine.setActiveChatId(activeChatId)
+                            connectToSector(activeChatId.toString(), communityPassword)
+                        } else {
+                            _authState.value = TelegramAuthState.Unauthenticated
+                        }
+                    }
+                    else -> {}
+                }
+            }
         }
 
         // Forward genuine Telegram MTProto events from TDLib

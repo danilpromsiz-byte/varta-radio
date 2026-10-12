@@ -78,6 +78,10 @@ class AppUpdateManager(private val context: Context) {
     private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
     val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
 
+    fun resetStatus() {
+        _updateStatus.value = UpdateStatus.Idle
+    }
+
     suspend fun checkForUpdates(force: Boolean = false): Result<Boolean> = withContext(Dispatchers.IO) {
         _updateStatus.value = UpdateStatus.Checking
         try {
@@ -99,17 +103,19 @@ class AppUpdateManager(private val context: Context) {
                 .url(url)
                 .header("Accept", "application/vnd.github.v3+json")
                 .header("User-Agent", "VartaRadio-App")
+                .header("Cache-Control", "no-cache")
+                .header("Pragma", "no-cache")
                 .build()
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
                 if (response.code == 404) {
                     val err = "Репозиторий «$repo» или релизы в нём не найдены (404). Опубликуйте релиз на GitHub!"
-                    _updateStatus.value = UpdateStatus.Error(err)
+                    _updateStatus.value = if (force) UpdateStatus.Error(err) else UpdateStatus.Idle
                     return@withContext Result.failure(Exception(err))
                 }
                 val err = "Ошибка GitHub API: HTTP ${response.code}"
-                _updateStatus.value = UpdateStatus.Error(err)
+                _updateStatus.value = if (force) UpdateStatus.Error(err) else UpdateStatus.Idle
                 return@withContext Result.failure(Exception(err))
             }
 
@@ -132,16 +138,17 @@ class AppUpdateManager(private val context: Context) {
                     )
                     Result.success(true)
                 } else {
-                    _updateStatus.value = UpdateStatus.Error("В релизе $remoteTag нет APK файла")
+                    val err = "В релизе $remoteTag нет APK файла"
+                    _updateStatus.value = if (force) UpdateStatus.Error(err) else UpdateStatus.Idle
                     Result.success(false)
                 }
             } else {
-                _updateStatus.value = UpdateStatus.UpToDate
+                _updateStatus.value = if (force) UpdateStatus.UpToDate else UpdateStatus.Idle
                 Result.success(false)
             }
         } catch (e: Exception) {
             Log.e("AppUpdater", "Update check failed", e)
-            _updateStatus.value = UpdateStatus.Error(e.message ?: "Ошибка проверки обновлений")
+            _updateStatus.value = if (force) UpdateStatus.Error(e.message ?: "Ошибка проверки обновлений") else UpdateStatus.Idle
             Result.failure(e)
         }
     }
@@ -237,9 +244,5 @@ class AppUpdateManager(private val context: Context) {
         } catch (_: Exception) {
             return remote != current
         }
-    }
-
-    fun resetStatus() {
-        _updateStatus.value = UpdateStatus.Idle
     }
 }

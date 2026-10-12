@@ -5,70 +5,153 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Tactical Radio Antenna -->
+    <!-- Radio Waves radiating from Antenna (Top Waves) -->
     <path
-        android:fillColor="#78909C"
-        android:pathData="M38,20 h4 v18 h-4 z" />
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M32,18 C36,12 44,10 50,10" />
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M24,24 C30,14 42,12 52,12" />
+
+    <!-- Lateral Radio Broadcast Waves (Left Side) -->
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M20,48 C16,55 16,65 20,72" />
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M14,42 C8,52 8,72 14,82" />
+
+    <!-- Lateral Radio Broadcast Waves (Right Side) -->
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M88,48 C92,55 92,65 88,72" />
+    <path
+        android:strokeColor="#FFEA00"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M94,42 C100,52 100,72 94,82" />
+
+    <!-- Tactical Rubber Antenna (Top Left) -->
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M40,26 h5 v8 h-5 z" />
+    <path
+        android:fillColor="#263238"
+        android:pathData="M41,12 h3 v14 h-3 z" />
     <path
         android:fillColor="#FFD600"
-        android:pathData="M37,17 h6 v4 h-6 z" />
+        android:pathData="M40.5,9 h4 v4 h-4 z" />
 
-    <!-- Radio Pulse Soundwaves (Left & Right) -->
+    <!-- Volume / Channel Control Knob (Top Right) -->
+    <path
+        android:fillColor="#455A64"
+        android:pathData="M63,26 h8 v8 h-8 z" />
+    <path
+        android:fillColor="#263238"
+        android:pathData="M64,23 h6 v3 h-6 z" />
     <path
         android:strokeColor="#FFD600"
-        android:strokeWidth="2.2"
-        android:strokeLineCap="round"
+        android:strokeWidth="1.2"
         android:fillColor="#00000000"
-        android:pathData="M24,42 C20,49 20,59 24,66" />
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M18,36 C13,47 13,63 18,74" />
+        android:pathData="M67,24 v6" />
 
+    <!-- PTT (Push-To-Talk) Side Button on Left -->
     <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="2.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M84,42 C88,49 88,59 84,66" />
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M90,36 C95,47 95,63 90,74" />
+        android:fillColor="#FFD600"
+        android:pathData="M30,46 h4 v18 h-4 c-1.5,0 -2.5,-1.2 -2.5,-2.5 v-13 c0,-1.3 1,-2.5 2.5,-2.5 z" />
 
-    <!-- Outer Armor Shield (Varta Crest) -->
+    <!-- Side Grip Texture Ribs (Right side) -->
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M74,48 h3 v4 h-3 z M74,54 h3 v4 h-3 z M74,60 h3 v4 h-3 z" />
+
+    <!-- Main Walkie-Talkie Chassis (Handheld Radio Body) -->
     <path
         android:fillColor="#1A2634"
-        android:strokeColor="#00E5FF"
-        android:strokeWidth="2.8"
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.6"
         android:strokeLineJoin="round"
-        android:pathData="M54,26 L76,33 C76,57 66,74 54,82 C42,74 32,57 32,33 Z" />
+        android:pathData="M37,34 h34 c3,0 5,2 5,5 v45 c0,3.5 -2.5,6 -6,6 h-28 c-3.5,0 -6,-2.5 -6,-6 v-45 c0,-3 2,-5 5,-5 z" />
 
-    <!-- Inner Shield Plate -->
+    <!-- Beveled Front Face Plate -->
     <path
         android:fillColor="#223244"
-        android:pathData="M54,30 L72,36 C72,55 64,69 54,76 C44,69 36,55 36,36 Z" />
+        android:pathData="M39,37 h30 c2,0 3.5,1.5 3.5,3.5 v43 c0,2.5 -2,4.5 -4.5,4.5 h-24 c-2.5,0 -4.5,-2 -4.5,-4.5 v-43 c0,-2 1.5,-3.5 3.5,-3.5 z" />
 
-    <!-- Tactical Yellow V Emblem -->
-    <path
-        android:fillColor="#FFD600"
-        android:pathData="M44,40 L49,40 L54,58 L59,40 L64,40 L56,66 L52,66 Z" />
-
-    <!-- Central Signal Beacon / LED -->
+    <!-- Status LED Indicator (Above Screen) -->
     <path
         android:fillColor="#00E5FF"
-        android:pathData="M54,34 A3,3 0 1,1 53.9,34 Z" />
+        android:pathData="M54,39 A1.8,1.8 0 1,1 53.9,39 Z" />
 
-    <!-- Walkie-Talkie Speaker Grille Lines -->
+    <!-- Tactical LCD Screen Display -->
+    <path
+        android:fillColor="#0B131C"
+        android:strokeColor="#FFD600"
+        android:strokeWidth="1.2"
+        android:pathData="M43,43 h22 c1.2,0 2,0.8 2,2 v9 c0,1.2 -0.8,2 -2,2 h-22 c-1.2,0 -2,-0.8 -2,-2 v-9 c0,-1.2 0.8,-2 2,-2 z" />
+
+    <!-- LCD Frequency / Signal Glyphs on Screen -->
+    <path
+        android:fillColor="#FFD600"
+        android:pathData="M46,47 h2 v5 h-2 z M49,49 h2 v3 h-2 z M52,46 h2 v6 h-2 z" />
     <path
         android:strokeColor="#FFEA00"
-        android:strokeWidth="1.6"
+        android:strokeWidth="1.2"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M48,70 L60,70 M50,73 L58,73" />
+        android:pathData="M56,49 h7" />
+
+    <!-- Central Tactical Speaker Grille Slits -->
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M44,61 h20" />
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M42,66 h24" />
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M42,71 h24" />
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M45,76 h18" />
+    <path
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M48,81 h12" />
+
+    <!-- Bottom Lanyard Mount Loop -->
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M50,90 h8 v3 c0,1 -0.8,1.8 -1.8,1.8 h-4.4 c-1,0 -1.8,-0.8 -1.8,-1.8 z" />
 
 </vector>

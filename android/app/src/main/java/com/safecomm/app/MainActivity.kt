@@ -10,11 +10,17 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.safecomm.app.data.model.*
@@ -440,43 +446,170 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // --- GITHUB UPDATE AVAILABLE DIALOG ---
-        if (updateStatus is UpdateStatus.UpdateAvailable) {
-            val updateInfo = updateStatus as UpdateStatus.UpdateAvailable
-            AlertDialog(
-                onDismissRequest = { appUpdateManager.resetStatus() },
-                title = {
-                    Text(
-                        text = "🚀 Доступно обновление: ${updateInfo.newVersion}",
-                        color = TelegramTextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Text(
-                        text = "В репозитории GitHub найдена новая версия приложения.\n\n${updateInfo.releaseNotes.ifBlank { "Рекомендуется обновить приложение для стабильной связи." }}",
-                        color = TelegramTextSecondary
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
+        // --- IN-APP MANDATORY / PROMPT UPDATE MODAL ---
+        when (val s = updateStatus) {
+            is UpdateStatus.UpdateAvailable -> {
+                AlertDialog(
+                    onDismissRequest = { appUpdateManager.resetStatus() },
+                    title = {
+                        Text(
+                            text = "🚀 Доступно обновление: ${s.newVersion}",
+                            color = TelegramTextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column {
+                            Text(
+                                text = "Вышла новая версия приложения Varta Radio.\nОбновитесь для стабильной связи и актуальных функций Telegram-каналов.",
+                                color = TelegramTextPrimary,
+                                fontSize = 14.sp
+                            )
+                            if (s.releaseNotes.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Что нового:",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AlertMilitaryYellow,
+                                    fontSize = 13.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = s.releaseNotes,
+                                    color = TelegramTextSecondary,
+                                    fontSize = 12.sp
+                                )
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
-                    ) {
-                        Text("Обновить сейчас")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { appUpdateManager.resetStatus() }) {
-                        Text("Позже", color = TelegramTextSecondary)
-                    }
-                },
-                containerColor = TelegramDarkSurface
-            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    appUpdateManager.downloadAndInstallApk(s.downloadUrl)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
+                        ) {
+                            Text("⚡ Обновить сейчас", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { appUpdateManager.resetStatus() }) {
+                            Text("Позже", color = TelegramTextSecondary)
+                        }
+                    },
+                    containerColor = TelegramDarkSurface
+                )
+            }
+            is UpdateStatus.Downloading -> {
+                AlertDialog(
+                    onDismissRequest = { /* Don't dismiss while downloading */ },
+                    title = {
+                        Text(
+                            text = "⬇️ Загрузка обновления...",
+                            color = TelegramTextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column {
+                            Text(
+                                text = "Загрузка новой версии: ${s.progressPercent}%",
+                                color = TelegramTextPrimary,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            LinearProgressIndicator(
+                                progress = { (s.progressPercent / 100f).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth().height(8.dp),
+                                color = AlertFireOrange,
+                                trackColor = TelegramDarkBg
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Пожалуйста, подождите завершения загрузки. Установка начнется автоматически.",
+                                color = TelegramTextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    },
+                    confirmButton = {},
+                    containerColor = TelegramDarkSurface
+                )
+            }
+            is UpdateStatus.ReadyToInstall -> {
+                AlertDialog(
+                    onDismissRequest = { appUpdateManager.resetStatus() },
+                    title = {
+                        Text(
+                            text = "📦 Обновление загружено",
+                            color = TelegramTextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column {
+                            Text(
+                                text = "Файл обновления успешно загружен на устройство.",
+                                color = TelegramTextPrimary,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Если окно установки не открылось автоматически, нажмите кнопку «Установить» ниже.",
+                                color = TelegramTextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                appUpdateManager.triggerApkInstall(s.apkFile)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AlertMedicalGreen)
+                        ) {
+                            Text("Установить сейчас", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { appUpdateManager.resetStatus() }) {
+                            Text("Закрыть", color = TelegramTextSecondary)
+                        }
+                    },
+                    containerColor = TelegramDarkSurface
+                )
+            }
+            is UpdateStatus.Error -> {
+                AlertDialog(
+                    onDismissRequest = { appUpdateManager.resetStatus() },
+                    title = {
+                        Text(
+                            text = "⚠️ Ошибка обновления",
+                            color = AlertShellingRed,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = s.message,
+                            color = TelegramTextPrimary,
+                            fontSize = 13.sp
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = { appUpdateManager.resetStatus() },
+                            colors = ButtonDefaults.buttonColors(containerColor = TelegramDarkCard)
+                        ) {
+                            Text("Понятно")
+                        }
+                    },
+                    containerColor = TelegramDarkSurface
+                )
+            }
+            else -> {}
         }
     }
 
