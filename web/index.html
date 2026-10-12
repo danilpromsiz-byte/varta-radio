@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SafeComm - Безопасная Связь</title>
+  
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app" class="app-root">
+    <!-- Top Bar Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button id="btn-group-selector" class="group-select-btn" title="Выбрать группу">
+          <span class="group-icon">👥</span>
+          <span id="current-group-name" class="group-name">Загрузка...</span>
+          <span class="chevron-down">▼</span>
+        </button>
+      </div>
+      <div class="header-right">
+        <div id="ws-status-badge" class="status-indicator status-offline" title="Статус сети">
+          <span class="status-dot"></span>
+          <span id="ws-status-text" class="status-text">Оффлайн</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- Active Broadcast / Audio Playing Banner -->
+    <div id="voice-incoming-banner" class="voice-incoming-banner hidden">
+      <div class="incoming-pulse"></div>
+      <div class="incoming-info">
+        <span class="incoming-icon">🔊</span>
+        <span id="incoming-sender-nick" class="incoming-nick">В эфире...</span>
+      </div>
+      <div class="incoming-bars">
+        <span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <!-- Active Sent Alert Cancellation Bar (30 sec undo window) -->
+    <div id="alert-undo-banner" class="alert-undo-banner hidden">
+      <div class="undo-content">
+        <span class="undo-text">Тревога отправлена! Отмена (<span id="undo-countdown">30</span>с)</span>
+        <button id="btn-undo-alert" class="undo-btn">ОТМЕНИТЬ</button>
+      </div>
+      <div class="undo-progress-track">
+        <div id="undo-progress-fill" class="undo-progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- Main Screens Container -->
+    <main class="main-content">
+      <!-- SCREEN 1: Walkie-Talkie & Map (Home) -->
+      <section id="screen-main" class="screen screen-active">
+        <!-- Map Container (40% Viewport height) -->
+        <div class="map-section">
+          <div id="map" class="map-canvas"></div>
+          <button id="btn-recenter-map" class="map-recenter-btn" title="Мое местоположение">🎯</button>
+          <div id="map-active-alerts-badge" class="map-alerts-badge hidden">
+            <span class="badge-icon">⚠️</span>
+            <span id="map-alerts-count">0</span> активных тревог
+          </div>
+        </div>
+
+        <!-- Controls Area (60% Viewport - Mobile Thumb Zone) -->
+        <div class="controls-section">
+          <!-- Voice PTT Zone (Large Center Button ~25% height) -->
+          <div class="ptt-container">
+            <div id="ptt-amplitude-bars" class="amplitude-bars">
+              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              <span class="bar"></span>
+            </div>
+
+            <button id="btn-ptt" class="ptt-button" aria-label="Нажмите и удерживайте для передачи голоса">
+              <div class="ptt-glow"></div>
+              <div class="ptt-inner">
+                <svg class="ptt-mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+                <span id="ptt-status-text" class="ptt-label">ЗАЖМИТЕ ДЛЯ СВЯЗИ</span>
+                <span id="ptt-timer" class="ptt-timer hidden">00:00</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Quick Action Buttons: Alert & Photo (Side-by-side, ~15% height) -->
+          <div class="action-buttons-row">
+            <button id="btn-open-alert-modal" class="btn-action btn-danger" aria-label="Сигнал тревоги">
+              <span class="action-icon">🚨</span>
+              <div class="action-text">
+                <span class="action-title">ТРЕВОГА</span>
+                <span class="action-sub">Сигнал SOS</span>
+              </div>
+            </button>
+
+            <button id="btn-quick-photo" class="btn-action btn-primary" aria-label="Сделать фото с геометкой">
+              <span class="action-icon">📷</span>
+              <div class="action-text">
+                <span class="action-title">ФОТО</span>
+                <span class="action-sub">С фиксацией</span>
+              </div>
+              <input type="file" id="camera-file-input" accept="image/*" capture="environment" class="hidden-file-input">
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: Alerts Feed Screen -->
+      <section id="screen-alerts" class="screen">
+        <div class="screen-header">
+          <h2>Лента тревог</h2>
+          <button id="btn-refresh-alerts" class="icon-btn" title="Обновить">🔄</button>
+        </div>
+        <div id="alerts-list" class="cards-list alerts-feed-list">
+          <div class="empty-state">Нет активных сигналов тревоги</div>
+        </div>
+      </section>
+
+      <!-- SCREEN 3: Voice History Screen -->
+      <section id="screen-history" class="screen">
+        <div class="screen-header">
+          <h2>История рации</h2>
+          <button id="btn-refresh-history" class="icon-btn" title="Обновить">🔄</button>
+        </div>
+        <div id="voice-history-list" class="cards-list voice-history-container">
+          <div class="empty-state">Голосовых сообщений пока нет</div>
+        </div>
+      </section>
+
+      <!-- SCREEN 4: Groups Screen -->
+      <section id="screen-groups" class="screen">
+        <div class="screen-header">
+          <h2>Управление группами</h2>
+        </div>
+        
+        <div class="groups-tab-controls">
+          <button id="tab-my-groups" class="tab-btn tab-btn-active">Мои группы</button>
+          <button id="tab-join-group" class="tab-btn">Вступить</button>
+          <button id="tab-create-group" class="tab-btn">Создать</button>
+        </div>
+
+        <!-- My Groups Tab View -->
+        <div id="view-my-groups" class="group-tab-view view-active">
+          <div id="user-groups-list" class="cards-list">
+            <div class="empty-state">Вы не состоите ни в одной группе</div>
+          </div>
+          
+          <div id="current-group-details" class="group-details-card hidden">
+            <div class="group-details-header">
+              <h3 id="details-group-name">Название группы</h3>
+              <span id="details-group-code" class="invite-badge" title="Нажмите, чтобы скопировать инвайт">Код: ...</span>
+            </div>
+            <div class="members-section-header">
+              <h4>Участники группы</h4>
+            </div>
+            <div id="group-members-list" class="members-list">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Join Group Tab View -->
+        <div id="view-join-group" class="group-tab-view hidden">
+          <form id="form-join-group" class="app-form">
+            <div class="form-group">
+              <label for="join-invite-code">Код приглашения</label>
+              <input type="text" id="join-invite-code" class="form-input" placeholder="Например: SEC-8472" required autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="join-password">Пароль группы</label>
+              <input type="password" id="join-password" class="form-input" placeholder="Пароль доступа" required autocomplete="off">
+            </div>
+            <button type="submit" class="submit-btn btn-primary">Вступить в группу</button>
+          </form>
+        </div>
+
+        <!-- Create Group Tab View -->
+        <div id="view-create-group" class="group-tab-view hidden">
+          <form id="form-create-group" class="app-form">
+            <div class="form-group">
+              <label for="create-group-name">Название группы</label>
+              <input type="text" id="create-group-name" class="form-input" placeholder="Например: Семья / Охрана Сектора" required maxlength="50">
+            </div>
+            <div class="form-group">
+              <label for="create-group-password">Пароль группы</label>
+              <input type="password" id="create-group-password" class="form-input" placeholder="Придумайте пароль" required minlength="4">
+            </div>
+            <button type="submit" class="submit-btn btn-primary">Создать новую группу</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- SCREEN 5: Settings & Profile Screen -->
+      <section id="screen-settings" class="screen">
+        <div class="screen-header">
+          <h2>Настройки и профиль</h2>
+        </div>
+
+        <div class="settings-container">
+          <!-- Profile Card -->
+          <div class="settings-card profile-card">
+            <div class="profile-avatar-wrapper">
+              <div id="profile-avatar-display" class="profile-avatar-img">👤</div>
+            </div>
+            <div class="profile-info-fields">
+              <div class="form-group">
+                <label for="input-nickname">Ваш позывной / Имя</label>
+                <div class="input-with-action">
+                  <input type="text" id="input-nickname" class="form-input" placeholder="Введите позывной" maxlength="32">
+                  <button id="btn-save-profile" class="btn-small btn-primary">ОК</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Settings Card -->
+          <div class="settings-card">
+            <h3 class="card-title">Параметры безопасности</h3>
+
+            <div class="form-group slider-group">
+              <div class="slider-header">
+                <label for="slider-radius">Радиус оповещения</label>
+                <span id="radius-value-display" class="badge-value">5 км</span>
+              </div>
+              <input type="range" id="slider-radius" min="1" max="50" step="1" value="5" class="range-slider">
+              <p class="field-hint">Звук тревоги включится только для событий в пределах этого радиуса.</p>
+            </div>
+
+            <div class="form-group toggle-group">
+              <label class="toggle-label" for="toggle-sound">
+                <span class="toggle-title">Звуковые сигналы</span>
+                <span class="field-hint">Громкий сигнал при получении тревоги</span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" id="toggle-sound" checked>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- App Info Card -->
+          <div class="settings-card info-card">
+            <div class="app-version-info">
+              <span>SafeComm Emergency WebApp</span>
+              <span class="version-tag">v1.0.0 TWA</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item nav-item-active" data-target="screen-main">
+        <span class="nav-icon">📻</span>
+        <span class="nav-label">Рация</span>
+      </button>
+      <button class="nav-item" data-target="screen-alerts">
+        <span class="nav-icon">🚨</span>
+        <span class="nav-label">Тревоги</span>
+        <span id="nav-alerts-badge" class="nav-badge hidden">0</span>
+      </button>
+      <button class="nav-item" data-target="screen-history">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">История</span>
+      </button>
+      <button class="nav-item" data-target="screen-groups">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Группа</span>
+      </button>
+      <button class="nav-item" data-target="screen-settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Настройки</span>
+      </button>
+    </nav>
+
+    <!-- MODAL 1: Alert Type Selection & Long-Press Confirmation -->
+    <div id="modal-alert-select" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h3>Выберите тип тревоги</h3>
+          <button id="btn-close-alert-modal" class="modal-close-btn">&times;</button>
+        </div>
+
+        <div class="alert-types-grid" id="alert-types-container">
+          <!-- 6 Alert types rendered dynamically or fallback -->
+        </div>
+
+        <!-- Optional Description & Photo Preview -->
+        <div class="alert-details-accordion">
+          <div class="form-group">
+            <textarea id="alert-custom-description" class="form-textarea" placeholder="Краткое описание (необязательно)" rows="2" maxlength="200"></textarea>
+          </div>
+          <div id="alert-selected-photo-preview" class="photo-preview-box hidden">
+            <img id="alert-preview-img" src="" alt="Превью фото">
+            <button id="btn-remove-photo" class="remove-photo-btn">&times;</button>
+          </div>
+        </div>
+
+        <!-- Long-Press Confirmation Button -->
+        <div class="longpress-action-container">
+          <div class="longpress-hint">Удерживайте кнопку 2 сек для подтверждения</div>
+          <button id="btn-longpress-confirm" class="btn-longpress" disabled>
+            <div id="longpress-progress" class="longpress-progress-bar"></div>
+            <span id="longpress-btn-label" class="longpress-btn-text">ВЫБЕРИТЕ ТИП СОБЫТИЯ</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: Photo Capture Confirmation Modal -->
+    <div id="modal-photo-confirm" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+          <h3>Отправка фото-фиксации</h3>
+          <button id="btn-close-photo-modal" class="modal-close-btn">&times;</button>
+        </div>
+        
+        <div class="photo-confirm-content">
+          <div class="preview-large-wrapper">
+            <img id="photo-preview-large" src="" alt="Снимок">
+          </div>
+          <div class="form-group">
+            <label for="photo-alert-type-select">Тип инцидента</label>
+            <select id="photo-alert-type-select" class="form-input">
+              <option value="danger">⚠️ Опасность</option>
+              <option value="accident">🚗 ДТП</option>
+              <option value="medical">🚑 Скорая помощь</option>
+              <option value="fire">🔥 Пожар</option>
+              <option value="suspicious">👁 Подозрительное лицо</option>
+              <option value="other">❓ Другое происшествие</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <input type="text" id="photo-comment-input" class="form-input" placeholder="Комментарий к фото" maxlength="150">
+          </div>
+          <div class="modal-actions-row">
+            <button id="btn-cancel-photo-send" class="btn-secondary">Отмена</button>
+            <button id="btn-send-photo-alert" class="btn-primary">Отправить фиксацию</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: New User Profile Setup -->
+    <div id="modal-new-profile" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-dialog-content">
+          <div class="dialog-icon">🛡️</div>
+          <h2>Добро пожаловать в SafeComm</h2>
+          <p>Для радиообмена и системы экстренных оповещений укажите ваш позывной:</p>
+          <form id="form-init-profile">
+            <div class="form-group">
+              <input type="text" id="init-nickname-input" class="form-input" placeholder="Позывной (например: Сокол-1)" required maxlength="25">
+              <span id="init-nickname-error" class="error-text hidden">Позывной занят или некорректен</span>
+            </div>
+            <button type="submit" class="submit-btn btn-primary">Продолжить</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

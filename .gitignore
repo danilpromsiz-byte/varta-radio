@@ -1,0 +1,14 @@
+# Android build outputs and caches
+*.apk
+*.aab
+.gradle/
+build/
+android/build/
+android/app/build/
+local.properties
+*.iml
+.idea/
+
+# Go / binary outputs
+*.exe
+uploads/
