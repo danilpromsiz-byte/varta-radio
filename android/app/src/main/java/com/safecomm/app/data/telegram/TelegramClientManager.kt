@@ -360,8 +360,15 @@ class TelegramClientManager(private val context: Context) {
 
             var decryptedLink: String? = null
 
-            // If room owner set verification question, and user is not the owner -> knock and wait for approval!
-            if (existing.authMode == "QUESTION" && existing.ownerId != mySenderId) {
+            // If room owner set verification question, and user is not the owner:
+            if (existing.isAbandoned) {
+                Log.d("VartaNetwork", "Room is abandoned by owner, allowing entry by password")
+            } else if (existing.authMode == "QUESTION" && existing.ownerId != mySenderId) {
+                if (verificationAnswer.trim().isBlank()) {
+                    val q = existing.verificationQuestion.ifBlank { "Подтвердите позывной и цель входа" }
+                    return@withContext Result.failure(IllegalArgumentException("NEED_ANSWER:$q"))
+                }
+
                 _connectionStatusText.value = "Запрос на вход у создателя..."
                 val knockReq = KnockRequest(
                     channelName = cleanName,
@@ -372,7 +379,9 @@ class TelegramClientManager(private val context: Context) {
                 )
                 val knockResult = channelRegistry.requestKnockApproval(knockReq)
                 val approval = knockResult.getOrElse { err ->
-                    return@withContext Result.failure(IllegalArgumentException(err.message ?: "Запрос на вход не одобрен"))
+                    val hint = if (existing.redirectionMessage.isNotBlank()) "\n📢 Записка в комнате: «${existing.redirectionMessage}»" else ""
+                    val msg = (err.message ?: "Создатель комнаты не ответил на запрос") + hint
+                    return@withContext Result.failure(IllegalArgumentException(msg))
                 }
                 if (approval.status != "APPROVED") {
                     val reason = approval.reason.ifBlank { "Создатель комнаты отклонил ваш запрос на вход." }
@@ -594,7 +603,27 @@ class TelegramClientManager(private val context: Context) {
         Result.success(Unit)
     }
 
+    suspend fun updateRedirectionMessage(message: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+        val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
+            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+
+        val updated = existing.copy(redirectionMessage = message.trim())
+        _currentChannelDescriptor.value = updated
+        channelRegistry.registerChannel(updated)
+        Result.success(Unit)
+    }
+
     fun leaveRoom() {
+        val desc = _currentChannelDescriptor.value
+        if (desc != null && desc.ownerId == mySenderId) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val updated = desc.copy(isAbandoned = true)
+                    channelRegistry.registerChannel(updated)
+                } catch (_: Exception) {}
+            }
+        }
         disconnectFromSector()
         _isSectorConnected.value = false
         _connectionStatusText.value = "Не подключено"

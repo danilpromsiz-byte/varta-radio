@@ -431,6 +431,7 @@ class MainActivity : ComponentActivity() {
                     initialVerificationQuestion = currentDescriptor?.verificationQuestion ?: "",
                     initialAutoDeleteEnabled = (currentDescriptor?.autoDeleteTtl ?: 86400) > 0,
                     initialTelegramBridgeEnabled = currentDescriptor?.telegramBridgeEnabled ?: false,
+                    initialRedirectionMessage = currentDescriptor?.redirectionMessage ?: "",
                     onSaveRoomModeration = { enabled, question ->
                         coroutineScope.launch {
                             telegramClient.updateRoomSecurity(enabled, question)
@@ -439,6 +440,17 @@ class MainActivity : ComponentActivity() {
                                 }
                                 .onFailure {
                                     Toast.makeText(this@MainActivity, "Ошибка сохранения: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    onSaveRedirectionMessage = { msg ->
+                        coroutineScope.launch {
+                            telegramClient.updateRedirectionMessage(msg)
+                                .onSuccess {
+                                    Toast.makeText(this@MainActivity, "Записка для гостей сохранена", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
                                 }
                         }
                     },

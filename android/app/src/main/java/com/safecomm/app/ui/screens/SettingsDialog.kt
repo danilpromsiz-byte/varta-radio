@@ -53,7 +53,9 @@ fun SettingsDialog(
     initialVerificationQuestion: String = "",
     initialAutoDeleteEnabled: Boolean = true,
     initialTelegramBridgeEnabled: Boolean = false,
+    initialRedirectionMessage: String = "",
     onSaveRoomModeration: ((enabled: Boolean, question: String) -> Unit)? = null,
+    onSaveRedirectionMessage: ((String) -> Unit)? = null,
     onChangeRoomPassword: ((String) -> Unit)? = null,
     onToggleAutoDelete: ((Boolean) -> Unit)? = null,
     onToggleTelegramBridge: ((Boolean) -> Unit)? = null,
@@ -73,6 +75,7 @@ fun SettingsDialog(
     var isAutoDeleteEnabled by remember { mutableStateOf(initialAutoDeleteEnabled) }
     var isTelegramBridgeEnabled by remember { mutableStateOf(initialTelegramBridgeEnabled) }
     var showLegacyTelegramSettings by remember { mutableStateOf(false) }
+    var redirectionMessageInput by remember { mutableStateOf(initialRedirectionMessage) }
 
     val scrollState = rememberScrollState()
 
@@ -487,6 +490,53 @@ fun SettingsDialog(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4CAF50))
                     ) {
                         Text("💾 Применить настройки модерации", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 5. Записка / перенаправление для гостей
+                    Text(
+                        text = "📢 Записка для гостей (если вышли / перешли)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TelegramTextPrimary
+                    )
+                    Text(
+                        text = "Увидят те, кто стучится в комнату (например: «Мы перешли в комнату 24»)",
+                        fontSize = 11.sp,
+                        color = TelegramTextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = redirectionMessageInput,
+                        onValueChange = { redirectionMessageInput = it },
+                        label = { Text("Сообщение для стучащихся в комнату", color = TelegramTextSecondary, fontSize = 11.sp) },
+                        placeholder = { Text("Например: Мы перешли в комнату 24, пароль тот же", color = TelegramTextSecondary) },
+                        singleLine = false,
+                        maxLines = 2,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = AlertFireOrange,
+                            unfocusedBorderColor = TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    if (redirectionMessageInput.trim() != initialRedirectionMessage.trim()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                onSaveRedirectionMessage?.invoke(redirectionMessageInput.trim())
+                            },
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertFireOrange)
+                        ) {
+                            Text("📢 Сохранить записку для гостей", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(18.dp))

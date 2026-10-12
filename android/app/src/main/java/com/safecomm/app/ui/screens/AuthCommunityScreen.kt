@@ -105,6 +105,7 @@ fun AuthCommunityScreen(
     // Distributed registry discovery
     var existingChannelDescriptor by remember { mutableStateOf<ChannelDescriptor?>(null) }
     var isCheckingChannel by remember { mutableStateOf(false) }
+    var showVerificationModal by remember { mutableStateOf(false) }
 
     // Optional Telegram bridge accordion
     var isTelegramSectionExpanded by remember { mutableStateOf(false) }
@@ -353,7 +354,44 @@ fun AuthCommunityScreen(
                                     )
                                 }
 
-                                if (descriptor.authMode == "QUESTION" && descriptor.verificationQuestion.isNotBlank()) {
+                                if (descriptor.redirectionMessage.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0x33FF9800)),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, AlertFireOrange)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("📢", fontSize = 14.sp)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Записка от создателя комнаты:",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = AlertFireOrange
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "«${descriptor.redirectionMessage}»",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = TelegramTextPrimary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (descriptor.isAbandoned) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "⚠️ В комнате сейчас никого нет (создатель вышел). Доступ открыт по общему паролю.",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFFFD600)
+                                    )
+                                } else if (descriptor.authMode == "QUESTION" && descriptor.verificationQuestion.isNotBlank()) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "❓ Проверочный вопрос создателя:\n«${descriptor.verificationQuestion}»",
@@ -404,15 +442,26 @@ fun AuthCommunityScreen(
                                 return@Button
                             }
 
-                            onSmartConnect(
-                                channelNameInput.trim(),
-                                groupPassword.trim(),
-                                guestVerificationAnswer.trim(),
-                                false,
-                                "",
-                                false,
-                                true
-                            )
+                            coroutineScope.launch {
+                                val desc = existingChannelDescriptor ?: onCheckChannelExists(channelNameInput.trim())
+                                if (desc != null) {
+                                    existingChannelDescriptor = desc
+                                    if (desc.authMode == "QUESTION" && !desc.isAbandoned && guestVerificationAnswer.trim().isBlank()) {
+                                        showVerificationModal = true
+                                        return@launch
+                                    }
+                                }
+
+                                onSmartConnect(
+                                    channelNameInput.trim(),
+                                    groupPassword.trim(),
+                                    guestVerificationAnswer.trim(),
+                                    false,
+                                    "",
+                                    false,
+                                    true
+                                )
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -857,6 +906,83 @@ fun AuthCommunityScreen(
                 showAvatarPicker = false
             },
             onDismiss = { showAvatarPicker = false }
+        )
+    }
+
+    if (showVerificationModal && existingChannelDescriptor != null) {
+        val desc = existingChannelDescriptor!!
+        AlertDialog(
+            onDismissRequest = { showVerificationModal = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("❓", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Проверочный вопрос", fontWeight = FontWeight.Bold, color = TelegramTextPrimary)
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Создатель комнаты «${desc.channelName}» требует ответ для допуска в эфир:",
+                        fontSize = 12.sp,
+                        color = TelegramTextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "«${desc.verificationQuestion}»",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFD600)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = guestVerificationAnswer,
+                        onValueChange = { guestVerificationAnswer = it },
+                        label = { Text("Ваш ответ создателю *", color = TelegramTextSecondary, fontSize = 11.sp) },
+                        placeholder = { Text("Напишите ответ текстом", color = TelegramTextSecondary) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = TelegramBlue,
+                            unfocusedBorderColor = TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (guestVerificationAnswer.trim().isBlank()) {
+                            Toast.makeText(context, "Введите ответ для создателя", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        showVerificationModal = false
+                        onSmartConnect(
+                            channelNameInput.trim(),
+                            groupPassword.trim(),
+                            guestVerificationAnswer.trim(),
+                            false,
+                            "",
+                            false,
+                            true
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
+                ) {
+                    Text("Отправить и войти", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVerificationModal = false }) {
+                    Text("Отмена", color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
         )
     }
 }

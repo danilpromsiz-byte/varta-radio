@@ -27,6 +27,8 @@ data class ChannelDescriptor(
     val telegramChatId: Long = 0L,
     val encryptedInviteLink: String = "",
     val autoDeleteTtl: Int = 86400, // 86400 = 24 hours (default ephemeral mode), 0 = disabled
+    val redirectionMessage: String = "", // Announcement / redirect message for visitors (e.g. "We are in room 24")
+    val isAbandoned: Boolean = false,    // Marked true when owner leaves/closes room
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -264,7 +266,7 @@ class VartaChannelRegistry {
     /**
      * Guest sends a knock request to the room owner and waits for an APPROVED or REJECTED response.
      */
-    suspend fun requestKnockApproval(request: KnockRequest, timeoutMs: Long = 45000L): Result<KnockResponse> = withContext(Dispatchers.IO) {
+    suspend fun requestKnockApproval(request: KnockRequest, timeoutMs: Long = 15000L): Result<KnockResponse> = withContext(Dispatchers.IO) {
         val knockTopic = getKnockTopic(request.channelName)
         val replyTopic = getKnockReplyTopic(request.channelName, request.guestSenderId)
         val payload = json.encodeToString(request)
@@ -344,7 +346,7 @@ class VartaChannelRegistry {
                 Result.failure(Exception("Создатель комнаты не ответил на запрос"))
             }
         } catch (e: TimeoutCancellationException) {
-            Result.failure(Exception("Создатель комнаты не ответил на запрос в течение 45 сек. Возможно, он сейчас занят или оффлайн."))
+            Result.failure(Exception("Создатель комнаты не ответил на запрос (оффлайн или занят)"))
         } catch (e: Exception) {
             Result.failure(e)
         } finally {
