@@ -82,7 +82,7 @@ fun GroupMembersDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Invite Code Box with Copy action
+                // Secure Channel Identifier Box with Copy action
                 group?.inviteCode?.let { code ->
                     Card(
                         modifier = Modifier
@@ -90,8 +90,8 @@ fun GroupMembersDialog(
                             .clip(RoundedCornerShape(12.dp))
                             .clickable {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("Invite Code", code))
-                                Toast.makeText(context, "Код приглашения скопирован: $code", Toast.LENGTH_SHORT).show()
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Varta Channel Code", code))
+                                Toast.makeText(context, "Идентификатор радиоканала скопирован", Toast.LENGTH_SHORT).show()
                             },
                         colors = CardDefaults.cardColors(containerColor = TelegramDarkCard)
                     ) {
@@ -102,9 +102,11 @@ fun GroupMembersDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text("Код приглашения:", fontSize = 11.sp, color = TelegramTextSecondary)
-                                Text(code, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TelegramBlue, letterSpacing = 2.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Идентификатор радиоканала:", fontSize = 11.sp, color = TelegramTextSecondary)
+                                Text(code, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TelegramBlue)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text("🔒 Ссылка Telegram скрыта для безопасности", fontSize = 10.sp, color = Color(0xFFFFD600))
                             }
                             Icon(imageVector = Icons.Default.ContentCopy, contentDescription = "Копировать", tint = TelegramBlue)
                         }

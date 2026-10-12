@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safecomm.app.data.telegram.TdAuthState
 import com.safecomm.app.data.telegram.TdlibEngine
+import com.safecomm.app.util.VartaChannelToken
 import com.safecomm.app.ui.components.AvatarSelectionDialog
 import com.safecomm.app.ui.components.UserAvatarView
 import com.safecomm.app.ui.theme.*
@@ -98,6 +99,7 @@ fun AuthCommunityScreen(
     var inputPhone by remember { mutableStateOf("") }
     var inputCode by remember { mutableStateOf("") }
     var input2faPassword by remember { mutableStateOf("") }
+    var showChangePhoneConfirmDialog by remember { mutableStateOf(false) }
 
     // Channel Inputs
     var channelMode by remember { mutableStateOf(0) } // 0: Создать закрытый канал, 1: Войти по ссылке/ID, 2: Мои группы
@@ -312,11 +314,11 @@ fun AuthCommunityScreen(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(
-                                onClick = { onLogOutTelegram() },
+                                onClick = { showChangePhoneConfirmDialog = true },
                                 modifier = Modifier.weight(1f).height(46.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Назад", color = TelegramTextSecondary, fontSize = 13.sp)
+                                Text("Изменить номер", color = TelegramTextSecondary, fontSize = 12.sp)
                             }
 
                             Button(
@@ -332,6 +334,40 @@ fun AuthCommunityScreen(
                             ) {
                                 Text("Войти", fontWeight = FontWeight.Bold)
                             }
+                        }
+
+                        if (showChangePhoneConfirmDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showChangePhoneConfirmDialog = false },
+                                title = { Text("Изменить номер телефона?", fontWeight = FontWeight.Bold) },
+                                text = {
+                                    Text(
+                                        "Вы уверены, что хотите вернуться к вводу номера?\nЗапрошенный код подтверждения Telegram для ${state.phoneNumber} будет аннулирован.",
+                                        fontSize = 13.sp,
+                                        color = TelegramTextSecondary
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            showChangePhoneConfirmDialog = false
+                                            onLogOutTelegram()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252))
+                                    ) {
+                                        Text("Да, изменить", fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                },
+                                dismissButton = {
+                                    OutlinedButton(onClick = { showChangePhoneConfirmDialog = false }) {
+                                        Text("Отмена", color = TelegramTextPrimary)
+                                    }
+                                },
+                                containerColor = TelegramDarkSurface,
+                                titleContentColor = TelegramTextPrimary,
+                                textContentColor = TelegramTextSecondary,
+                                shape = RoundedCornerShape(16.dp)
+                            )
                         }
                     }
 
@@ -691,7 +727,7 @@ fun AuthCommunityScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "По ссылке / ID",
+                                text = "По имени / Коду",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (channelMode == 1) Color.White else TelegramTextSecondary
@@ -745,7 +781,7 @@ fun AuthCommunityScreen(
 
                             OutlinedTextField(
                                 value = newChannelTitle,
-                                onValueChange = { newChannelTitle = it.trim() },
+                                onValueChange = { newChannelTitle = it },
                                 placeholder = { Text("Например: Дозор-Север или 74821", color = TelegramTextSecondary) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
@@ -769,12 +805,12 @@ fun AuthCommunityScreen(
                         }
 
                         1 -> {
-                            // MODE 1: Enter existing channel by link or ID
+                            // MODE 1: Enter existing channel by Name or VR- Code
                             OutlinedTextField(
                                 value = channelTargetInput,
-                                onValueChange = { channelTargetInput = it.trim() },
-                                label = { Text("Ссылка приглашения или ID группы", color = TelegramTextSecondary, fontSize = 12.sp) },
-                                placeholder = { Text("https://t.me/+xyz... или -10012345678", color = TelegramTextSecondary) },
+                                onValueChange = { channelTargetInput = it },
+                                label = { Text("Название канала или Код (VR-...)", color = TelegramTextSecondary, fontSize = 12.sp) },
+                                placeholder = { Text("Например: Дозор-1 или VR-...", color = TelegramTextSecondary) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -788,9 +824,31 @@ fun AuthCommunityScreen(
                                 shape = RoundedCornerShape(12.dp)
                             )
 
+                            val matchingChat = recentChats.firstOrNull {
+                                channelTargetInput.isNotBlank() && (it.title.equals(channelTargetInput.trim(), ignoreCase = true) || it.title.contains(channelTargetInput.trim(), ignoreCase = true))
+                            }
+                            if (matchingChat != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "✅ Найдена группа в Telegram: ${matchingChat.title}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF4CAF50),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            } else if (VartaChannelToken.isVartaToken(channelTargetInput)) {
+                                val tokenInfo = VartaChannelToken.decode(channelTargetInput)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "🛡️ Защищённый код: ${tokenInfo?.channelTitle ?: "Канал"} (Ссылка TG скрыта)",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFFFD600),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "💡 Вставьте ссылку-приглашение из Telegram (t.me/+...) со второго телефона.",
+                                text = "💡 Введите название группы из вашего Telegram или вставьте защищённый Код (VR-...) со второго телефона.",
                                 fontSize = 10.sp,
                                 color = TelegramTextSecondary
                             )
@@ -971,7 +1029,7 @@ fun AuthCommunityScreen(
                     callSign.isBlank() -> "Укажите ваш позывной"
                     groupPassword.isBlank() -> "Задайте обязательный секретный пароль канала"
                     channelMode == 0 && newChannelTitle.isBlank() -> "Укажите название нового канала"
-                    channelMode != 0 && channelTargetInput.isBlank() -> "Укажите ссылку приглашения или ID группы"
+                    channelMode != 0 && channelTargetInput.isBlank() -> "Укажите название канала или защищённый Код (VR-...)"
                     else -> ""
                 }
                 if (missingReason.isNotBlank()) {

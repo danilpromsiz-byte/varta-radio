@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
+import com.safecomm.app.util.VartaChannelToken
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
@@ -116,7 +117,15 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
     fun sendPhoneNumber(phoneNumber: String) {
         val normalized = normalizePhoneNumber(phoneNumber)
         pendingPhone = normalized
-        val c = client ?: return
+        val c = client
+        if (c == null) {
+            start()
+            scope.launch {
+                delay(800)
+                sendPhoneNumber(phoneNumber)
+            }
+            return
+        }
         val settings = TdApi.PhoneNumberAuthenticationSettings().apply {
             allowFlashCall = false
             allowMissedCall = false
@@ -124,6 +133,24 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             allowSmsRetrieverApi = false
         }
         c.send(TdApi.SetAuthenticationPhoneNumber(normalized, settings), this)
+    }
+
+    fun restartAuth(retryPhone: String? = null) {
+        scope.launch {
+            Log.d("TDLib", "Restarting TDLib authentication engine cleanly...")
+            _authState.value = TdAuthState.Initializing
+            val oldClient = client
+            client = null
+            try {
+                oldClient?.send(TdApi.Close(), null)
+            } catch (_: Exception) {}
+            delay(400)
+            start()
+            if (!retryPhone.isNullOrBlank()) {
+                delay(800)
+                sendPhoneNumber(retryPhone)
+            }
+        }
     }
 
     companion object {
@@ -176,10 +203,15 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
 
     fun logOut() {
         scope.launch {
-            try {
-                send(TdApi.LogOut())
-            } catch (_: Exception) {}
-            _authState.value = TdAuthState.WaitPhoneNumber
+            if (_authState.value is TdAuthState.Authenticated) {
+                try {
+                    send(TdApi.LogOut())
+                } catch (_: Exception) {
+                    restartAuth()
+                }
+            } else {
+                restartAuth()
+            }
         }
     }
 
@@ -206,7 +238,13 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             }
             is TdApi.Error -> {
                 Log.e("TDLib", "TDLib API error: [${`object`.code}] ${`object`.message}")
-                if (_authState.value !is TdAuthState.Authenticated) {
+                val upper = `object`.message.uppercase()
+                if (upper.contains("PHONE_NUMBER_ALREADY_SET") ||
+                    upper.contains("AUTHORIZATIONSTATEWAITCODE") ||
+                    upper.contains("METHOD IS NOT AVAILABLE IN STATE")) {
+                    Log.w("TDLib", "TDLib stuck in state machine error, triggering clean restart...")
+                    restartAuth()
+                } else if (_authState.value !is TdAuthState.Authenticated) {
                     _authState.value = TdAuthState.Error(`object`.message)
                 }
             }
@@ -232,7 +270,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     systemLanguageCode = "ru"
                     deviceModel = "Android"
                     systemVersion = Build.VERSION.RELEASE
-                    applicationVersion = "1.1.1"
+                    applicationVersion = "1.1.2"
                 }
                 client?.send(params, this)
             }
@@ -474,24 +512,52 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
         val trimmed = input.trim()
         if (trimmed.isBlank()) return@withContext Result.failure(IllegalArgumentException("Канал не указан"))
 
-        // 1. Try numeric chat ID
+        // 1. Try Varta Secure Token (VR-...)
+        if (VartaChannelToken.isVartaToken(trimmed)) {
+            val tokenInfo = VartaChannelToken.decode(trimmed)
+            if (tokenInfo != null) {
+                if (tokenInfo.inviteLink.isNotBlank()) {
+                    val joinRes = joinChannelByLink(tokenInfo.inviteLink)
+                    if (joinRes.isSuccess) return@withContext joinRes
+                }
+                if (tokenInfo.chatId != 0L) {
+                    val openRes = openChat(tokenInfo.chatId)
+                    if (openRes.isSuccess) return@withContext openRes
+                }
+            }
+        }
+
+        // 2. Try numeric chat ID
         trimmed.toLongOrNull()?.let { numId ->
             val chatRes = openChat(numId)
             if (chatRes.isSuccess) return@withContext chatRes
         }
 
-        // 2. Try invite link (https://t.me/+... or joinchat or +...)
+        // 3. Try invite link (https://t.me/+... or joinchat or +...)
         if (trimmed.contains("/+") || trimmed.contains("joinchat") || trimmed.startsWith("+")) {
             val linkRes = joinChannelByLink(trimmed)
             if (linkRes.isSuccess) return@withContext linkRes
         }
 
-        // 3. Try public chat username
+        // 4. Try matching user's own existing Telegram chats by title/name
+        val myChats = loadRecentChats(50)
+        val matchedChat = myChats.firstOrNull {
+            it.title.equals(trimmed, ignoreCase = true) || it.title.contains(trimmed, ignoreCase = true)
+        }
+        if (matchedChat != null) {
+            setActiveChatId(matchedChat.id)
+            return@withContext Result.success(matchedChat)
+        }
+
+        // 5. Try public chat username
         val pubRes = searchPublicChat(trimmed)
         if (pubRes.isSuccess) return@withContext pubRes
 
-        // 4. Fallback: try join by link directly
-        joinChannelByLink(trimmed)
+        // 6. Fallback: try join by link directly
+        val fallbackRes = joinChannelByLink(trimmed)
+        if (fallbackRes.isSuccess) return@withContext fallbackRes
+
+        Result.failure(IllegalArgumentException("Канал «$trimmed» не найден. Создайте закрытый канал или введите защищённый Код (VR-...)."))
     }
 
     suspend fun loadRecentChats(limit: Int = 30): List<TdApi.Chat> = withContext(Dispatchers.IO) {

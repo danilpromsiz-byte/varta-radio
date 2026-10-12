@@ -9,6 +9,7 @@ import com.safecomm.app.data.model.Alert
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.GroupMember
 import com.safecomm.app.data.model.VoiceMessage
+import com.safecomm.app.util.VartaChannelToken
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -156,8 +157,8 @@ class TelegramClientManager(private val context: Context) {
     private var currentTopicBase: String = ""
 
     init {
-        // One-time forced migration v111: ensure clean channel selection in Telegram MTProto and evict from cached rooms
-        val isMigrated = prefs.getBoolean("tdlib_migrated_v111", false)
+        // One-time forced migration v112: ensure clean channel selection in Telegram MTProto and evict from cached rooms
+        val isMigrated = prefs.getBoolean("tdlib_migrated_v112", false)
         if (!isMigrated) {
             prefs.edit()
                 .remove("session_token")
@@ -165,7 +166,7 @@ class TelegramClientManager(private val context: Context) {
                 .remove("active_invite_link")
                 .remove("community_link")
                 .remove("community_password")
-                .putBoolean("tdlib_migrated_v111", true)
+                .putBoolean("tdlib_migrated_v112", true)
                 .apply()
         }
 
@@ -335,8 +336,9 @@ class TelegramClientManager(private val context: Context) {
             sessionToken = "tdlib_${chat.id}"
 
             val linkRes = tdlibEngine.getInviteLink(chat.id)
-            val inviteLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
-            activeInviteLink = inviteLink
+            val rawInviteLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
+            val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
+            activeInviteLink = secureToken
 
             connectToSector(chat.id.toString(), password)
 
@@ -347,7 +349,7 @@ class TelegramClientManager(private val context: Context) {
             } ?: callSign
 
             _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
-            Result.success(Pair(chat.id, inviteLink))
+            Result.success(Pair(chat.id, secureToken))
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Failed to create Telegram channel", e)
             Result.failure(e)
@@ -364,8 +366,9 @@ class TelegramClientManager(private val context: Context) {
             sessionToken = "tdlib_${chat.id}"
 
             val linkRes = tdlibEngine.getInviteLink(chat.id)
-            val inviteLink = linkRes.getOrDefault(input)
-            activeInviteLink = inviteLink
+            val rawInviteLink = linkRes.getOrDefault(input)
+            val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
+            activeInviteLink = secureToken
 
             connectToSector(chat.id.toString(), password)
 
@@ -376,7 +379,7 @@ class TelegramClientManager(private val context: Context) {
             } ?: callSign
 
             _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
-            Result.success(Pair(chat.id, inviteLink))
+            Result.success(Pair(chat.id, secureToken))
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Failed to join Telegram channel", e)
             Result.failure(e)
