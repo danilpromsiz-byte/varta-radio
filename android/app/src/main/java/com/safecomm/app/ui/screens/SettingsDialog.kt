@@ -61,6 +61,7 @@ fun SettingsDialog(
     onToggleTelegramBridge: ((Boolean) -> Unit)? = null,
     onSaveTelegramConfig: (radiusKm: Double, soundEnabled: Boolean, token: String, chat: String, pass: String) -> Unit,
     onLeaveRoom: () -> Unit = {},
+    onDeleteRoom: (() -> Unit)? = null,
     onLogOutTelegram: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
@@ -645,6 +646,20 @@ fun SettingsDialog(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
                     ) {
                         Text("🚪 Сменить комнату", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    if (isRoomOwner && onDeleteRoom != null) {
+                        OutlinedButton(
+                            onClick = {
+                                onDismiss()
+                                onDeleteRoom()
+                            },
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                        ) {
+                            Text("🗑️ Удалить комнату из сети", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     OutlinedButton(

@@ -29,6 +29,7 @@ data class ChannelDescriptor(
     val autoDeleteTtl: Int = 86400, // 86400 = 24 hours (default ephemeral mode), 0 = disabled
     val redirectionMessage: String = "", // Announcement / redirect message for visitors (e.g. "We are in room 24")
     val isAbandoned: Boolean = false,    // Marked true when owner leaves/closes room
+    val ownerDeviceId: String = "",      // Persistent device ID of the room creator
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -170,6 +171,64 @@ class VartaChannelRegistry {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("VartaRegistry", "Error registering channel", e)
+            Result.failure(e)
+        } finally {
+            try {
+                if (client?.isConnected == true) client?.disconnect()
+                client?.close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Deletes a channel from the distributed registry by publishing a retained message with 0-byte payload.
+     * In MQTT, a retained message with empty payload tells the broker to erase the retained topic.
+     */
+    suspend fun unregisterChannel(channelName: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val topic = getTopicForChannel(channelName)
+        var client: MqttAsyncClient? = null
+
+        try {
+            val clientId = "RegDel_" + java.util.UUID.randomUUID().toString().take(8)
+            client = MqttAsyncClient(brokerUrls[0], clientId, MemoryPersistence())
+            val connOpts = MqttConnectOptions().apply {
+                serverURIs = brokerUrls
+                connectionTimeout = 5
+                keepAliveInterval = 10
+                isCleanSession = true
+            }
+
+            suspendCancellableCoroutine<Unit> { cont ->
+                client.connect(connOpts, null, object : IMqttActionListener {
+                    override fun onSuccess(asyncActionToken: IMqttToken?) {
+                        try {
+                            val msg = MqttMessage(ByteArray(0)).apply {
+                                qos = 1
+                                isRetained = true
+                            }
+                            client.publish(topic, msg, null, object : IMqttActionListener {
+                                override fun onSuccess(t: IMqttToken?) {
+                                    Log.d("VartaRegistry", "Channel deleted from registry: $topic")
+                                    if (cont.isActive) cont.resume(Unit)
+                                }
+                                override fun onFailure(t: IMqttToken?, e: Throwable?) {
+                                    Log.w("VartaRegistry", "Failed to publish delete on $topic", e)
+                                    if (cont.isActive) cont.resume(Unit)
+                                }
+                            })
+                        } catch (e: Exception) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                    }
+                    override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                })
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("VartaRegistry", "Error unregistering channel", e)
             Result.failure(e)
         } finally {
             try {

@@ -64,6 +64,7 @@ fun AuthCommunityScreen(
     currentAvatar: String = "shield",
     initialCommunity: String,
     initialPassword: String,
+    currentDeviceId: String = "",
     onSendPhoneNumber: (String) -> Unit,
     onCheckAuthCode: (String) -> Unit,
     onCheckAuthPassword: (String) -> Unit,
@@ -75,7 +76,8 @@ fun AuthCommunityScreen(
         enableVerification: Boolean,
         newQuestion: String,
         telegramBridgeEnabled: Boolean,
-        autoDeleteEnabled: Boolean
+        autoDeleteEnabled: Boolean,
+        isCreatingNewRoom: Boolean
     ) -> Unit,
     onCheckChannelExists: suspend (channelName: String) -> ChannelDescriptor?,
     loadRecentChats: suspend () -> List<TdApi.Chat>,
@@ -446,7 +448,8 @@ fun AuthCommunityScreen(
                                 val desc = existingChannelDescriptor ?: onCheckChannelExists(channelNameInput.trim())
                                 if (desc != null) {
                                     existingChannelDescriptor = desc
-                                    if (desc.authMode == "QUESTION" && !desc.isAbandoned && guestVerificationAnswer.trim().isBlank()) {
+                                    val isOwner = currentDeviceId.isNotBlank() && (desc.ownerDeviceId == currentDeviceId || desc.ownerId.startsWith(currentDeviceId))
+                                    if (desc.authMode == "QUESTION" && !desc.isAbandoned && !isOwner && guestVerificationAnswer.trim().isBlank()) {
                                         showVerificationModal = true
                                         return@launch
                                     }
@@ -459,7 +462,8 @@ fun AuthCommunityScreen(
                                     false,
                                     "",
                                     false,
-                                    true
+                                    true,
+                                    false
                                 )
                             }
                         },
@@ -537,6 +541,35 @@ fun AuthCommunityScreen(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
+
+                    if (existingChannelDescriptor != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        val desc = existingChannelDescriptor!!
+                        val isOwner = currentDeviceId.isNotBlank() && (desc.ownerDeviceId == currentDeviceId || desc.ownerId.startsWith(currentDeviceId))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = if (isOwner) Color(0x224CAF50) else Color(0x22FF9800)),
+                            border = BorderStroke(1.dp, if (isOwner) Color(0xFF4CAF50) else AlertFireOrange)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(if (isOwner) "👑" else "ℹ️", fontSize = 16.sp)
+                                Text(
+                                    text = if (isOwner) {
+                                        "Это ваша созданная ранее комната. При вводе правильного пароля её настройки будут обновлены, и вы войдете как владелец."
+                                    } else {
+                                        "Комната «${desc.channelName}» уже зарегистрирована в сети. Если это ваша комната, введите её пароль для восстановления управления."
+                                    },
+                                    fontSize = 11.sp,
+                                    color = TelegramTextPrimary
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -676,7 +709,8 @@ fun AuthCommunityScreen(
                                 enableVerification,
                                 newVerificationQuestion.trim(),
                                 telegramBridgeEnabled,
-                                autoDeleteEnabled
+                                autoDeleteEnabled,
+                                true
                             )
                         },
                         modifier = Modifier
@@ -969,7 +1003,8 @@ fun AuthCommunityScreen(
                             false,
                             "",
                             false,
-                            true
+                            true,
+                            false
                         )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)

@@ -223,11 +223,12 @@ class MainActivity : ComponentActivity() {
                     currentAvatar = telegramClient.userAvatar,
                     initialCommunity = telegramClient.communityLinkOrTag,
                     initialPassword = telegramClient.communityPassword,
+                    currentDeviceId = telegramClient.deviceId,
                     onSendPhoneNumber = { phone -> telegramClient.tdlibEngine.sendPhoneNumber(phone) },
                     onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
                     onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
                     onLogOutTelegram = { telegramClient.logout() },
-                    onSmartConnect = { channelName, password, answer, enableVerif, question, telegramBridge, autoDelete ->
+                    onSmartConnect = { channelName, password, answer, enableVerif, question, telegramBridge, autoDelete, isCreatingNewRoom ->
                         coroutineScope.launch {
                             telegramClient.enterOrJoinSmartChannel(
                                 channelName = channelName,
@@ -236,7 +237,8 @@ class MainActivity : ComponentActivity() {
                                 enableVerification = enableVerif,
                                 newQuestion = question,
                                 telegramBridgeEnabled = telegramBridge,
-                                autoDeleteEnabled = autoDelete
+                                autoDeleteEnabled = autoDelete,
+                                isCreatingNewRoom = isCreatingNewRoom
                             ).onSuccess { (chatId, inviteLink) ->
                                 VartaRadioService.start(this@MainActivity, channelName, telegramClient.callSign)
                                 Toast.makeText(this@MainActivity, "Подключено к эфиру «$channelName»!", Toast.LENGTH_SHORT).show()
@@ -426,7 +428,7 @@ class MainActivity : ComponentActivity() {
                         walkieTalkieManager.stopPlayback()
                     },
                     onKickMember = {},
-                    isRoomOwner = currentDescriptor == null || currentDescriptor?.ownerId == telegramClient.mySenderId,
+                    isRoomOwner = currentDescriptor == null || telegramClient.isRoomOwner(currentDescriptor),
                     initialVerificationEnabled = currentDescriptor?.authMode == "QUESTION",
                     initialVerificationQuestion = currentDescriptor?.verificationQuestion ?: "",
                     initialAutoDeleteEnabled = (currentDescriptor?.autoDeleteTtl ?: 86400) > 0,
@@ -501,6 +503,17 @@ class MainActivity : ComponentActivity() {
                     onLeaveRoom = {
                         telegramClient.leaveRoom()
                         Toast.makeText(this@MainActivity, "Вы вышли из комнаты", Toast.LENGTH_SHORT).show()
+                    },
+                    onDeleteRoom = {
+                        coroutineScope.launch {
+                            telegramClient.deleteRoom()
+                                .onSuccess {
+                                    Toast.makeText(this@MainActivity, "Комната удалена из сети", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка удаления: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
                     },
                     onLogOutTelegram = {
                         telegramClient.logout()

@@ -328,6 +328,13 @@ class TelegramClientManager(private val context: Context) {
 
     // --- Authentication & Sector Join ---
 
+    fun isRoomOwner(desc: ChannelDescriptor?): Boolean {
+        if (desc == null) return true
+        if (desc.ownerDeviceId.isNotBlank() && desc.ownerDeviceId == deviceId) return true
+        if (desc.ownerId == mySenderId || desc.ownerId.startsWith(deviceId)) return true
+        return false
+    }
+
     suspend fun checkChannelExists(channelName: String): ChannelDescriptor? {
         return channelRegistry.queryChannel(channelName)
     }
@@ -339,7 +346,8 @@ class TelegramClientManager(private val context: Context) {
         enableVerification: Boolean = true,
         newQuestion: String = "",
         telegramBridgeEnabled: Boolean = false,
-        autoDeleteEnabled: Boolean = true
+        autoDeleteEnabled: Boolean = true,
+        isCreatingNewRoom: Boolean = false
     ): Result<Pair<Long, String>> = withContext(Dispatchers.IO) {
         val cleanName = ChannelSecurity.normalizeChannelName(channelName)
         val pass = password.trim()
@@ -349,6 +357,103 @@ class TelegramClientManager(private val context: Context) {
         // 1. Check if channel already exists in the distributed registry
         val existing = channelRegistry.queryChannel(cleanName)
 
+        if (isCreatingNewRoom) {
+            val passHash = ChannelSecurity.hashString(pass)
+            if (existing != null) {
+                val passwordMatches = (passHash == existing.passwordHash)
+                val isOriginalOwner = isRoomOwner(existing)
+
+                if (passwordMatches || isOriginalOwner) {
+                    Log.d("VartaNetwork", "Reclaiming / updating room '$cleanName' as owner")
+                    val updated = existing.copy(
+                        ownerCallSign = callSign,
+                        ownerId = mySenderId,
+                        ownerDeviceId = deviceId,
+                        passwordHash = passHash,
+                        authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
+                        verificationQuestion = if (enableVerification) newQuestion.trim() else "",
+                        telegramBridgeEnabled = telegramBridgeEnabled,
+                        autoDeleteTtl = if (autoDeleteEnabled) 86400 else 0,
+                        isAbandoned = false
+                    )
+                    channelRegistry.registerChannel(updated)
+                    _currentChannelDescriptor.value = updated
+                    communityLinkOrTag = cleanName
+                    communityPassword = pass
+                    sessionToken = "varta_$cleanName"
+                    _isSectorConnected.value = true
+                    _connectionStatusText.value = "Комната «$cleanName» обновлена (Вы владелец)"
+                    _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
+                    _authState.value = TelegramAuthState.Ready(callSign, cleanName)
+                    connectToSector(cleanName, pass)
+                    return@withContext Result.success(Pair(activeChatId.takeIf { it != 0L } ?: 1L, activeInviteLink.ifBlank { "varta_$cleanName" }))
+                } else {
+                    return@withContext Result.failure(
+                        IllegalArgumentException("Комната «${existing.channelName}» уже зарегистрирована с другим паролем! Введите правильный пароль для управления или создайте комнату с другим названием.")
+                    )
+                }
+            } else {
+                Log.d("VartaNetwork", "Channel '$cleanName' does not exist. Creating new channel as owner...")
+
+                var newChatId = 0L
+                var rawInviteLink = ""
+                var secureToken = "varta_$cleanName"
+
+                // If creator explicitly enabled Telegram bridge AND TDLib is authenticated:
+                if (telegramBridgeEnabled && tdlibEngine.authState.value is TdAuthState.Authenticated) {
+                    try {
+                        val chatRes = tdlibEngine.createRadioChannel(channelName.trim(), "Защищённая рация Varta GO")
+                        val chat = chatRes.getOrNull()
+                        if (chat != null) {
+                            newChatId = chat.id
+                            activeChatId = chat.id
+                            val linkRes = tdlibEngine.getInviteLink(chat.id)
+                            rawInviteLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
+                            secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
+                            activeInviteLink = secureToken
+                        }
+                    } catch (e: Exception) {
+                        Log.w("VartaNetwork", "Telegram channel creation skipped: ${e.message}")
+                    }
+                }
+
+                communityLinkOrTag = cleanName
+                communityPassword = pass
+                sessionToken = "varta_$cleanName"
+                if (activeInviteLink.isBlank()) activeInviteLink = secureToken
+
+                // Register channel in distributed registry (Dark Room by default!)
+                val descriptor = ChannelDescriptor(
+                    channelName = cleanName,
+                    ownerCallSign = callSign,
+                    ownerId = mySenderId,
+                    ownerDeviceId = deviceId,
+                    passwordHash = ChannelSecurity.hashString(pass),
+                    authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
+                    verificationQuestion = if (enableVerification) newQuestion.trim() else "",
+                    verificationAnswerHash = "",
+                    telegramBridgeEnabled = telegramBridgeEnabled,
+                    telegramChatId = newChatId,
+                    encryptedInviteLink = if (rawInviteLink.isNotBlank()) ChannelSecurity.encryptInviteLink(rawInviteLink, pass) else "",
+                    autoDeleteTtl = if (autoDeleteEnabled) 86400 else 0,
+                    createdAt = System.currentTimeMillis()
+                )
+                channelRegistry.registerChannel(descriptor)
+                _currentChannelDescriptor.value = descriptor
+
+                _isSectorConnected.value = true
+                _connectionStatusText.value = "Комната «$cleanName» создана (Вы создатель)"
+                _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
+
+                _authState.value = TelegramAuthState.Ready(callSign, cleanName)
+
+                connectToSector(cleanName, pass)
+
+                return@withContext Result.success(Pair(newChatId.takeIf { it != 0L } ?: 1L, secureToken))
+            }
+        }
+
+        // --- Joining existing room ---
         if (existing != null) {
             Log.d("VartaNetwork", "Channel '$cleanName' found in registry. Validating credentials...")
 
@@ -359,11 +464,22 @@ class TelegramClientManager(private val context: Context) {
             }
 
             var decryptedLink: String? = null
+            val isUserTheOwner = isRoomOwner(existing)
 
-            // If room owner set verification question, and user is not the owner:
-            if (existing.isAbandoned) {
+            if (isUserTheOwner) {
+                // Room creator entering their own room: refresh owner id and bypass knock
+                Log.d("VartaNetwork", "Recognized device as room owner, bypassing question")
+                val updated = existing.copy(
+                    ownerCallSign = callSign,
+                    ownerId = mySenderId,
+                    ownerDeviceId = deviceId,
+                    isAbandoned = false
+                )
+                channelRegistry.registerChannel(updated)
+                _currentChannelDescriptor.value = updated
+            } else if (existing.isAbandoned) {
                 Log.d("VartaNetwork", "Room is abandoned by owner, allowing entry by password")
-            } else if (existing.authMode == "QUESTION" && existing.ownerId != mySenderId) {
+            } else if (existing.authMode == "QUESTION") {
                 if (verificationAnswer.trim().isBlank()) {
                     val q = existing.verificationQuestion.ifBlank { "Подтвердите позывной и цель входа" }
                     return@withContext Result.failure(IllegalArgumentException("NEED_ANSWER:$q"))
@@ -431,7 +547,6 @@ class TelegramClientManager(private val context: Context) {
             var rawInviteLink = ""
             var secureToken = "varta_$cleanName"
 
-            // If creator explicitly enabled Telegram bridge AND TDLib is authenticated:
             if (telegramBridgeEnabled && tdlibEngine.authState.value is TdAuthState.Authenticated) {
                 try {
                     val chatRes = tdlibEngine.createRadioChannel(channelName.trim(), "Защищённая рация Varta GO")
@@ -454,11 +569,11 @@ class TelegramClientManager(private val context: Context) {
             sessionToken = "varta_$cleanName"
             if (activeInviteLink.isBlank()) activeInviteLink = secureToken
 
-            // Register channel in distributed registry (Dark Room by default!)
             val descriptor = ChannelDescriptor(
                 channelName = cleanName,
                 ownerCallSign = callSign,
                 ownerId = mySenderId,
+                ownerDeviceId = deviceId,
                 passwordHash = ChannelSecurity.hashString(pass),
                 authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
                 verificationQuestion = if (enableVerification) newQuestion.trim() else "",
@@ -614,9 +729,18 @@ class TelegramClientManager(private val context: Context) {
         Result.success(Unit)
     }
 
+    suspend fun deleteRoom(): Result<Unit> = withContext(Dispatchers.IO) {
+        val room = communityLinkOrTag
+        if (room.isNotBlank()) {
+            channelRegistry.unregisterChannel(room)
+        }
+        leaveRoom()
+        Result.success(Unit)
+    }
+
     fun leaveRoom() {
         val desc = _currentChannelDescriptor.value
-        if (desc != null && desc.ownerId == mySenderId) {
+        if (desc != null && isRoomOwner(desc)) {
             scope.launch(Dispatchers.IO) {
                 try {
                     val updated = desc.copy(isAbandoned = true)
@@ -918,7 +1042,7 @@ class TelegramClientManager(private val context: Context) {
             val knock = json.decodeFromString<KnockRequest>(payloadStr)
             val desc = _currentChannelDescriptor.value
             // Only process knock if we are the owner or no descriptor yet (default host)
-            if (desc != null && desc.ownerId != mySenderId) {
+            if (desc != null && !isRoomOwner(desc)) {
                 Log.d("VartaNetwork", "Ignored knock: we are not room owner (owner=${desc.ownerId}, me=$mySenderId)")
                 return
             }

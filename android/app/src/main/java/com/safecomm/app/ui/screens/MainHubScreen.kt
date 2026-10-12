@@ -77,6 +77,7 @@ fun MainHubScreen(
     onToggleAutoDelete: ((Boolean) -> Unit)? = null,
     onToggleTelegramBridge: ((Boolean) -> Unit)? = null,
     onLeaveRoom: () -> Unit = {},
+    onDeleteRoom: (() -> Unit)? = null,
     onLogOutTelegram: () -> Unit = {},
     onHapticTick: () -> Unit
 ) {
@@ -382,6 +383,7 @@ fun MainHubScreen(
                 onSaveSettings(r, s, t, c, p)
             },
             onLeaveRoom = onLeaveRoom,
+            onDeleteRoom = onDeleteRoom,
             onLogOutTelegram = onLogOutTelegram,
             onDismiss = { showSettingsDialog = false }
         )
