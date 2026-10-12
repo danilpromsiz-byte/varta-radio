@@ -326,26 +326,12 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                OutlinedButton(
+                    onClick = { onCheckUpdate(repoInput) },
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { onCheckUpdate(repoInput) },
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Проверить", fontSize = 12.sp)
-                    }
-
-                    Button(
-                        onClick = { onForceUpdate(repoInput) },
-                        modifier = Modifier.weight(1.3f).height(44.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("⚡ Принудительно", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
-                    }
+                    Text("🔍 Проверить обновления", fontSize = 13.sp)
                 }
 
                 if (isUpdateAvailable) {

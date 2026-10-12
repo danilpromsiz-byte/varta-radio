@@ -273,7 +273,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     systemLanguageCode = "ru"
                     deviceModel = "Android"
                     systemVersion = Build.VERSION.RELEASE
-                    applicationVersion = "1.1.3"
+                    applicationVersion = "1.1.4"
                 }
                 client?.send(params, this)
             }
@@ -439,6 +439,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             }
             val newGroup = send<TdApi.Chat>(query)
             setActiveChatId(newGroup.id)
+            hideChatInArchive(newGroup.id)
             Result.success(newGroup)
         } catch (e: Exception) {
             Log.e("TDLib", "Failed to create radio channel", e)
@@ -469,9 +470,26 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             }
             val chat = send<TdApi.Chat>(query)
             setActiveChatId(chat.id)
+            hideChatInArchive(chat.id)
             Result.success(chat)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    fun hideChatInArchive(chatId: Long) {
+        scope.launch {
+            try {
+                send(TdApi.AddChatToList(chatId, TdApi.ChatListArchive()))
+                val notif = TdApi.ChatNotificationSettings().apply {
+                    muteFor = 2147483647
+                    useDefaultMuteFor = false
+                }
+                send(TdApi.SetChatNotificationSettings(chatId, notif))
+                Log.d("TDLib", "Chat $chatId successfully moved to Telegram Archive and muted")
+            } catch (e: Exception) {
+                Log.w("TDLib", "Failed to archive chat $chatId: ${e.message}")
+            }
         }
     }
 

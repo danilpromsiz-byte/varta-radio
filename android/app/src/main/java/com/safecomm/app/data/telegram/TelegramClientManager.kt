@@ -129,6 +129,7 @@ class TelegramClientManager(private val context: Context) {
 
     val tdlibEngine = TdlibEngine(context)
     val telegramDirectClient = TelegramDirectClient(context)
+    val channelRegistry = VartaChannelRegistry()
 
     private val _authState = MutableStateFlow<TelegramAuthState>(
         TelegramAuthState.Unauthenticated
@@ -163,8 +164,8 @@ class TelegramClientManager(private val context: Context) {
     private var currentTopicBase: String = ""
 
     init {
-        // One-time forced migration v112: ensure clean channel selection in Telegram MTProto and evict from cached rooms
-        val isMigrated = prefs.getBoolean("tdlib_migrated_v112", false)
+        // One-time forced migration v114: evict from cached rooms to enforce unified smart rooms
+        val isMigrated = prefs.getBoolean("varta_migrated_v114", false)
         if (!isMigrated) {
             prefs.edit()
                 .remove("session_token")
@@ -172,7 +173,7 @@ class TelegramClientManager(private val context: Context) {
                 .remove("active_invite_link")
                 .remove("community_link")
                 .remove("community_password")
-                .putBoolean("tdlib_migrated_v112", true)
+                .putBoolean("varta_migrated_v114", true)
                 .apply()
         }
 
@@ -202,7 +203,7 @@ class TelegramClientManager(private val context: Context) {
                             tdlibEngine.setActiveChatId(activeChatId)
                             _isSectorConnected.value = true
                             _connectionStatusText.value = "В эфире (Telegram)"
-                            connectToSector(activeChatId.toString(), communityPassword.ifBlank { "varta_default" })
+                            connectToSector(communityLinkOrTag.ifBlank { activeChatId.toString() }, communityPassword.ifBlank { "varta_default" })
                         } else {
                             _authState.value = TelegramAuthState.Unauthenticated
                         }
@@ -315,7 +316,7 @@ class TelegramClientManager(private val context: Context) {
     }
 
     private fun deriveTopicBase(sector: String, password: String): String {
-        val cleanSector = sector.trim().lowercase().replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "default" }
+        val cleanSector = ChannelSecurity.normalizeChannelName(sector)
         val cleanPass = password.trim()
         return if (cleanPass.isNotBlank()) {
             val raw = "$cleanSector:$cleanPass:VARTA_SECURE_SALT_2026"
@@ -329,6 +330,122 @@ class TelegramClientManager(private val context: Context) {
     }
 
     // --- Authentication & Sector Join ---
+
+    suspend fun checkChannelExists(channelName: String): ChannelDescriptor? {
+        return channelRegistry.queryChannel(channelName)
+    }
+
+    suspend fun enterOrJoinSmartChannel(
+        channelName: String,
+        password: String,
+        verificationAnswer: String = "",
+        enableVerification: Boolean = true,
+        newQuestion: String = "",
+        newAnswer: String = ""
+    ): Result<Pair<Long, String>> = withContext(Dispatchers.IO) {
+        val cleanName = ChannelSecurity.normalizeChannelName(channelName)
+        val pass = password.trim()
+        if (cleanName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Укажите название или номер канала"))
+        if (pass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль обязателен для защиты эфира"))
+
+        // 1. Check if channel already exists in the distributed registry
+        val existing = channelRegistry.queryChannel(cleanName)
+
+        if (existing != null) {
+            Log.d("VartaNetwork", "Channel '$cleanName' found in registry. Validating credentials...")
+
+            // Validate password
+            val passHash = ChannelSecurity.hashString(pass)
+            if (passHash != existing.passwordHash) {
+                return@withContext Result.failure(IllegalArgumentException("Неверный пароль канала «${existing.channelName}»!"))
+            }
+
+            // Validate verification question if enabled by room owner
+            if (existing.authMode == "QUESTION" && existing.verificationAnswerHash.isNotBlank()) {
+                val ansHash = ChannelSecurity.hashAnswer(verificationAnswer)
+                if (ansHash != existing.verificationAnswerHash) {
+                    val prompt = if (existing.verificationQuestion.isNotBlank()) "«${existing.verificationQuestion}»" else "секретный вопрос"
+                    return@withContext Result.failure(IllegalArgumentException("Неверный ответ на проверочный вопрос создателя:\n$prompt"))
+                }
+            }
+
+            // Decrypt Telegram invite link
+            val inviteLink = ChannelSecurity.decryptInviteLink(existing.encryptedInviteLink, pass)
+                ?: return@withContext Result.failure(IllegalStateException("Ошибка расшифровки доступа к каналу Telegram"))
+
+            // Join the exact same Telegram channel
+            val chatRes = tdlibEngine.joinOrOpenChannel(inviteLink)
+            val chat = chatRes.getOrThrow()
+            activeChatId = chat.id
+            communityLinkOrTag = chat.title
+            communityPassword = pass
+            sessionToken = "tdlib_${chat.id}"
+
+            val secureToken = VartaChannelToken.encode(chat.id, inviteLink, chat.title)
+            activeInviteLink = secureToken
+
+            val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
+                listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
+                    u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
+                }
+            } ?: callSign
+
+            _isSectorConnected.value = true
+            _connectionStatusText.value = "Канал «${chat.title}» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «${chat.title}» в эфире"))
+
+            _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
+
+            connectToSector(cleanName, pass)
+
+            Result.success(Pair(chat.id, secureToken))
+        } else {
+            Log.d("VartaNetwork", "Channel '$cleanName' does not exist. Creating new channel as owner...")
+
+            val chatRes = tdlibEngine.createRadioChannel(channelName.trim(), "Защищённая рация Varta PTT")
+            val chat = chatRes.getOrThrow()
+            activeChatId = chat.id
+            communityLinkOrTag = chat.title
+            communityPassword = pass
+            sessionToken = "tdlib_${chat.id}"
+
+            val linkRes = tdlibEngine.getInviteLink(chat.id)
+            val rawInviteLink = linkRes.getOrDefault("https://t.me/c/${chat.id}")
+            val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
+            activeInviteLink = secureToken
+
+            // Register channel in distributed registry so all peers join this exact channel
+            val descriptor = ChannelDescriptor(
+                channelName = cleanName,
+                ownerCallSign = callSign,
+                ownerId = mySenderId,
+                passwordHash = ChannelSecurity.hashString(pass),
+                authMode = if (enableVerification && newQuestion.isNotBlank() && newAnswer.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
+                verificationQuestion = if (enableVerification) newQuestion.trim() else "",
+                verificationAnswerHash = if (enableVerification && newAnswer.isNotBlank()) ChannelSecurity.hashAnswer(newAnswer) else "",
+                telegramChatId = chat.id,
+                encryptedInviteLink = ChannelSecurity.encryptInviteLink(rawInviteLink, pass),
+                createdAt = System.currentTimeMillis()
+            )
+            channelRegistry.registerChannel(descriptor)
+
+            val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
+                listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
+                    u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
+                }
+            } ?: callSign
+
+            _isSectorConnected.value = true
+            _connectionStatusText.value = "Канал «${chat.title}» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «${chat.title}» в эфире"))
+
+            _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
+
+            connectToSector(cleanName, pass)
+
+            Result.success(Pair(chat.id, secureToken))
+        }
+    }
 
     suspend fun verifyCodeAndSignIn(code: String, targetCommunity: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {

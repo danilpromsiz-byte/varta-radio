@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.safecomm.app.data.model.*
@@ -219,39 +220,25 @@ class MainActivity : ComponentActivity() {
                     onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
                     onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
                     onLogOutTelegram = { telegramClient.logout() },
-                    onCreateChannel = { title, password ->
+                    onSmartConnect = { channelName, password, answer, enableVerif, question, answerForGuests ->
                         coroutineScope.launch {
-                            telegramClient.createTelegramChannel(title, password)
-                                .onSuccess { (chatId, inviteLink) ->
-                                    VartaRadioService.start(this@MainActivity, title, telegramClient.callSign)
-                                    Toast.makeText(this@MainActivity, "Закрытый канал «$title» создан!", Toast.LENGTH_SHORT).show()
-                                }
-                                .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, "Ошибка создания: ${err.message}", Toast.LENGTH_LONG).show()
-                                }
+                            telegramClient.enterOrJoinSmartChannel(
+                                channelName = channelName,
+                                password = password,
+                                verificationAnswer = answer,
+                                enableVerification = enableVerif,
+                                newQuestion = question,
+                                newAnswer = answerForGuests
+                            ).onSuccess { (chatId, inviteLink) ->
+                                VartaRadioService.start(this@MainActivity, channelName, telegramClient.callSign)
+                                Toast.makeText(this@MainActivity, "Подключено к эфиру «$channelName»!", Toast.LENGTH_SHORT).show()
+                            }.onFailure { err ->
+                                Toast.makeText(this@MainActivity, "Ошибка входа: ${err.message}", Toast.LENGTH_LONG).show()
+                            }
                         }
                     },
-                    onJoinChannel = { input, password ->
-                        coroutineScope.launch {
-                            telegramClient.joinTelegramChannel(input, password)
-                                .onSuccess { (chatId, inviteLink) ->
-                                    VartaRadioService.start(this@MainActivity, telegramClient.communityLinkOrTag, telegramClient.callSign)
-                                    Toast.makeText(this@MainActivity, "Канал подключён!", Toast.LENGTH_SHORT).show()
-                                }
-                                .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, "Ошибка подключения: ${err.message}", Toast.LENGTH_LONG).show()
-                                }
-                        }
-                    },
-                    onEnterFallback = { callSign, sector, password, avatar ->
-                        coroutineScope.launch {
-                            telegramClient.callSign = callSign
-                            telegramClient.userAvatar = avatar
-                            telegramClient.verifyCodeAndSignIn("OK", sector, password)
-                                .onSuccess {
-                                    VartaRadioService.start(this@MainActivity, sector, callSign)
-                                }
-                        }
+                    onCheckChannelExists = { name ->
+                        telegramClient.checkChannelExists(name)
                     },
                     loadRecentChats = {
                         telegramClient.tdlibEngine.loadRecentChats()
@@ -459,10 +446,11 @@ class MainActivity : ComponentActivity() {
         when (val s = updateStatus) {
             is UpdateStatus.UpdateAvailable -> {
                 AlertDialog(
-                    onDismissRequest = { appUpdateManager.resetStatus() },
+                    onDismissRequest = { /* Mandatory update cannot be dismissed */ },
+                    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
                     title = {
                         Text(
-                            text = "🚀 Доступно обновление: ${s.newVersion}",
+                            text = "⚡ Обязательное обновление: ${s.newVersion}",
                             color = TelegramTextPrimary,
                             fontWeight = FontWeight.Bold
                         )
@@ -470,7 +458,7 @@ class MainActivity : ComponentActivity() {
                     text = {
                         Column {
                             Text(
-                                text = "Вышла новая версия приложения Varta Radio.\nОбновитесь для стабильной связи и актуальных функций Telegram-каналов.",
+                                text = "Вышла обязательная версия приложения Varta Radio.\nОбновитесь для стабильной связи и актуальной защиты комнат.",
                                 color = TelegramTextPrimary,
                                 fontSize = 14.sp
                             )
@@ -498,14 +486,10 @@ class MainActivity : ComponentActivity() {
                                     appUpdateManager.downloadAndInstallApk(s.downloadUrl)
                                 }
                             },
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
                         ) {
                             Text("⚡ Обновить сейчас", fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { appUpdateManager.resetStatus() }) {
-                            Text("Позже", color = TelegramTextSecondary)
                         }
                     },
                     containerColor = TelegramDarkSurface
@@ -514,6 +498,7 @@ class MainActivity : ComponentActivity() {
             is UpdateStatus.Downloading -> {
                 AlertDialog(
                     onDismissRequest = { /* Don't dismiss while downloading */ },
+                    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
                     title = {
                         Text(
                             text = "⬇️ Загрузка обновления...",
@@ -549,7 +534,8 @@ class MainActivity : ComponentActivity() {
             }
             is UpdateStatus.ReadyToInstall -> {
                 AlertDialog(
-                    onDismissRequest = { appUpdateManager.resetStatus() },
+                    onDismissRequest = { /* Mandatory update */ },
+                    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
                     title = {
                         Text(
                             text = "📦 Обновление загружено",
@@ -566,7 +552,7 @@ class MainActivity : ComponentActivity() {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Если окно установки не открылось автоматически, нажмите кнопку «Установить» ниже.",
+                                text = "Нажмите «Установить сейчас» для применения новой версии.",
                                 color = TelegramTextSecondary,
                                 fontSize = 12.sp
                             )
@@ -577,14 +563,10 @@ class MainActivity : ComponentActivity() {
                             onClick = {
                                 appUpdateManager.triggerApkInstall(s.apkFile)
                             },
+                            modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AlertMedicalGreen)
                         ) {
-                            Text("Установить сейчас", fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { appUpdateManager.resetStatus() }) {
-                            Text("Закрыть", color = TelegramTextSecondary)
+                            Text("📦 Установить сейчас", fontWeight = FontWeight.Bold)
                         }
                     },
                     containerColor = TelegramDarkSurface
