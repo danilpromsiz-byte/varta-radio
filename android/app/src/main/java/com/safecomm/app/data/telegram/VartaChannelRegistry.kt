@@ -20,7 +20,7 @@ data class ChannelDescriptor(
     val ownerCallSign: String,
     val ownerId: String,
     val passwordHash: String,
-    val authMode: String = "QUESTION", // "QUESTION" (manual approval) or "PASSWORD_ONLY"
+    val authMode: String = "PASSWORD_ONLY", // Access protected by room password
     val verificationQuestion: String = "",
     val verificationAnswerHash: String = "",
     val telegramBridgeEnabled: Boolean = false, // false = Dark room (invisible in Telegram), true = bridged
@@ -30,6 +30,7 @@ data class ChannelDescriptor(
     val redirectionMessage: String = "", // Announcement / redirect message for visitors (e.g. "We are in room 24")
     val isAbandoned: Boolean = false,    // Marked true when owner leaves/closes room
     val ownerDeviceId: String = "",      // Persistent device ID of the room creator
+    val bannedUsers: Map<String, Long> = emptyMap(), // key: senderId/deviceId/lowercase nickname, value: banUntilMs (-1 for permanent)
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -312,28 +313,13 @@ class VartaChannelRegistry {
         foundDescriptor
     }
 
-    fun getKnockTopic(channelName: String): String {
-        val clean = ChannelSecurity.normalizeChannelName(channelName)
-        return "varta/knock/$clean"
-    }
 
-    fun getKnockReplyTopic(channelName: String, guestSenderId: String): String {
-        val clean = ChannelSecurity.normalizeChannelName(channelName)
-        return "varta/knock_reply/$clean/$guestSenderId"
-    }
 
     /**
      * Guest sends a knock request to the room owner and waits for an APPROVED or REJECTED response.
      */
-    suspend fun requestKnockApproval(request: KnockRequest, timeoutMs: Long = 15000L): Result<KnockResponse> = withContext(Dispatchers.IO) {
-        val knockTopic = getKnockTopic(request.channelName)
-        val replyTopic = getKnockReplyTopic(request.channelName, request.guestSenderId)
-        val payload = json.encodeToString(request)
-        var client: MqttAsyncClient? = null
-        var response: KnockResponse? = null
-
-        try {
-            val clientId = "Knock_" + java.util.UUID.randomUUID().toString().take(8)
+    suspend fun requestKnockApproval(request: KnockRequest, timeoutMs: Long = 15000L): Result<KnockResponse> = Result.failure(Exception("Disabled"))
+/*
             client = MqttAsyncClient(brokerUrls[0], clientId, MemoryPersistence())
             val connOpts = MqttConnectOptions().apply {
                 serverURIs = brokerUrls
@@ -471,4 +457,5 @@ class VartaChannelRegistry {
             } catch (_: Exception) {}
         }
     }
+*/
 }

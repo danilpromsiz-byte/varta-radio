@@ -9,15 +9,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,9 +36,11 @@ fun GroupMembersDialog(
     currentUserId: Long,
     isAdmin: Boolean,
     onKickMember: (GroupMember) -> Unit,
+    onBanMember: (GroupMember, Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    var selectedMemberForModeration by remember { mutableStateOf<GroupMember?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -70,7 +70,7 @@ fun GroupMembersDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "${members.size} участников",
+                            text = "${members.size} участников онлайн",
                             fontSize = 12.sp,
                             color = TelegramTextSecondary
                         )
@@ -116,7 +116,7 @@ fun GroupMembersDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "СПИСОК УЧАСТНИКОВ:",
+                    text = "СПИСОК УЧАСТНИКОВ В ЭФИРЕ:",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = TelegramTextSecondary,
@@ -159,23 +159,27 @@ fun GroupMembersDialog(
                                         color = TelegramTextPrimary
                                     )
                                     Text(
-                                        text = if (member.role == "admin") "Администратор" else "Участник",
+                                        text = if (member.role == "admin") "Администратор комнаты" else "Участник",
                                         fontSize = 11.sp,
                                         color = if (member.role == "admin") TelegramBlue else TelegramTextSecondary
                                     )
                                 }
 
                                 if (isAdmin && !isSelf) {
-                                    IconButton(
-                                        onClick = { onKickMember(member) },
-                                        modifier = Modifier.size(32.dp)
+                                    OutlinedButton(
+                                        onClick = { selectedMemberForModeration = member },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertShellingRed)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Исключить",
-                                            tint = AlertShellingRed,
-                                            modifier = Modifier.size(20.dp)
+                                            imageVector = Icons.Default.Shield,
+                                            contentDescription = "Модерация",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = AlertShellingRed
                                         )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Бан/Кик", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -184,5 +188,115 @@ fun GroupMembersDialog(
                 }
             }
         }
+    }
+
+    // Modal moderation dialog for admin
+    selectedMemberForModeration?.let { target ->
+        AlertDialog(
+            onDismissRequest = { selectedMemberForModeration = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🛡️", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Модерация участника",
+                        fontWeight = FontWeight.Bold,
+                        color = TelegramTextPrimary
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Позывной: ${target.nickname}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color(0xFFFFD600)
+                    )
+                    Text(
+                        text = "Выберите действие для принудительного отключения участника:",
+                        fontSize = 12.sp,
+                        color = TelegramTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // 1. KICK
+                    Button(
+                        onClick = {
+                            onKickMember(target)
+                            selectedMemberForModeration = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
+                    ) {
+                        Text("🚪 Выгнать сейчас (Kick)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+
+                    // 2. BAN 15 min
+                    OutlinedButton(
+                        onClick = {
+                            onBanMember(target, 15 * 60 * 1000L)
+                            selectedMemberForModeration = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFB74D))
+                    ) {
+                        Text("⏳ Забанить на 15 минут", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                    }
+
+                    // 3. BAN 1 hour
+                    OutlinedButton(
+                        onClick = {
+                            onBanMember(target, 60 * 60 * 1000L)
+                            selectedMemberForModeration = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF7043))
+                    ) {
+                        Text("⏳ Забанить на 1 час", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                    }
+
+                    // 4. BAN 24 hours
+                    OutlinedButton(
+                        onClick = {
+                            onBanMember(target, 24 * 60 * 60 * 1000L)
+                            selectedMemberForModeration = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF4511E))
+                    ) {
+                        Text("⏳ Забанить на 24 часа", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                    }
+
+                    // 5. PERMANENT BAN
+                    Button(
+                        onClick = {
+                            onBanMember(target, -1L)
+                            selectedMemberForModeration = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                    ) {
+                        Text("🚫 Забанить навсегда", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectedMemberForModeration = null }) {
+                    Text("Отмена", color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
     }
 }

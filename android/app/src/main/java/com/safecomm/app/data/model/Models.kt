@@ -56,6 +56,7 @@ data class GroupMember(
     val nickname: String = "",
     @SerialName("avatar_url") val avatarUrl: String = "",
     val role: String = "member", // "admin" or "member"
+    val senderId: String = "",
     @SerialName("joined_at") val joinedAt: String = ""
 )
 

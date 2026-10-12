@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
+import android.widget.Toast
 import com.safecomm.app.data.model.Alert
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.GroupMember
@@ -52,6 +53,9 @@ data class VartaPacket(
     val desc: String = "",
     val photoBase64: String = "",
     val alertId: Long = 0L,
+    val targetSenderId: String = "",
+    val targetNick: String = "",
+    val banUntil: Long = 0L, // 0 = none, -1 = permanent ban, > 0 = timestamp
     val sig: String = ""
 )
 
@@ -149,14 +153,17 @@ class TelegramClientManager(private val context: Context) {
     private val _activeMembers = MutableStateFlow<List<GroupMember>>(emptyList())
     val activeMembers: StateFlow<List<GroupMember>> = _activeMembers.asStateFlow()
 
-    // Doorbell knock requests for room owner moderation
-    private val _pendingKnockRequests = MutableStateFlow<List<KnockRequest>>(emptyList())
-    val pendingKnockRequests: StateFlow<List<KnockRequest>> = _pendingKnockRequests.asStateFlow()
-
     private val _currentChannelDescriptor = MutableStateFlow<ChannelDescriptor?>(null)
     val currentChannelDescriptor: StateFlow<ChannelDescriptor?> = _currentChannelDescriptor.asStateFlow()
 
-    private val membersSeen = ConcurrentHashMap<String, Triple<String, String, Long>>() // senderId -> Triple(callSign, avatar, lastSeenMs)
+    data class PeerPresence(
+        val senderId: String,
+        val callSign: String,
+        val avatar: String,
+        val lastSeenMs: Long
+    )
+
+    private val membersSeen = ConcurrentHashMap<String, PeerPresence>() // senderId -> PeerPresence
     private val processedPacketIds: MutableSet<String> = java.util.Collections.synchronizedSet(
         object : java.util.LinkedHashMap<String, Boolean>(100, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>): Boolean = size > 250
@@ -226,7 +233,7 @@ class TelegramClientManager(private val context: Context) {
             tdlibEngine.events.collect { tdEvent ->
                 when (tdEvent) {
                     is TdRadioEvent.IncomingVoice -> {
-                        membersSeen[tdEvent.senderNick] = Triple(tdEvent.senderNick, "shield", System.currentTimeMillis())
+                        membersSeen[tdEvent.senderNick] = PeerPresence(tdEvent.senderNick, tdEvent.senderNick, "shield", System.currentTimeMillis())
                         pruneInactiveMembers()
                         _events.emit(
                             TelegramLiveEvent.LiveVoice(
@@ -249,7 +256,7 @@ class TelegramClientManager(private val context: Context) {
                             isActive = true,
                             createdAt = "Только что"
                         )
-                        membersSeen[tdEvent.senderNick] = Triple(tdEvent.senderNick, "shield", System.currentTimeMillis())
+                        membersSeen[tdEvent.senderNick] = PeerPresence(tdEvent.senderNick, tdEvent.senderNick, "shield", System.currentTimeMillis())
                         pruneInactiveMembers()
                         _events.emit(TelegramLiveEvent.LiveAlert(alert))
                     }
@@ -260,7 +267,7 @@ class TelegramClientManager(private val context: Context) {
                         _events.emit(TelegramLiveEvent.ConnectionState(tdEvent.isConnected, tdEvent.message))
                     }
                     is TdRadioEvent.MemberJoined -> {
-                        membersSeen[tdEvent.memberName] = Triple(tdEvent.memberName, "shield", System.currentTimeMillis())
+                        membersSeen[tdEvent.memberName] = PeerPresence(tdEvent.memberName, tdEvent.memberName, "shield", System.currentTimeMillis())
                         pruneInactiveMembers()
                     }
                 }
@@ -272,12 +279,12 @@ class TelegramClientManager(private val context: Context) {
             telegramDirectClient.events.collect { tgEvent ->
                 when (tgEvent) {
                     is TelegramLiveEvent.LiveVoice -> {
-                        membersSeen[tgEvent.senderNick] = Triple(tgEvent.senderNick, "shield", System.currentTimeMillis())
+                        membersSeen[tgEvent.senderNick] = PeerPresence(tgEvent.senderNick, tgEvent.senderNick, "shield", System.currentTimeMillis())
                         pruneInactiveMembers()
                         _events.emit(tgEvent)
                     }
                     is TelegramLiveEvent.LiveAlert -> {
-                        membersSeen[tgEvent.alert.senderNick] = Triple(tgEvent.alert.senderNick, "shield", System.currentTimeMillis())
+                        membersSeen[tgEvent.alert.senderNick] = PeerPresence(tgEvent.alert.senderNick, tgEvent.alert.senderNick, "shield", System.currentTimeMillis())
                         pruneInactiveMembers()
                         _events.emit(tgEvent)
                     }
@@ -342,9 +349,6 @@ class TelegramClientManager(private val context: Context) {
     suspend fun enterOrJoinSmartChannel(
         channelName: String,
         password: String,
-        verificationAnswer: String = "",
-        enableVerification: Boolean = true,
-        newQuestion: String = "",
         telegramBridgeEnabled: Boolean = false,
         autoDeleteEnabled: Boolean = true,
         isCreatingNewRoom: Boolean = false
@@ -354,8 +358,31 @@ class TelegramClientManager(private val context: Context) {
         if (cleanName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Укажите номер или название комнаты"))
         if (pass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль обязателен для защиты эфира"))
 
+        // Check local ban
+        val localBan = getLocalBan(cleanName)
+        if (localBan != null && (localBan == -1L || localBan > System.currentTimeMillis())) {
+            val msg = if (localBan == -1L) "🚫 Вы навсегда заблокированы в этой комнате администратором." else "⏳ Вы временно заблокированы в этой комнате."
+            return@withContext Result.failure(IllegalArgumentException(msg))
+        }
+
         // 1. Check if channel already exists in the distributed registry
         val existing = channelRegistry.queryChannel(cleanName)
+
+        // Check remote ban in descriptor
+        if (existing != null) {
+            val remoteBan = existing.bannedUsers[mySenderId]
+                ?: existing.bannedUsers[deviceId]
+                ?: existing.bannedUsers[callSign.trim().lowercase()]
+            if (remoteBan != null && (remoteBan == -1L || remoteBan == Long.MAX_VALUE || remoteBan > System.currentTimeMillis())) {
+                val msg = if (remoteBan == -1L || remoteBan == Long.MAX_VALUE) {
+                    "🚫 Вы навсегда заблокированы в комнате «${existing.channelName}» администратором."
+                } else {
+                    val mins = kotlin.math.max(1, ((remoteBan - System.currentTimeMillis()) / 60000L).toInt())
+                    "⏳ Вы временно заблокированы в комнате «${existing.channelName}» ещё на $mins мин."
+                }
+                return@withContext Result.failure(IllegalArgumentException(msg))
+            }
+        }
 
         if (isCreatingNewRoom) {
             val passHash = ChannelSecurity.hashString(pass)
@@ -370,8 +397,7 @@ class TelegramClientManager(private val context: Context) {
                         ownerId = mySenderId,
                         ownerDeviceId = deviceId,
                         passwordHash = passHash,
-                        authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
-                        verificationQuestion = if (enableVerification) newQuestion.trim() else "",
+                        authMode = "PASSWORD_ONLY",
                         telegramBridgeEnabled = telegramBridgeEnabled,
                         autoDeleteTtl = if (autoDeleteEnabled) 86400 else 0,
                         isAbandoned = false
@@ -429,9 +455,7 @@ class TelegramClientManager(private val context: Context) {
                     ownerId = mySenderId,
                     ownerDeviceId = deviceId,
                     passwordHash = ChannelSecurity.hashString(pass),
-                    authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
-                    verificationQuestion = if (enableVerification) newQuestion.trim() else "",
-                    verificationAnswerHash = "",
+                    authMode = "PASSWORD_ONLY",
                     telegramBridgeEnabled = telegramBridgeEnabled,
                     telegramChatId = newChatId,
                     encryptedInviteLink = if (rawInviteLink.isNotBlank()) ChannelSecurity.encryptInviteLink(rawInviteLink, pass) else "",
@@ -467,8 +491,7 @@ class TelegramClientManager(private val context: Context) {
             val isUserTheOwner = isRoomOwner(existing)
 
             if (isUserTheOwner) {
-                // Room creator entering their own room: refresh owner id and bypass knock
-                Log.d("VartaNetwork", "Recognized device as room owner, bypassing question")
+                Log.d("VartaNetwork", "Recognized device as room owner")
                 val updated = existing.copy(
                     ownerCallSign = callSign,
                     ownerId = mySenderId,
@@ -477,38 +500,9 @@ class TelegramClientManager(private val context: Context) {
                 )
                 channelRegistry.registerChannel(updated)
                 _currentChannelDescriptor.value = updated
-            } else if (existing.isAbandoned) {
-                Log.d("VartaNetwork", "Room is abandoned by owner, allowing entry by password")
-            } else if (existing.authMode == "QUESTION") {
-                if (verificationAnswer.trim().isBlank()) {
-                    val q = existing.verificationQuestion.ifBlank { "Подтвердите позывной и цель входа" }
-                    return@withContext Result.failure(IllegalArgumentException("NEED_ANSWER:$q"))
-                }
-
-                _connectionStatusText.value = "Запрос на вход у создателя..."
-                val knockReq = KnockRequest(
-                    channelName = cleanName,
-                    guestCallSign = callSign,
-                    guestSenderId = mySenderId,
-                    question = existing.verificationQuestion,
-                    answer = verificationAnswer.trim()
-                )
-                val knockResult = channelRegistry.requestKnockApproval(knockReq)
-                val approval = knockResult.getOrElse { err ->
-                    val hint = if (existing.redirectionMessage.isNotBlank()) "\n📢 Записка в комнате: «${existing.redirectionMessage}»" else ""
-                    val msg = (err.message ?: "Создатель комнаты не ответил на запрос") + hint
-                    return@withContext Result.failure(IllegalArgumentException(msg))
-                }
-                if (approval.status != "APPROVED") {
-                    val reason = approval.reason.ifBlank { "Создатель комнаты отклонил ваш запрос на вход." }
-                    return@withContext Result.failure(IllegalArgumentException(reason))
-                }
-                if (approval.encryptedInviteLink.isNotBlank()) {
-                    decryptedLink = ChannelSecurity.decryptInviteLink(approval.encryptedInviteLink, pass)
-                }
             }
 
-            if (decryptedLink.isNullOrBlank() && existing.encryptedInviteLink.isNotBlank()) {
+            if (existing.encryptedInviteLink.isNotBlank()) {
                 decryptedLink = ChannelSecurity.decryptInviteLink(existing.encryptedInviteLink, pass)
             }
 
@@ -575,9 +569,7 @@ class TelegramClientManager(private val context: Context) {
                 ownerId = mySenderId,
                 ownerDeviceId = deviceId,
                 passwordHash = ChannelSecurity.hashString(pass),
-                authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
-                verificationQuestion = if (enableVerification) newQuestion.trim() else "",
-                verificationAnswerHash = "",
+                authMode = "PASSWORD_ONLY",
                 telegramBridgeEnabled = telegramBridgeEnabled,
                 telegramChatId = newChatId,
                 encryptedInviteLink = if (rawInviteLink.isNotBlank()) ChannelSecurity.encryptInviteLink(rawInviteLink, pass) else "",
@@ -599,50 +591,91 @@ class TelegramClientManager(private val context: Context) {
         }
     }
 
-    fun approveKnock(request: KnockRequest) {
-        scope.launch {
-            val pass = communityPassword
-            val inviteLinkRes = tdlibEngine.getInviteLink(activeChatId)
-            val rawLink = inviteLinkRes.getOrNull()
-                ?: VartaChannelToken.decode(activeInviteLink)?.inviteLink
-                ?: activeInviteLink
-            val encryptedLink = ChannelSecurity.encryptInviteLink(rawLink, pass)
+    fun saveLocalBan(channelName: String, banUntil: Long) {
+        val clean = ChannelSecurity.normalizeChannelName(channelName)
+        prefs.edit().putLong("ban_$clean", banUntil).apply()
+    }
 
-            val response = KnockResponse(
-                requestId = request.requestId,
-                status = "APPROVED",
-                encryptedInviteLink = encryptedLink,
-                ownerCallSign = callSign
+    fun getLocalBan(channelName: String): Long? {
+        val clean = ChannelSecurity.normalizeChannelName(channelName)
+        val ban = prefs.getLong("ban_$clean", 0L)
+        return if (ban != 0L) ban else null
+    }
+
+    suspend fun kickMember(member: GroupMember): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val packet = VartaPacket(
+                type = "KICK",
+                senderId = mySenderId,
+                senderNick = callSign,
+                targetSenderId = member.senderId,
+                targetNick = member.nickname,
+                timestamp = System.currentTimeMillis()
             )
-            channelRegistry.sendKnockResponse(request.channelName, request.guestSenderId, response)
-            _pendingKnockRequests.value = _pendingKnockRequests.value.filter { it.requestId != request.requestId }
+            publishPacket("$currentTopicBase/control", packet, qos = 1)
+            Log.d("VartaNetwork", "Sent KICK for member ${member.nickname} (${member.senderId})")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("VartaNetwork", "Failed to kick member", e)
+            Result.failure(e)
         }
     }
 
-    fun rejectKnock(request: KnockRequest) {
-        scope.launch {
-            val response = KnockResponse(
-                requestId = request.requestId,
-                status = "REJECTED",
-                reason = "Запрос на вход отклонён создателем комнаты",
-                ownerCallSign = callSign
+    suspend fun banMember(member: GroupMember, durationMs: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val banUntil = if (durationMs <= 0L) -1L else System.currentTimeMillis() + durationMs
+            val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+            val desc = _currentChannelDescriptor.value ?: channelRegistry.queryChannel(clean)
+
+            if (desc != null) {
+                val updatedBans = desc.bannedUsers.toMutableMap()
+                if (member.senderId.isNotBlank()) {
+                    updatedBans[member.senderId] = banUntil
+                }
+                val normNick = member.nickname.trim().lowercase()
+                if (normNick.isNotBlank()) {
+                    updatedBans[normNick] = banUntil
+                }
+                val updatedDesc = desc.copy(bannedUsers = updatedBans)
+                _currentChannelDescriptor.value = updatedDesc
+                channelRegistry.registerChannel(updatedDesc)
+            }
+
+            val packet = VartaPacket(
+                type = "BAN",
+                senderId = mySenderId,
+                senderNick = callSign,
+                targetSenderId = member.senderId,
+                targetNick = member.nickname,
+                banUntil = banUntil,
+                timestamp = System.currentTimeMillis()
             )
-            channelRegistry.sendKnockResponse(request.channelName, request.guestSenderId, response)
-            _pendingKnockRequests.value = _pendingKnockRequests.value.filter { it.requestId != request.requestId }
+            publishPacket("$currentTopicBase/control", packet, qos = 1)
+            Log.d("VartaNetwork", "Sent BAN for member ${member.nickname} (${member.senderId}), until=$banUntil")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("VartaNetwork", "Failed to ban member", e)
+            Result.failure(e)
         }
     }
 
-    suspend fun updateRoomSecurity(enableVerification: Boolean, verificationQuestion: String): Result<Unit> = withContext(Dispatchers.IO) {
-        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
-        val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
-            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
-
-        val updated = existing.copy(
-            authMode = if (enableVerification) "QUESTION" else "PASSWORD_ONLY",
-            verificationQuestion = if (enableVerification) verificationQuestion.trim() else ""
-        )
-        _currentChannelDescriptor.value = updated
-        channelRegistry.registerChannel(updated)
+    suspend fun unbanUser(key: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+            val desc = _currentChannelDescriptor.value ?: channelRegistry.queryChannel(clean)
+            if (desc != null) {
+                val updatedBans = desc.bannedUsers.toMutableMap()
+                updatedBans.remove(key)
+                updatedBans.remove(key.lowercase())
+                val updatedDesc = desc.copy(bannedUsers = updatedBans)
+                _currentChannelDescriptor.value = updatedDesc
+                channelRegistry.registerChannel(updatedDesc)
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("VartaNetwork", "Failed to unban user", e)
+            Result.failure(e)
+        }
     }
 
     suspend fun changeRoomPassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -956,11 +989,7 @@ class TelegramClientManager(private val context: Context) {
                     override fun messageArrived(topic: String?, message: MqttMessage?) {
                         if (topic == null || message == null) return
                         val payload = String(message.payload, Charsets.UTF_8)
-                        if (topic.startsWith("varta/knock/")) {
-                            handleIncomingKnock(payload)
-                        } else {
-                            handleIncomingPacket(payload)
-                        }
+                        handleIncomingPacket(payload)
                     }
 
                     override fun deliveryComplete(token: IMqttDeliveryToken?) {}
@@ -1007,53 +1036,29 @@ class TelegramClientManager(private val context: Context) {
     private fun subscribeToSectorTopics() {
         val client = mqttClient ?: return
         try {
-            val roomName = communityLinkOrTag.ifBlank { activeChatId.toString() }
-            val knockTopic = channelRegistry.getKnockTopic(roomName)
             val topics = arrayOf(
                 "$currentTopicBase/presence",
                 "$currentTopicBase/voice",
                 "$currentTopicBase/alert",
                 "$currentTopicBase/control",
-                "$currentTopicBase/+",
-                knockTopic
+                "$currentTopicBase/+"
             )
-            val qos = intArrayOf(1, 1, 1, 1, 1, 1)
+            val qos = intArrayOf(1, 1, 1, 1, 1)
             client.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("VartaNetwork", "Subscribed successfully to sector topics and knock: $knockTopic")
+                    Log.d("VartaNetwork", "Subscribed successfully to sector topics")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                     Log.e("VartaNetwork", "Failed to subscribe to sector topics array, falling back to wildcard", exception)
                     try {
                         client.subscribe("$currentTopicBase/#", 1)
-                        client.subscribe(knockTopic, 1)
                     } catch (_: Exception) {}
                 }
             })
             Log.d("VartaNetwork", "Subscribing to topics: ${topics.joinToString()}")
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Subscribe error", e)
-        }
-    }
-
-    private fun handleIncomingKnock(payloadStr: String) {
-        try {
-            val knock = json.decodeFromString<KnockRequest>(payloadStr)
-            val desc = _currentChannelDescriptor.value
-            // Only process knock if we are the owner or no descriptor yet (default host)
-            if (desc != null && !isRoomOwner(desc)) {
-                Log.d("VartaNetwork", "Ignored knock: we are not room owner (owner=${desc.ownerId}, me=$mySenderId)")
-                return
-            }
-
-            val currentList = _pendingKnockRequests.value
-            if (currentList.none { it.requestId == knock.requestId }) {
-                Log.d("VartaNetwork", "Doorbell knock received from ${knock.guestCallSign}: ${knock.answer}")
-                _pendingKnockRequests.value = currentList + knock
-            }
-        } catch (e: Exception) {
-            Log.e("VartaNetwork", "Failed to parse incoming knock request", e)
         }
     }
 
@@ -1135,16 +1140,17 @@ class TelegramClientManager(private val context: Context) {
                 userId = 1L,
                 nickname = "$callSign (Вы)",
                 avatarUrl = userAvatar,
-                role = "admin"
+                role = if (isRoomOwner(_currentChannelDescriptor.value)) "admin" else "member",
+                senderId = mySenderId
             )
         )
 
         // Remove self or expired members
-        membersSeen.entries.removeIf { (id, triple) ->
+        membersSeen.entries.removeIf { (id, peer) ->
             id == mySenderId ||
-            triple.first.equals(callSign, ignoreCase = true) ||
-            triple.first.startsWith("$callSign (", ignoreCase = true) ||
-            (now - triple.third) > timeout
+            peer.callSign.equals(callSign, ignoreCase = true) ||
+            peer.callSign.startsWith("$callSign (", ignoreCase = true) ||
+            (now - peer.lastSeenMs) > timeout
         }
 
         // Deduplicate strictly by normalized nickname (no duplicate entries from PC + phone or MQTT + TDLib)
@@ -1152,16 +1158,17 @@ class TelegramClientManager(private val context: Context) {
         var counterId = 2L
 
         membersSeen.values
-            .sortedByDescending { it.third }
-            .forEach { triple ->
-                val normNick = triple.first.trim().lowercase()
+            .sortedByDescending { it.lastSeenMs }
+            .forEach { peer ->
+                val normNick = peer.callSign.trim().lowercase()
                 if (normNick.isNotBlank() && seenNicks.add(normNick)) {
                     activeList.add(
                         GroupMember(
                             userId = counterId++,
-                            nickname = triple.first.trim(),
-                            avatarUrl = triple.second,
-                            role = "member"
+                            nickname = peer.callSign.trim(),
+                            avatarUrl = peer.avatar,
+                            role = "member",
+                            senderId = peer.senderId
                         )
                     )
                 }
@@ -1180,7 +1187,8 @@ class TelegramClientManager(private val context: Context) {
             if (packet.senderId == mySenderId) return
 
             // Always immediately register or refresh member presence & avatar on ANY received packet!
-            membersSeen[packet.senderId] = Triple(
+            membersSeen[packet.senderId] = PeerPresence(
+                packet.senderId,
                 packet.senderNick,
                 packet.avatar.ifBlank { "shield" },
                 System.currentTimeMillis()
@@ -1207,6 +1215,38 @@ class TelegramClientManager(private val context: Context) {
                         Log.w("VartaNetwork", "Callsign collision detected with ${packet.senderId}! Renaming...")
                         val suffix = (10..99).random()
                         callSign = "$callSign-$suffix"
+                    }
+                }
+
+                "KICK" -> {
+                    val isTarget = (packet.targetSenderId.isNotBlank() && packet.targetSenderId == mySenderId) ||
+                                   (packet.targetNick.isNotBlank() && packet.targetNick.equals(callSign, ignoreCase = true))
+                    if (isTarget) {
+                        Log.w("VartaNetwork", "Received KICK command from admin (${packet.senderNick})")
+                        scope.launch(Dispatchers.Main) {
+                            Toast.makeText(context, "🚪 Вы были исключены из комнаты администратором.", Toast.LENGTH_LONG).show()
+                            leaveRoom()
+                        }
+                    }
+                }
+
+                "BAN" -> {
+                    val isTarget = (packet.targetSenderId.isNotBlank() && packet.targetSenderId == mySenderId) ||
+                                   (packet.targetNick.isNotBlank() && packet.targetNick.equals(callSign, ignoreCase = true))
+                    if (isTarget) {
+                        val banUntil = packet.banUntil
+                        saveLocalBan(communityLinkOrTag, banUntil)
+                        Log.w("VartaNetwork", "Received BAN command from admin (${packet.senderNick}), until=$banUntil")
+                        scope.launch(Dispatchers.Main) {
+                            val msg = if (banUntil == -1L || banUntil == Long.MAX_VALUE) {
+                                "🚫 Вы навсегда заблокированы в этой комнате администратором."
+                            } else {
+                                val mins = kotlin.math.max(1, ((banUntil - System.currentTimeMillis()) / 60000L).toInt())
+                                "⏳ Вы временно заблокированы в этой комнате на $mins мин."
+                            }
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            leaveRoom()
+                        }
                     }
                 }
 

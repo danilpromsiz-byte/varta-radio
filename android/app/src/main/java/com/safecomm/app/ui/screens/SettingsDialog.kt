@@ -49,12 +49,11 @@ fun SettingsDialog(
     onForceUpdate: (String) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     isRoomOwner: Boolean = false,
-    initialVerificationEnabled: Boolean = true,
-    initialVerificationQuestion: String = "",
+    bannedUsers: Map<String, Long> = emptyMap(),
     initialAutoDeleteEnabled: Boolean = true,
     initialTelegramBridgeEnabled: Boolean = false,
     initialRedirectionMessage: String = "",
-    onSaveRoomModeration: ((enabled: Boolean, question: String) -> Unit)? = null,
+    onUnbanUser: ((String) -> Unit)? = null,
     onSaveRedirectionMessage: ((String) -> Unit)? = null,
     onChangeRoomPassword: ((String) -> Unit)? = null,
     onToggleAutoDelete: ((Boolean) -> Unit)? = null,
@@ -70,8 +69,6 @@ fun SettingsDialog(
     var tokenInput by remember { mutableStateOf(botToken) }
     var chatIdInput by remember { mutableStateOf(chatId) }
     var passwordInput by remember { mutableStateOf(groupPassword) }
-    var isVerificationEnabled by remember { mutableStateOf(initialVerificationEnabled) }
-    var verificationQuestionInput by remember { mutableStateOf(initialVerificationQuestion) }
     var newRoomPasswordInput by remember { mutableStateOf("") }
     var isAutoDeleteEnabled by remember { mutableStateOf(initialAutoDeleteEnabled) }
     var isTelegramBridgeEnabled by remember { mutableStateOf(initialTelegramBridgeEnabled) }
@@ -305,7 +302,7 @@ fun SettingsDialog(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // --- ROOM SETTINGS & SECURITY (FOR OWNER) ---
-                if (isRoomOwner || onSaveRoomModeration != null) {
+                if (isRoomOwner) {
                     Text(
                         text = "🛡️ НАСТРОЙКИ КОМНАТЫ (СОЗДАТЕЛЬ)",
                         fontSize = 13.sp,
@@ -430,67 +427,64 @@ fun SettingsDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 4. Проверочный вопрос
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            Text(
-                                text = "Проверочный вопрос для гостей",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TelegramTextPrimary
-                            )
-                            Text(
-                                text = if (isVerificationEnabled) "Включён: ручной допуск создателем" else "Выключен: вход только по паролю",
-                                fontSize = 11.sp,
-                                color = if (isVerificationEnabled) Color(0xFFFFD600) else TelegramTextSecondary
-                            )
-                        }
-                        Switch(
-                            checked = isVerificationEnabled,
-                            onCheckedChange = { isVerificationEnabled = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = TelegramBlue
-                            )
+                    // 4. Заблокированные участники (Чёрный список)
+                    Text(
+                        text = "🚫 Заблокированные участники (${bannedUsers.size})",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TelegramTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (bannedUsers.isEmpty()) {
+                        Text(
+                            text = "Чёрный список комнаты пуст. Все участники могут подключаться по паролю.",
+                            fontSize = 11.sp,
+                            color = TelegramTextSecondary
                         )
-                    }
-
-                    if (isVerificationEnabled) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = verificationQuestionInput,
-                            onValueChange = { verificationQuestionInput = it },
-                            label = { Text("Вопрос создателя для гостей *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                            placeholder = { Text("Например: Ваш позывной или подразделение?", color = TelegramTextSecondary) },
-                            singleLine = true,
+                    } else {
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary,
-                                focusedBorderColor = Color(0xFFFFD600),
-                                unfocusedBorderColor = TelegramDivider,
-                                focusedContainerColor = TelegramDarkCard,
-                                unfocusedContainerColor = TelegramDarkCard
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            bannedUsers.forEach { (userKey, banUntil) ->
+                                val isPermanent = (banUntil == -1L || banUntil == Long.MAX_VALUE)
+                                val remainingMins = if (!isPermanent) {
+                                    ((banUntil - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
+                                } else 0L
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = userKey,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = TelegramTextPrimary
+                                            )
+                                            Text(
+                                                text = if (isPermanent) "🚫 Забанен навсегда" else "⏳ Бан ещё на $remainingMins мин.",
+                                                fontSize = 10.sp,
+                                                color = if (isPermanent) AlertShellingRed else Color(0xFFFFB74D)
+                                            )
+                                        }
 
-                    OutlinedButton(
-                        onClick = {
-                            onSaveRoomModeration?.invoke(isVerificationEnabled, verificationQuestionInput)
-                        },
-                        modifier = Modifier.fillMaxWidth().height(42.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4CAF50))
-                    ) {
-                        Text("💾 Применить настройки модерации", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        TextButton(
+                                            onClick = { onUnbanUser?.invoke(userKey) }
+                                        ) {
+                                            Text("Разблокировать", fontSize = 11.sp, color = TelegramBlue, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))

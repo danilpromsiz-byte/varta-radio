@@ -145,7 +145,6 @@ class MainActivity : ComponentActivity() {
 
         val isConnected by telegramClient.isSectorConnected.collectAsState()
         val connectionStatusText by telegramClient.connectionStatusText.collectAsState()
-        val pendingKnocks by telegramClient.pendingKnockRequests.collectAsState()
         val currentDescriptor by telegramClient.currentChannelDescriptor.collectAsState()
         var alertRadiusKm by remember { mutableDoubleStateOf(2.0) }
         var soundEnabled by remember { mutableStateOf(true) }
@@ -160,13 +159,6 @@ class MainActivity : ComponentActivity() {
         val isPlayingVoice by walkieTalkieManager.isPlaying.collectAsState()
         val currentSpeaker by walkieTalkieManager.currentSpeaker.collectAsState()
         val amplitude by walkieTalkieManager.amplitude.collectAsState()
-
-        // Haptic notification when a guest knocks on the room door
-        LaunchedEffect(pendingKnocks) {
-            if (pendingKnocks.isNotEmpty()) {
-                alertNotificationManager.triggerHapticFeedback(isLong = true)
-            }
-        }
 
         // Auto-check GitHub updates on launch
         LaunchedEffect(Unit) {
@@ -228,14 +220,11 @@ class MainActivity : ComponentActivity() {
                     onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
                     onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
                     onLogOutTelegram = { telegramClient.logout() },
-                    onSmartConnect = { channelName, password, answer, enableVerif, question, telegramBridge, autoDelete, isCreatingNewRoom ->
+                    onSmartConnect = { channelName, password, telegramBridge, autoDelete, isCreatingNewRoom ->
                         coroutineScope.launch {
                             telegramClient.enterOrJoinSmartChannel(
                                 channelName = channelName,
                                 password = password,
-                                verificationAnswer = answer,
-                                enableVerification = enableVerif,
-                                newQuestion = question,
                                 telegramBridgeEnabled = telegramBridge,
                                 autoDeleteEnabled = autoDelete,
                                 isCreatingNewRoom = isCreatingNewRoom
@@ -427,24 +416,45 @@ class MainActivity : ComponentActivity() {
                     onStopHistoryVoice = {
                         walkieTalkieManager.stopPlayback()
                     },
-                    onKickMember = {},
-                    isRoomOwner = currentDescriptor == null || telegramClient.isRoomOwner(currentDescriptor),
-                    initialVerificationEnabled = currentDescriptor?.authMode == "QUESTION",
-                    initialVerificationQuestion = currentDescriptor?.verificationQuestion ?: "",
-                    initialAutoDeleteEnabled = (currentDescriptor?.autoDeleteTtl ?: 86400) > 0,
-                    initialTelegramBridgeEnabled = currentDescriptor?.telegramBridgeEnabled ?: false,
-                    initialRedirectionMessage = currentDescriptor?.redirectionMessage ?: "",
-                    onSaveRoomModeration = { enabled, question ->
+                    onKickMember = { member ->
                         coroutineScope.launch {
-                            telegramClient.updateRoomSecurity(enabled, question)
+                            telegramClient.kickMember(member)
                                 .onSuccess {
-                                    Toast.makeText(this@MainActivity, "Настройки модерации комнаты сохранены", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Участник ${member.nickname} исключён из эфира", Toast.LENGTH_SHORT).show()
                                 }
                                 .onFailure {
-                                    Toast.makeText(this@MainActivity, "Ошибка сохранения: ${it.message}", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, "Ошибка исключения: ${it.message}", Toast.LENGTH_SHORT).show()
                                 }
                         }
                     },
+                    onBanMember = { member, durationMs ->
+                        coroutineScope.launch {
+                            telegramClient.banMember(member, durationMs)
+                                .onSuccess {
+                                    val banText = if (durationMs <= 0L) "навсегда" else "на ${durationMs / 60000} мин."
+                                    Toast.makeText(this@MainActivity, "Участник ${member.nickname} заблокирован $banText", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка блокировки: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    },
+                    bannedUsers = currentDescriptor?.bannedUsers ?: emptyMap(),
+                    onUnbanUser = { key ->
+                        coroutineScope.launch {
+                            telegramClient.unbanUser(key)
+                                .onSuccess {
+                                    Toast.makeText(this@MainActivity, "Участник $key разблокирован", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    },
+                    isRoomOwner = currentDescriptor == null || telegramClient.isRoomOwner(currentDescriptor),
+                    initialAutoDeleteEnabled = (currentDescriptor?.autoDeleteTtl ?: 86400) > 0,
+                    initialTelegramBridgeEnabled = currentDescriptor?.telegramBridgeEnabled ?: false,
+                    initialRedirectionMessage = currentDescriptor?.redirectionMessage ?: "",
                     onSaveRedirectionMessage = { msg ->
                         coroutineScope.launch {
                             telegramClient.updateRedirectionMessage(msg)
@@ -520,97 +530,6 @@ class MainActivity : ComponentActivity() {
                         Toast.makeText(this@MainActivity, "Выход из Telegram выполнен", Toast.LENGTH_SHORT).show()
                     }
                 )
-
-                // --- DOORBELL KNOCK APPROVAL DIALOG FOR ROOM OWNER ---
-                if (pendingKnocks.isNotEmpty()) {
-                    val req = pendingKnocks.first()
-                    AlertDialog(
-                        onDismissRequest = { /* Must explicitly approve or reject */ },
-                        title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🔔", fontSize = 20.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Запрос на вход в эфир",
-                                    fontWeight = FontWeight.Bold,
-                                    color = TelegramTextPrimary
-                                )
-                            }
-                        },
-                        text = {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Позывной гостя:",
-                                    fontSize = 12.sp,
-                                    color = TelegramTextSecondary
-                                )
-                                Text(
-                                    text = req.guestCallSign,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = Color(0xFFFFD600)
-                                )
-
-                                if (req.question.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Ваш проверочный вопрос:",
-                                        fontSize = 12.sp,
-                                        color = TelegramTextSecondary
-                                    )
-                                    Text(
-                                        text = "«${req.question}»",
-                                        fontSize = 13.sp,
-                                        color = TelegramTextPrimary
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Ответ гостя:",
-                                    fontSize = 12.sp,
-                                    color = TelegramTextSecondary
-                                )
-                                Text(
-                                    text = if (req.answer.isNotBlank()) "«${req.answer}»" else "(Ответ не указан)",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = TelegramBlue
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "Впустить участника в закрытую группу Telegram и подключить к рации?",
-                                    fontSize = 12.sp,
-                                    color = TelegramTextSecondary
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    telegramClient.approveKnock(req)
-                                    Toast.makeText(this@MainActivity, "Вход одобрен для ${req.guestCallSign}", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                            ) {
-                                Text("✅ Впустить", fontWeight = FontWeight.Bold)
-                            }
-                        },
-                        dismissButton = {
-                            OutlinedButton(
-                                onClick = {
-                                    telegramClient.rejectKnock(req)
-                                    Toast.makeText(this@MainActivity, "Запрос ${req.guestCallSign} отклонён", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
-                            ) {
-                                Text("❌ Отклонить", fontWeight = FontWeight.Bold)
-                            }
-                        },
-                        containerColor = TelegramDarkSurface
-                    )
-                }
             }
         }
 
