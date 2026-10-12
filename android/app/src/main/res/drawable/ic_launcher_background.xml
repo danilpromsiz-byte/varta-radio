@@ -5,44 +5,23 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Deep Tactical Midnight Slate Background -->
+    <!-- Waze Signature Vibrant Sky Cyan -->
     <path
-        android:fillColor="#0D1520"
+        android:fillColor="#33CCFF"
         android:pathData="M0,0h108v108h-108z" />
 
-    <!-- Outer Tactical Radar Ring -->
+    <!-- Top Soft Radiant Glow Arc -->
     <path
-        android:strokeColor="#1E2E42"
-        android:strokeWidth="1.2"
-        android:fillColor="#00000000"
-        android:pathData="M54,12 A42,42 0 1,1 53.9,12 Z" />
+        android:fillColor="#4DE5FF"
+        android:pathData="M0,0 L108,0 L108,36 C72,44 36,44 0,36 Z" />
 
-    <!-- Mid Tactical Radar Ring -->
+    <!-- Subtle Navigation Road Curve -->
     <path
-        android:strokeColor="#253850"
-        android:strokeWidth="1.0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.0"
+        android:strokeAlpha="0.25"
+        android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M54,26 A28,28 0 1,1 53.9,26 Z" />
-
-    <!-- Inner Tactical Radar Ring -->
-    <path
-        android:strokeColor="#FFD600"
-        android:strokeWidth="0.8"
-        android:strokeAlpha="0.4"
-        android:fillColor="#00000000"
-        android:pathData="M54,40 A14,14 0 1,1 53.9,40 Z" />
-
-    <!-- Crosshair Grid lines -->
-    <path
-        android:strokeColor="#1E2E42"
-        android:strokeWidth="0.8"
-        android:fillColor="#00000000"
-        android:pathData="M54,8 L54,100 M8,54 L100,54" />
-
-    <path
-        android:strokeColor="#172433"
-        android:strokeWidth="0.6"
-        android:fillColor="#00000000"
-        android:pathData="M22,22 L86,86 M22,86 L86,22" />
+        android:pathData="M20,92 C36,82 72,82 88,92" />
 
 </vector>

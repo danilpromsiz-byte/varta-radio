@@ -36,6 +36,7 @@ import com.safecomm.app.service.WalkieTalkieManager
 import com.safecomm.app.ui.screens.AuthCommunityScreen
 import com.safecomm.app.service.VartaRadioService
 import com.safecomm.app.ui.i18n.AppLanguage
+import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.i18n.LanguageManager
 import com.safecomm.app.ui.i18n.LanguageSelectionDialog
 import com.safecomm.app.ui.screens.MainHubScreen
@@ -177,9 +178,14 @@ class MainActivity : ComponentActivity() {
         val currentSpeaker by walkieTalkieManager.currentSpeaker.collectAsState()
         val amplitude by walkieTalkieManager.amplitude.collectAsState()
 
-        // Auto-check GitHub updates on launch
-        LaunchedEffect(Unit) {
-            appUpdateManager.checkForUpdates()
+        // Auto-check GitHub updates on launch and periodically every 10 minutes when NOT in a room
+        LaunchedEffect(authState) {
+            if (authState !is TelegramAuthState.Ready) {
+                while (true) {
+                    appUpdateManager.checkForUpdates(force = false)
+                    kotlinx.coroutines.delay(10 * 60 * 1000L)
+                }
+            }
         }
 
         // Handle incoming live events from Telegram cloud
@@ -237,6 +243,32 @@ class MainActivity : ComponentActivity() {
                     onLanguageChange = { lang ->
                         LanguageManager.setLanguage(this@MainActivity, lang)
                         appLanguage = lang
+                    },
+                    appVersion = BuildConfig.VERSION_NAME,
+                    isUpdateAvailable = updateStatus is UpdateStatus.UpdateAvailable,
+                    onCheckUpdate = {
+                        coroutineScope.launch {
+                            Toast.makeText(this@MainActivity, I18n.checkingUpdatesStatus(this@MainActivity), Toast.LENGTH_SHORT).show()
+                            appUpdateManager.checkForUpdates(force = true)
+                                .onSuccess { available ->
+                                    if (!available) {
+                                        Toast.makeText(this@MainActivity, I18n.upToDateStatus(this@MainActivity, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(this@MainActivity, I18n.updateAvailableToast(this@MainActivity), Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                                .onFailure { err ->
+                                    Toast.makeText(this@MainActivity, err.message ?: "Update check error", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    onInstallUpdate = {
+                        (updateStatus as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
+                            coroutineScope.launch {
+                                Toast.makeText(this@MainActivity, I18n.downloadingApk(this@MainActivity), Toast.LENGTH_SHORT).show()
+                                appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
+                            }
+                        }
                     },
                     isSuperAdmin = telegramClient.isSuperAdmin(),
                     onUnlockSuperAdmin = { key ->
@@ -331,11 +363,11 @@ class MainActivity : ComponentActivity() {
                     githubRepo = appUpdateManager.githubRepo,
                     appVersion = BuildConfig.VERSION_NAME,
                     updateStatusText = when (val s = updateStatus) {
-                        is UpdateStatus.Checking -> "🔄 Проверка релизов на GitHub..."
-                        is UpdateStatus.UpdateAvailable -> "🎉 Доступна новая версия: ${s.newVersion}!"
-                        is UpdateStatus.UpToDate -> "✅ Установлена актуальная версия (v${BuildConfig.VERSION_NAME})"
-                        is UpdateStatus.Downloading -> "⬇️ Загрузка обновления: ${s.progressPercent}%"
-                        is UpdateStatus.ReadyToInstall -> "📦 Запуск установки APK..."
+                        is UpdateStatus.Checking -> I18n.checkingUpdatesStatus(this@MainActivity)
+                        is UpdateStatus.UpdateAvailable -> I18n.updateAvailableStatus(this@MainActivity, s.newVersion)
+                        is UpdateStatus.UpToDate -> I18n.upToDateStatus(this@MainActivity, BuildConfig.VERSION_NAME)
+                        is UpdateStatus.Downloading -> I18n.downloadingUpdateStatus(this@MainActivity, s.progressPercent)
+                        is UpdateStatus.ReadyToInstall -> I18n.readyToInstallStatus(this@MainActivity)
                         is UpdateStatus.Error -> "⚠️ ${s.message}"
                         is UpdateStatus.Idle -> ""
                     },
@@ -348,38 +380,38 @@ class MainActivity : ComponentActivity() {
                             appUpdateManager.checkForUpdates()
                                 .onSuccess { available ->
                                     if (!available) {
-                                        Toast.makeText(this@MainActivity, "Установлена актуальная версия (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, I18n.upToDateStatus(this@MainActivity, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(this@MainActivity, "Найдено обновление! Нажмите «Установить»", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(this@MainActivity, I18n.updateAvailableToast(this@MainActivity), Toast.LENGTH_LONG).show()
                                     }
                                 }
                                 .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, err.message ?: "Ошибка проверки", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, err.message ?: "Update check error", Toast.LENGTH_LONG).show()
                                 }
                         }
                     },
                     onForceUpdate = { repo ->
                         appUpdateManager.githubRepo = repo
                         coroutineScope.launch {
-                            Toast.makeText(this@MainActivity, "Принудительный запрос релиза...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, I18n.checkingUpdatesStatus(this@MainActivity), Toast.LENGTH_SHORT).show()
                             appUpdateManager.checkForUpdates(force = true)
                                 .onSuccess { available ->
                                     if (available) {
                                         (appUpdateManager.updateStatus.value as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
-                                            Toast.makeText(this@MainActivity, "Загрузка последней сборки APK (${updateInfo.newVersion})...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(this@MainActivity, I18n.downloadingApk(this@MainActivity), Toast.LENGTH_SHORT).show()
                                             appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
                                         }
                                     }
                                 }
                                 .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, err.message ?: "Ошибка обновления", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, err.message ?: "Update error", Toast.LENGTH_LONG).show()
                                 }
                         }
                     },
                     onInstallUpdate = {
                         (updateStatus as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
                             coroutineScope.launch {
-                                Toast.makeText(this@MainActivity, "Скачивание обновления...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this@MainActivity, I18n.downloadingApk(this@MainActivity), Toast.LENGTH_SHORT).show()
                                 appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
                             }
                         }
@@ -610,7 +642,7 @@ class MainActivity : ComponentActivity() {
                     properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
                     title = {
                         Text(
-                            text = "⚡ Обязательное обновление: ${s.newVersion}",
+                            text = I18n.updateModalTitle(this@MainActivity, s.newVersion),
                             color = TelegramTextPrimary,
                             fontWeight = FontWeight.Bold
                         )
@@ -618,14 +650,14 @@ class MainActivity : ComponentActivity() {
                     text = {
                         Column {
                             Text(
-                                text = "Вышла обязательная версия приложения Varta Radio.\nОбновитесь для стабильной связи и актуальной защиты комнат.",
+                                text = I18n.updateModalDesc(this@MainActivity),
                                 color = TelegramTextPrimary,
                                 fontSize = 14.sp
                             )
                             if (s.releaseNotes.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Text(
-                                    text = "Что нового:",
+                                    text = I18n.whatsNew(this@MainActivity),
                                     fontWeight = FontWeight.SemiBold,
                                     color = AlertMilitaryYellow,
                                     fontSize = 13.sp
@@ -649,7 +681,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
                         ) {
-                            Text("⚡ Обновить сейчас", fontWeight = FontWeight.Bold)
+                            Text(I18n.installUpdateBtn(this@MainActivity), fontWeight = FontWeight.Bold)
                         }
                     },
                     containerColor = TelegramDarkSurface
@@ -661,7 +693,7 @@ class MainActivity : ComponentActivity() {
                     properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
                     title = {
                         Text(
-                            text = "⬇️ Загрузка обновления...",
+                            text = I18n.downloadingUpdateTitle(this@MainActivity),
                             color = TelegramTextPrimary,
                             fontWeight = FontWeight.Bold
                         )
@@ -669,7 +701,7 @@ class MainActivity : ComponentActivity() {
                     text = {
                         Column {
                             Text(
-                                text = "Загрузка новой версии: ${s.progressPercent}%",
+                                text = I18n.downloadProgressText(this@MainActivity, s.progressPercent),
                                 color = TelegramTextPrimary,
                                 fontSize = 14.sp
                             )
@@ -682,7 +714,7 @@ class MainActivity : ComponentActivity() {
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Пожалуйста, подождите завершения загрузки. Установка начнется автоматически.",
+                                text = I18n.downloadWaitText(this@MainActivity),
                                 color = TelegramTextSecondary,
                                 fontSize = 12.sp
                             )
@@ -698,7 +730,7 @@ class MainActivity : ComponentActivity() {
                     properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
                     title = {
                         Text(
-                            text = "📦 Обновление загружено",
+                            text = I18n.updateDownloadedTitle(this@MainActivity),
                             color = TelegramTextPrimary,
                             fontWeight = FontWeight.Bold
                         )
@@ -706,13 +738,13 @@ class MainActivity : ComponentActivity() {
                     text = {
                         Column {
                             Text(
-                                text = "Файл обновления успешно загружен на устройство.",
+                                text = I18n.updateDownloadedDesc(this@MainActivity),
                                 color = TelegramTextPrimary,
                                 fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Нажмите «Установить сейчас» для применения новой версии.",
+                                text = I18n.installNowPrompt(this@MainActivity),
                                 color = TelegramTextSecondary,
                                 fontSize = 12.sp
                             )
@@ -726,7 +758,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AlertMedicalGreen)
                         ) {
-                            Text("📦 Установить сейчас", fontWeight = FontWeight.Bold)
+                            Text(I18n.installNowBtn(this@MainActivity), fontWeight = FontWeight.Bold)
                         }
                     },
                     containerColor = TelegramDarkSurface
@@ -737,7 +769,7 @@ class MainActivity : ComponentActivity() {
                     onDismissRequest = { appUpdateManager.resetStatus() },
                     title = {
                         Text(
-                            text = "⚠️ Ошибка обновления",
+                            text = I18n.updateErrorTitle(this@MainActivity),
                             color = AlertShellingRed,
                             fontWeight = FontWeight.Bold
                         )
@@ -754,7 +786,7 @@ class MainActivity : ComponentActivity() {
                             onClick = { appUpdateManager.resetStatus() },
                             colors = ButtonDefaults.buttonColors(containerColor = TelegramDarkCard)
                         ) {
-                            Text("Понятно")
+                            Text(I18n.gotItBtn(this@MainActivity))
                         }
                     },
                     containerColor = TelegramDarkSurface

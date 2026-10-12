@@ -4,13 +4,13 @@ import android.content.Context
 import com.safecomm.app.BuildConfig
 
 enum class AppLanguage(val code: String, val title: String, val flag: String) {
-    RU("ru", "Русский", "🇷🇺"),
+    EN("en", "English", "🇬🇧"),
     UK("uk", "Українська", "🇺🇦"),
-    EN("en", "English", "🇬🇧");
+    RU("ru", "Русский", "🇷🇺");
 
     companion object {
         fun fromCode(code: String): AppLanguage {
-            return entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: RU
+            return entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: EN
         }
     }
 }
@@ -29,8 +29,8 @@ object LanguageManager {
             val sys = java.util.Locale.getDefault().language.lowercase()
             when {
                 sys.startsWith("uk") -> AppLanguage.UK
-                sys.startsWith("en") -> AppLanguage.EN
-                else -> AppLanguage.RU
+                sys.startsWith("ru") -> AppLanguage.RU
+                else -> AppLanguage.EN
             }
         }
     }
@@ -39,20 +39,20 @@ object LanguageManager {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_LANG, lang.code)
-            .putInt(KEY_PROMPT_VERSION, 21)
+            .putInt(KEY_PROMPT_VERSION, 23)
             .apply()
     }
 
     fun shouldPromptLanguage(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val lastVer = prefs.getInt(KEY_PROMPT_VERSION, 0)
-        return lastVer < 21
+        return lastVer < 23
     }
 
     fun markPromptCompleted(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putInt(KEY_PROMPT_VERSION, 21)
+            .putInt(KEY_PROMPT_VERSION, 23)
             .apply()
     }
 }

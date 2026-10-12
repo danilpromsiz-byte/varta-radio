@@ -5,221 +5,121 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- SPHERICAL RADIO BROADCAST SIGNAL ICON -->
-    <!-- Concentric Spherical Radio Waves radiating 360° in Tactical Yellow (#FFD600 / #FFEA00) -->
+    <!-- Ground Shadow under car -->
+    <path
+        android:fillColor="#330A5078"
+        android:pathData="M32,77 A22,4 0 1,0 76,77 A22,4 0 1,0 32,77 Z" />
 
-    <!-- Deep Horizon Spherical Horizon Wave (Radius 43, Center 54,54) -->
+    <!-- Radio Walkie-Talkie Antenna rod -->
     <path
-        android:strokeColor="#44FFD600"
-        android:strokeWidth="1.6"
+        android:strokeColor="#1C2532"
+        android:strokeWidth="2.6"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M23.6,23.6 A43,43 0 0,1 84.4,23.6" />
-    <path
-        android:strokeColor="#44FFD600"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M84.4,84.4 A43,43 0 0,1 23.6,84.4" />
-    <path
-        android:strokeColor="#44FFD600"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M11,54 A43,43 0 0,1 23.6,23.6" />
-    <path
-        android:strokeColor="#44FFD600"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M23.6,84.4 A43,43 0 0,1 11,54" />
-    <path
-        android:strokeColor="#44FFD600"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M97,54 A43,43 0 0,0 84.4,23.6" />
-    <path
-        android:strokeColor="#44FFD600"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M84.4,84.4 A43,43 0 0,0 97,54" />
+        android:pathData="M63,45 L72,28" />
 
-    <!-- Spherical Radio Wave Layer 3 (Radius 33, Center 54,54) -->
-    <!-- Top Arc -->
+    <!-- Antenna Tip Ball -->
     <path
-        android:strokeColor="#88FFD600"
-        android:strokeWidth="2.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M30.7,30.7 A33,33 0 0,1 77.3,30.7" />
-    <!-- Bottom Arc -->
-    <path
-        android:strokeColor="#88FFD600"
-        android:strokeWidth="2.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M77.3,77.3 A33,33 0 0,1 30.7,77.3" />
-    <!-- Left Arc -->
-    <path
-        android:strokeColor="#B8FFD600"
-        android:strokeWidth="2.4"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M21,54 A33,33 0 0,1 30.7,30.7" />
-    <path
-        android:strokeColor="#B8FFD600"
-        android:strokeWidth="2.4"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M30.7,77.3 A33,33 0 0,1 21,54" />
-    <!-- Right Arc -->
-    <path
-        android:strokeColor="#B8FFD600"
-        android:strokeWidth="2.4"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M87,54 A33,33 0 0,0 77.3,30.7" />
-    <path
-        android:strokeColor="#B8FFD600"
-        android:strokeWidth="2.4"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M77.3,77.3 A33,33 0 0,0 87,54" />
-
-    <!-- Spherical Radio Wave Layer 2 (Radius 23, Center 54,54) -->
-    <!-- Top Arc -->
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M37.7,37.7 A23,23 0 0,1 70.3,37.7" />
-    <!-- Bottom Arc -->
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M70.3,70.3 A23,23 0 0,1 37.7,70.3" />
-    <!-- Left Arc -->
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="3.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M31,54 A23,23 0 0,1 37.7,37.7" />
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="3.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M37.7,70.3 A23,23 0 0,1 31,54" />
-    <!-- Right Arc -->
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="3.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M77,54 A23,23 0 0,0 70.3,37.7" />
-    <path
-        android:strokeColor="#FFEA00"
-        android:strokeWidth="3.0"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M70.3,70.3 A23,23 0 0,0 77,54" />
-
-    <!-- Spherical Radio Wave Layer 1 (Radius 13, Center 54,54 - Intense High Frequency Wave) -->
-    <!-- Top Arc -->
-    <path
-        android:strokeColor="#FFF59D"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M44.8,44.8 A13,13 0 0,1 63.2,44.8" />
-    <!-- Bottom Arc -->
-    <path
-        android:strokeColor="#FFF59D"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M63.2,63.2 A13,13 0 0,1 44.8,63.2" />
-    <!-- Left Arc -->
-    <path
-        android:strokeColor="#FFF59D"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M41,54 A13,13 0 0,1 44.8,44.8" />
-    <path
-        android:strokeColor="#FFF59D"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M44.8,63.2 A13,13 0 0,1 41,54" />
-    <!-- Right Arc -->
-    <path
-        android:strokeColor="#FFF59D"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M67,54 A13,13 0 0,0 63.2,44.8" />
-    <path
-        android:strokeColor="#FFF59D"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M63.2,63.2 A13,13 0 0,0 67,54" />
-
-    <!-- Cardinal Pulse Beacon Nodes (North, South, East, West) -->
+        android:fillColor="#1C2532"
+        android:pathData="M72,25 A3.5,3.5 0 1,1 71.9,25 Z" />
     <path
         android:fillColor="#FFD600"
-        android:pathData="M54,8.5 A2.5,2.5 0 1,1 53.9,8.5 Z" />
-    <path
-        android:fillColor="#FFD600"
-        android:pathData="M54,99.5 A2.5,2.5 0 1,1 53.9,99.5 Z" />
-    <path
-        android:fillColor="#FFD600"
-        android:pathData="M8.5,54 A2.5,2.5 0 1,1 8.4,54 Z" />
-    <path
-        android:fillColor="#FFD600"
-        android:pathData="M99.5,54 A2.5,2.5 0 1,1 99.4,54 Z" />
+        android:pathData="M72,26 A2.4,2.4 0 1,1 71.9,26 Z" />
 
-    <!-- Tactical Axis Pulse Beams -->
+    <!-- Radio Waves Emitting from Antenna -->
+    <!-- Inner Wave (Yellow) -->
     <path
-        android:strokeColor="#55FFD600"
-        android:strokeWidth="1.4"
+        android:strokeColor="#FFD600"
+        android:strokeWidth="2.0"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M54,12 L54,20" />
+        android:pathData="M67,21 C70,18 76,18 79,22" />
+    <!-- Outer Wave (Orange) -->
     <path
-        android:strokeColor="#55FFD600"
-        android:strokeWidth="1.4"
+        android:strokeColor="#FF9100"
+        android:strokeWidth="2.0"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M54,88 L54,96" />
-    <path
-        android:strokeColor="#55FFD600"
-        android:strokeWidth="1.4"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M12,54 L20,54" />
-    <path
-        android:strokeColor="#55FFD600"
-        android:strokeWidth="1.4"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M88,54 L96,54" />
+        android:pathData="M64,16 C69,12 79,12 84,18" />
 
-    <!-- Central Glowing Spherical Beacon Emitter Core -->
+    <!-- Left Wheel (Tire, Rim, Hub) -->
     <path
-        android:fillColor="#FFD600"
-        android:pathData="M54,48 A6,6 0 1,1 53.9,48 Z" />
-
-    <!-- High-Intensity White Plasma Center -->
+        android:fillColor="#1C2532"
+        android:pathData="M41,68 A7.5,7.5 0 1,1 40.9,68 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,51.5 A2.5,2.5 0 1,1 53.9,51.5 Z" />
+        android:pathData="M41,71 A4.5,4.5 0 1,1 40.9,71 Z" />
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M41,73.2 A2.3,2.3 0 1,1 40.9,73.2 Z" />
+
+    <!-- Right Wheel (Tire, Rim, Hub) -->
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M67,68 A7.5,7.5 0 1,1 66.9,68 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M67,71 A4.5,4.5 0 1,1 66.9,71 Z" />
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M67,73.2 A2.3,2.3 0 1,1 66.9,73.2 Z" />
+
+    <!-- Main Car Body Outer Contour (Bold Dark Stroke) -->
+    <!-- Rounded squircle: x:33 to 75, y:43 to 73, r=16 -->
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M49,43 L59,43 A16,16 0 0,1 75,59 L75,60 A13,13 0 0,1 62,73 L46,73 A13,13 0 0,1 33,60 L33,59 A16,16 0 0,1 49,43 Z" />
+
+    <!-- Main Car Body Inner (Clean White) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M49,45 L59,45 A14,14 0 0,1 73,59 L73,60 A11,11 0 0,1 62,71 L46,71 A11,11 0 0,1 35,60 L35,59 A14,14 0 0,1 49,45 Z" />
+
+    <!-- Soft Underbody Shading -->
+    <path
+        android:fillColor="#F0F5FA"
+        android:pathData="M37,65 L71,65 A10,10 0 0,1 62,71 L46,71 A10,10 0 0,1 37,65 Z" />
+
+    <!-- Left Eye -->
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M45,53 A3.2,4.2 0 1,1 44.9,53 Z" />
+    <!-- Left Eye Twinkle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44.2,55.5 A1.1,1.1 0 1,1 44.1,55.5 Z" />
+
+    <!-- Right Eye -->
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M63,53 A3.2,4.2 0 1,1 62.9,53 Z" />
+    <!-- Right Eye Twinkle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62.2,55.5 A1.1,1.1 0 1,1 62.1,55.5 Z" />
+
+    <!-- Cute Blush Cheeks -->
+    <path
+        android:fillColor="#FFA8A8"
+        android:pathData="M39,59.5 A2.5,1.6 0 1,1 38.9,59.5 Z" />
+    <path
+        android:fillColor="#FFA8A8"
+        android:pathData="M69,59.5 A2.5,1.6 0 1,1 68.9,59.5 Z" />
+
+    <!-- Smile -->
+    <path
+        android:strokeColor="#1C2532"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M51.5,60 Q54,63 56.5,60" />
+
+    <!-- Tactical Mini Shield / Badge on forehead -->
+    <path
+        android:fillColor="#1C2532"
+        android:pathData="M54,46.5 L56,47.5 L56,49.5 L54,51 L52,49.5 L52,47.5 Z" />
+    <path
+        android:fillColor="#FFD600"
+        android:pathData="M54,47.2 L55.3,47.8 L55.3,49.2 L54,50.3 L52.7,49.2 L52.7,47.8 Z" />
 
 </vector>

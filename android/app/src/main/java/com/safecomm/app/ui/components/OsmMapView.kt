@@ -60,7 +60,7 @@ fun OsmMapView(
             if (userMarkerInstance == null) {
                 val newMarker = Marker(map).apply {
                     position = userPoint
-                    title = "Ваше местоположение"
+                    title = com.safecomm.app.ui.i18n.I18n.myLocationTooltip(context)
                     icon = createCircleDrawable(context, AndroidColor.parseColor("#2AABEE"), "📍")
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 }
@@ -98,10 +98,11 @@ fun OsmMapView(
                 else -> AndroidColor.parseColor("#9E9E9E")
             }
 
+            val catLabel = com.safecomm.app.ui.i18n.I18n.alertTypeName(context, alert.typedCategory.rawValue)
             val marker = Marker(map).apply {
                 position = point
-                title = "${alert.typedCategory.icon} ${alert.typedCategory.label}"
-                snippet = alert.description.ifBlank { "Сообщил: ${alert.senderNick}" }
+                title = "${alert.typedCategory.icon} $catLabel"
+                snippet = alert.description.ifBlank { "${com.safecomm.app.ui.i18n.I18n.reportedByLabel(context)}: ${alert.senderNick}" }
                 icon = createCircleDrawable(context, color, alert.typedCategory.icon)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 setOnMarkerClickListener { _, _ ->
@@ -110,13 +111,6 @@ fun OsmMapView(
                 }
             }
             map.overlays.add(marker)
-        }
-
-        // If a new alert was just added, smoothly center on it
-        alerts.firstOrNull()?.let { newest ->
-            if (newest.latitude != 0.0 && newest.longitude != 0.0) {
-                map.controller.animateTo(GeoPoint(newest.latitude, newest.longitude))
-            }
         }
 
         map.invalidate()
@@ -129,6 +123,7 @@ fun OsmMapView(
                     setTileSource(TileSourceFactory.MAPNIK)
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     setMultiTouchControls(true)
+                    isTilesScaledToDpi = true
                     controller.setZoom(15.0)
                     val startPoint = if (userLat != 0.0 && userLng != 0.0) {
                         GeoPoint(userLat, userLng)

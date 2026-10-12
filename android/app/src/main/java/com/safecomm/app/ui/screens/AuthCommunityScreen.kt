@@ -46,26 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.drinkless.tdlib.TdApi
 
-private fun mapTelegramError(raw: String): String {
-    val upper = raw.uppercase()
-    return when {
-        upper.contains("PHONE_NUMBER_INVALID") ->
-            "Некорректный номер телефона. Введите номер в формате 099 779 98 80 или +380997799880."
-        upper.contains("PHONE_CODE_INVALID") ->
-            "Неверный 5-значный код. Проверьте сообщение в приложении Telegram."
-        upper.contains("PHONE_CODE_EXPIRED") ->
-            "Срок действия кода истёк. Запросите новый код."
-        upper.contains("PASSWORD_HASH_INVALID") ->
-            "Неверный облачный пароль 2FA Telegram. Попробуйте снова."
-        upper.contains("PHONE_NUMBER_BANNED") ->
-            "Этот номер телефона заблокирован в Telegram."
-        upper.contains("FLOOD_WAIT") ->
-            "Слишком много запросов к Telegram. Пожалуйста, подождите несколько минут."
-        upper.contains("PHONE_NUMBER_UNREGISTERED") ->
-            "Этот номер не зарегистрирован в Telegram."
-        else -> "Ошибка Telegram: $raw"
-    }
-}
+
 
 @Composable
 fun AuthCommunityScreen(
@@ -75,8 +56,12 @@ fun AuthCommunityScreen(
     initialCommunity: String,
     initialPassword: String,
     currentDeviceId: String = "",
-    currentLanguage: AppLanguage = AppLanguage.RU,
+    currentLanguage: AppLanguage = AppLanguage.EN,
     onLanguageChange: (AppLanguage) -> Unit = {},
+    appVersion: String = "1.2.3",
+    isUpdateAvailable: Boolean = false,
+    onCheckUpdate: (() -> Unit)? = null,
+    onInstallUpdate: (() -> Unit)? = null,
     isSuperAdmin: Boolean = false,
     onUnlockSuperAdmin: ((String) -> Boolean)? = null,
     onWipeAllRooms: (() -> Unit)? = null,
@@ -164,13 +149,35 @@ fun AuthCommunityScreen(
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top control bar: Language selector
+        // Top control bar: Updates on left, Languages on right
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.End,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Language selector chips
+            // App Version & Quick Update Check Button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isUpdateAvailable) AlertFireOrange.copy(alpha = 0.2f) else TelegramDarkCard)
+                    .border(1.dp, if (isUpdateAvailable) AlertFireOrange else TelegramDivider, RoundedCornerShape(8.dp))
+                    .clickable {
+                        if (isUpdateAvailable) onInstallUpdate?.invoke() else onCheckUpdate?.invoke()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = if (isUpdateAvailable) "⚡ ${I18n.installUpdateBtn(context)}" else "v$appVersion • ${I18n.checkForUpdatesBtn(context)}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isUpdateAvailable) AlertFireOrange else TelegramTextPrimary
+                )
+            }
+
+            // Language selector chips (Order: EN, UK, RU)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 AppLanguage.entries.forEach { lang ->
                     val isSel = currentLanguage == lang
@@ -180,7 +187,7 @@ fun AuthCommunityScreen(
                             .background(if (isSel) TelegramBlue.copy(alpha = 0.25f) else TelegramDarkCard)
                             .border(1.dp, if (isSel) TelegramBlue else TelegramDivider, RoundedCornerShape(8.dp))
                             .clickable { onLanguageChange(lang) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
                     ) {
                         Text(lang.flag, fontSize = 16.sp)
                     }
@@ -190,31 +197,15 @@ fun AuthCommunityScreen(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // App Header (Secret Easter Egg: 7 taps opens Super Admin mode)
+        // App Header
         Text(
             text = "🛡️ ${I18n.appTitle(context)}",
             style = MaterialTheme.typography.headlineLarge,
             color = TelegramTextPrimary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                val now = System.currentTimeMillis()
-                if (now - lastEasterEggClickTime > 1500L) {
-                    easterEggClicks = 1
-                } else {
-                    easterEggClicks++
-                    if (easterEggClicks >= 7) {
-                        easterEggClicks = 0
-                        showSuperAdminModal = true
-                    }
-                }
-                lastEasterEggClickTime = now
-            }
+            fontWeight = FontWeight.Bold
         )
         Text(
-            text = I18n.appSubtitle(context) + "\nAES-256 Retained P2P",
+            text = I18n.appSubtitle(context) + "\n" + I18n.encryptionBadge(context),
             style = MaterialTheme.typography.bodyMedium,
             color = TelegramTextSecondary,
             textAlign = TextAlign.Center
@@ -1122,13 +1113,13 @@ fun AuthCommunityScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
                                 ) {
-                                    Text("Подтвердить пароль 2FA", fontSize = 12.sp)
+                                    Text(I18n.confirmPasswordBtn(context), fontSize = 12.sp)
                                 }
                             }
 
                             is TdAuthState.Error -> {
                                 Text(
-                                    text = mapTelegramError(state.message),
+                                    text = I18n.mapTelegramError(context, state.message),
                                     fontSize = 11.sp,
                                     color = AlertShellingRed
                                 )
@@ -1138,7 +1129,7 @@ fun AuthCommunityScreen(
                                     modifier = Modifier.fillMaxWidth().height(36.dp),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Сбросить сессию Telegram", fontSize = 11.sp, color = TelegramTextSecondary)
+                                    Text(I18n.logOutTelegram(context), fontSize = 11.sp, color = TelegramTextSecondary)
                                 }
                             }
                         }

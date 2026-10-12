@@ -1,6 +1,7 @@
 package com.safecomm.app.ui.screens
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,14 +15,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safecomm.app.data.model.*
 import com.safecomm.app.ui.components.*
+import com.safecomm.app.ui.i18n.AppLanguage
+import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainHubScreen(
     group: Group?,
@@ -43,7 +47,7 @@ fun MainHubScreen(
     currentUserId: Long,
     capturedPhotoUri: Uri?,
     githubRepo: String = "danilpromsiz-byte/varta-radio",
-    appVersion: String = "1.0.0",
+    appVersion: String = "1.2.3",
     updateStatusText: String = "",
     isUpdateAvailable: Boolean = false,
     isDownloadingUpdate: Boolean = false,
@@ -69,8 +73,8 @@ fun MainHubScreen(
     isSuperAdmin: Boolean = false,
     onUnlockSuperAdmin: ((String) -> Boolean)? = null,
     onWipeAllRooms: (() -> Unit)? = null,
-    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.RU,
-    onLanguageChange: (com.safecomm.app.ui.i18n.AppLanguage) -> Unit = {},
+    currentLanguage: AppLanguage = AppLanguage.EN,
+    onLanguageChange: (AppLanguage) -> Unit = {},
     bannedUsers: Map<String, Long> = emptyMap(),
     onUnbanUser: ((String) -> Unit)? = null,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
@@ -87,6 +91,8 @@ fun MainHubScreen(
     onLogOutTelegram: () -> Unit = {},
     onHapticTick: () -> Unit
 ) {
+    val context = LocalContext.current
+
     var showDangerDialog by remember { mutableStateOf(false) }
     var showPhotoDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
@@ -102,220 +108,262 @@ fun MainHubScreen(
         (it.role == "admin" || it.role == "owner")
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // User Avatar in Circle (tappable to change avatar)
+    // =========================================================================
+    // ROOT FULLSCREEN CONTAINER (WAZE STYLE)
+    // Map is the base layer underneath all tactical controls.
+    // =========================================================================
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(TelegramDarkBg)
+    ) {
+        // --- 1. BASE FULLSCREEN NATIVE OSM MAP ---
+        OsmMapView(
+            userLat = userLat,
+            userLng = userLng,
+            alerts = alerts,
+            onAlertClick = { selectedAlertForDetail = it },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // --- 2. ACTIVE ALERTS FLOATING BANNER (Under Top Bar) ---
+        if (alerts.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 96.dp, start = 14.dp, end = 14.dp)
+            ) {
+                ActiveAlertsBanner(
+                    alerts = alerts,
+                    userLat = userLat,
+                    userLng = userLng,
+                    onAlertClick = { selectedAlertForDetail = it }
+                )
+            }
+        }
+
+        // --- 3. TOP FLOATING WAZE TACTICAL CAPSULE ---
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(start = 14.dp, end = 14.dp, top = 32.dp)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                color = TelegramDarkSurface.copy(alpha = 0.94f),
+                shadowElevation = 10.dp,
+                border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Left: Avatar + Room Info & Quick Switch
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showLeaveRoomConfirm = true }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
                         com.safecomm.app.ui.components.UserAvatarView(
                             avatarString = userAvatar,
-                            size = 36.dp,
+                            size = 38.dp,
                             borderWidth = 1.5.dp,
-                            borderColor = if (isConnected) AlertMedicalGreen else TelegramDivider,
+                            borderColor = if (isConnected) AlertMedicalGreen else AlertShellingRed,
                             modifier = Modifier.clickable { showAvatarDialog = true }
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-
-                        // Connection Indicator Dot
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(if (isConnected) AlertMedicalGreen else AlertShellingRed)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { showLeaveRoomConfirm = true }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        ) {
+                        Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = group?.name ?: "Varta GO",
+                                    text = group?.name ?: I18n.appTitle(context),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TelegramTextPrimary
+                                    color = TelegramTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     imageVector = Icons.Default.SwapHoriz,
-                                    contentDescription = "Сменить комнату",
+                                    contentDescription = I18n.switchRoomTooltip(context),
                                     tint = Color(0xFFFFD600),
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
                             Text(
                                 text = if (isConnected) {
-                                    "${members.size} в сети" + (if (isMuted) " • 🔇 Без звука" else " • 🔊 Рация")
-                                } else "Подключение к сети...",
+                                    "${members.size} " + I18n.online(context) + (if (isMuted) " • ${I18n.silentModeBadge(context)}" else " • ${I18n.loudspeakerBadge(context)}")
+                                } else I18n.connecting(context),
                                 fontSize = 11.sp,
                                 color = if (isConnected) (if (isMuted) Color(0xFFFFD600) else TelegramTextSecondary) else AlertShellingRed
                             )
                         }
                     }
-                },
-                actions = {
-                    // Switch Room Button
-                    IconButton(onClick = { showLeaveRoomConfirm = true }) {
-                        Icon(
-                            imageVector = Icons.Default.SwapHoriz,
-                            contentDescription = "Сменить комнату",
-                            tint = Color(0xFFFFD600)
-                        )
-                    }
-                    // Mute / Live Audio Toggle Button
-                    IconButton(onClick = onToggleMute) {
-                        Icon(
-                            imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                            contentDescription = if (isMuted) "Включить звук" else "Без звука",
-                            tint = if (isMuted) Color(0xFFFF5252) else Color(0xFFFFD600)
-                        )
-                    }
-                    IconButton(onClick = { showHistoryDialog = true }) {
-                        Icon(imageVector = Icons.Default.History, contentDescription = "История рации", tint = TelegramBlue)
-                    }
-                    IconButton(onClick = { showMembersDialog = true }) {
-                        Icon(imageVector = Icons.Default.Group, contentDescription = "Участники", tint = TelegramTextSecondary)
-                    }
-                    IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Настройки", tint = TelegramTextSecondary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = TelegramDarkBg)
-            )
-        },
-        containerColor = TelegramDarkBg
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // --- UPPER 40%: Leaflet/OSM Native Map ---
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.42f)
-            ) {
-                OsmMapView(
-                    userLat = userLat,
-                    userLng = userLng,
-                    alerts = alerts,
-                    onAlertClick = { selectedAlertForDetail = it }
-                )
-            }
 
-            // --- ACTIVE ALERTS BANNER ---
-            ActiveAlertsBanner(
-                alerts = alerts,
-                userLat = userLat,
-                userLng = userLng,
-                onAlertClick = { selectedAlertForDetail = it }
-            )
-
-            // --- LOWER AREA: CONTROLS & ERGONOMICS ---
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.58f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly
-            ) {
-                // --- DEDICATED ACTIVE SPEAKER / TRANSMISSION HUD BANNER ---
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = when {
-                            isPlayingVoice -> Color(0xFF263238)
-                            isRecordingVoice -> Color(0xFF3E1C1C)
-                            else -> TelegramDarkSurface.copy(alpha = 0.8f)
-                        }
-                    )
-                ) {
+                    // Right: Quick Tactical Actions (Mute, Radio History, Members, Settings)
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // Speaker / Mute Toggle Button
+                        IconButton(
+                            onClick = onToggleMute,
+                            modifier = Modifier.size(38.dp)
                         ) {
-                            val activeSpeakerAvatar = when {
-                                isRecordingVoice -> userAvatar
-                                isPlayingVoice -> members.firstOrNull { it.nickname == currentSpeaker || it.nickname.startsWith(currentSpeaker ?: "") }?.avatarUrl ?: "radio"
-                                else -> null
-                            }
-
-                            if (activeSpeakerAvatar != null) {
-                                com.safecomm.app.ui.components.UserAvatarView(
-                                    avatarString = activeSpeakerAvatar,
-                                    size = 24.dp,
-                                    borderWidth = 1.dp,
-                                    borderColor = if (isPlayingVoice) AlertFireOrange else AlertShellingRed
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF4CAF50))
-                                )
-                            }
-                            Text(
-                                text = when {
-                                    isPlayingVoice -> "ГОЛОС В ЭФИРЕ: ${currentSpeaker ?: "Собеседник"}"
-                                    isRecordingVoice -> "ВЫ В ЭФИРЕ (Передача)"
-                                    else -> "Радиоэфир свободен"
-                                },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = when {
-                                    isPlayingVoice -> AlertFireOrange
-                                    isRecordingVoice -> AlertShellingRed
-                                    else -> TelegramTextSecondary
-                                }
+                            Icon(
+                                imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                contentDescription = if (isMuted) "Unmute" else "Mute",
+                                tint = if (isMuted) Color(0xFFFF5252) else Color(0xFFFFD600),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
 
+                        // Voice History Button
+                        IconButton(
+                            onClick = { showHistoryDialog = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = I18n.voiceHistoryTooltip(context),
+                                tint = TelegramBlue,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Group Members Button
+                        IconButton(
+                            onClick = { showMembersDialog = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Group,
+                                contentDescription = I18n.membersTooltip(context),
+                                tint = TelegramTextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Settings Button
+                        IconButton(
+                            onClick = { showSettingsDialog = true },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = I18n.settingsTooltip(context),
+                                tint = TelegramTextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 4. BOTTOM FLOATING WAZE OPERATIONAL DOCK ---
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Speaker HUD Floating Capsule
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = when {
+                    isPlayingVoice -> Color(0xFF263238).copy(alpha = 0.95f)
+                    isRecordingVoice -> Color(0xFF3E1C1C).copy(alpha = 0.95f)
+                    else -> TelegramDarkSurface.copy(alpha = 0.92f)
+                },
+                border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.5f)),
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val activeSpeakerAvatar = when {
+                        isRecordingVoice -> userAvatar
+                        isPlayingVoice -> members.firstOrNull { it.nickname == currentSpeaker || it.nickname.startsWith(currentSpeaker ?: "") }?.avatarUrl ?: "radio"
+                        else -> null
+                    }
+                    if (activeSpeakerAvatar != null) {
+                        com.safecomm.app.ui.components.UserAvatarView(
+                            avatarString = activeSpeakerAvatar,
+                            size = 20.dp,
+                            borderWidth = 1.dp,
+                            borderColor = if (isPlayingVoice) AlertFireOrange else AlertShellingRed
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4CAF50))
+                        )
+                    }
+
+                    Text(
+                        text = when {
+                            isPlayingVoice -> I18n.activeSpeakerVoice(context, currentSpeaker ?: "User")
+                            isRecordingVoice -> I18n.youAreTransmitting(context)
+                            else -> I18n.channelClear(context)
+                        },
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = when {
+                            isPlayingVoice -> AlertFireOrange
+                            isRecordingVoice -> AlertShellingRed
+                            else -> TelegramTextSecondary
+                        }
+                    )
+
+                    if (isPlayingVoice || isRecordingVoice) {
                         Text(
-                            text = if (isPlayingVoice || isRecordingVoice) "🔊 АКТИВНО" else "${members.size} в сети",
-                            fontSize = 11.sp,
+                            text = I18n.activeSpeakerBadge(context),
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (isPlayingVoice || isRecordingVoice) Color.White else TelegramTextSecondary
+                            color = Color.White
                         )
                     }
                 }
-
-                // 3D Convex PTT Walkie-Talkie Button
-                PttButton(
-                    isRecording = isRecordingVoice,
-                    amplitude = amplitude,
-                    isReceivingVoice = isPlayingVoice,
-                    onStartTalk = onStartPtt,
-                    onStopTalk = onStopPtt
-                )
-
-                // Secondary Emergency Actions (Alarm & Photo)
-                AlertActionButtons(
-                    onTriggerAlarm = { showDangerDialog = true },
-                    onTriggerPhoto = {
-                        onLaunchCamera()
-                        showPhotoDialog = true
-                    }
-                )
             }
+
+            // 3D Convex PTT Walkie-Talkie Button
+            PttButton(
+                isRecording = isRecordingVoice,
+                amplitude = amplitude,
+                isReceivingVoice = isPlayingVoice,
+                onStartTalk = onStartPtt,
+                onStopTalk = onStopPtt
+            )
+
+            // Waze-Style Tactical Action Buttons (Never truncating)
+            AlertActionButtons(
+                onTriggerAlarm = { showDangerDialog = true },
+                onTriggerPhoto = {
+                    onLaunchCamera()
+                    showPhotoDialog = true
+                }
+            )
         }
     }
 
-    // Dialogs & Modals
+    // =========================================================================
+    // MODAL DIALOGS
+    // =========================================================================
     if (showDangerDialog) {
         DangerReportDialog(
             onDismiss = { showDangerDialog = false },
@@ -411,14 +459,14 @@ fun MainHubScreen(
             onDismissRequest = { showLeaveRoomConfirm = false },
             title = {
                 Text(
-                    text = "🚪 Сменить комнату?",
+                    text = I18n.switchRoomConfirmTitle(context),
                     fontWeight = FontWeight.Bold,
                     color = TelegramTextPrimary
                 )
             },
             text = {
                 Text(
-                    text = "Вы выйдете из текущего закрытого радиоканала «${group?.name}» и сможете выбрать другую группу или создать новый канал.\n\nВаша авторизация в Telegram сохранится.",
+                    text = I18n.switchRoomConfirmDesc(context, group?.name ?: I18n.appTitle(context)),
                     color = TelegramTextSecondary,
                     fontSize = 14.sp
                 )
@@ -431,12 +479,12 @@ fun MainHubScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
                 ) {
-                    Text("Сменить комнату", fontWeight = FontWeight.Bold)
+                    Text(I18n.switchRoomConfirmAction(context), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLeaveRoomConfirm = false }) {
-                    Text("Отмена", color = TelegramTextSecondary)
+                    Text(I18n.cancel(context), color = TelegramTextSecondary)
                 }
             },
             containerColor = TelegramDarkSurface

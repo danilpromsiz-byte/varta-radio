@@ -33,6 +33,7 @@ fun VoiceHistoryDialog(
     onStopVoice: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var currentlyPlayingId by remember { mutableStateOf<Long?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -56,13 +57,13 @@ fun VoiceHistoryDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "🎙 ИСТОРИЯ РАЦИИ",
+                        text = com.safecomm.app.ui.i18n.I18n.voiceHistoryTitle(context),
                         style = MaterialTheme.typography.titleMedium,
                         color = TelegramBlue,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть", tint = TelegramTextSecondary)
+                        Icon(imageVector = Icons.Default.Close, contentDescription = com.safecomm.app.ui.i18n.I18n.close(context), tint = TelegramTextSecondary)
                     }
                 }
 
@@ -71,7 +72,7 @@ fun VoiceHistoryDialog(
                 if (voiceMessages.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "Голосовых сообщений пока нет",
+                            text = com.safecomm.app.ui.i18n.I18n.noVoiceMessages(context),
                             color = TelegramTextSecondary,
                             fontSize = 14.sp
                         )
@@ -115,7 +116,7 @@ fun VoiceHistoryDialog(
                                     ) {
                                         Icon(
                                             imageVector = if (isThisPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                            contentDescription = if (isThisPlaying) "Стоп" else "Слушать",
+                                            contentDescription = null,
                                             tint = Color.White,
                                             modifier = Modifier.size(22.dp)
                                         )
@@ -125,14 +126,14 @@ fun VoiceHistoryDialog(
 
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = msg.senderNick.ifBlank { "Позывной #${msg.senderId}" },
+                                            text = msg.senderNick.ifBlank { "User #${msg.senderId}" },
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp,
                                             color = TelegramTextPrimary
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "Длительность: ${msg.durationSec} сек",
+                                            text = "${msg.durationSec}s",
                                             fontSize = 12.sp,
                                             color = TelegramTextSecondary
                                         )

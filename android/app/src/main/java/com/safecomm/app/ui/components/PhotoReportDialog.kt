@@ -45,6 +45,7 @@ fun PhotoReportDialog(
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -68,13 +69,13 @@ fun PhotoReportDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "📷 ФОТОФИКСАЦИЯ ОПАСНОСТИ",
+                        text = com.safecomm.app.ui.i18n.I18n.photoFixationTitle(context),
                         style = MaterialTheme.typography.titleMedium,
                         color = PhotoActionBlue,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть", tint = TelegramTextSecondary)
+                        Icon(imageVector = Icons.Default.Close, contentDescription = com.safecomm.app.ui.i18n.I18n.close(context), tint = TelegramTextSecondary)
                     }
                 }
 
@@ -93,7 +94,7 @@ fun PhotoReportDialog(
                     if (photoUri != null) {
                         AsyncImage(
                             model = photoUri,
-                            contentDescription = "Снимок опасности",
+                            contentDescription = "Photo",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
@@ -101,13 +102,13 @@ fun PhotoReportDialog(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Сделать снимок",
+                                contentDescription = "Camera",
                                 tint = PhotoActionBlue,
                                 modifier = Modifier.size(48.dp)
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Нажмите, чтобы сделать фото",
+                                text = com.safecomm.app.ui.i18n.I18n.tapToTakePhoto(context),
                                 color = TelegramTextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
@@ -120,7 +121,7 @@ fun PhotoReportDialog(
 
                 // Danger Type Selection
                 Text(
-                    text = "Тип опасности:",
+                    text = com.safecomm.app.ui.i18n.I18n.photoHazardTypeLabel(context),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TelegramTextSecondary,
                     modifier = Modifier.fillMaxWidth()
@@ -154,7 +155,7 @@ fun PhotoReportDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    placeholder = { Text("Описание (напр. беспилотник в небе)", color = TelegramTextSecondary, fontSize = 13.sp) },
+                    placeholder = { Text(com.safecomm.app.ui.i18n.I18n.photoDetailsHint(context), color = TelegramTextSecondary, fontSize = 13.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -214,7 +215,7 @@ fun PhotoReportDialog(
 
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (isHolding) "УДЕРЖИВАЙТЕ..." else "УДЕРЖИВАЙТЕ ДЛЯ ОТПРАВКИ",
+                            text = if (isHolding) com.safecomm.app.ui.i18n.I18n.holdingProgress(context, (holdProgress * 100).toInt()) else com.safecomm.app.ui.i18n.I18n.holdToSendPhotoPrompt(context),
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
@@ -225,7 +226,7 @@ fun PhotoReportDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TextButton(onClick = onDismiss) {
-                    Text("Отмена", color = TelegramTextSecondary)
+                    Text(com.safecomm.app.ui.i18n.I18n.cancel(context), color = TelegramTextSecondary)
                 }
             }
         }

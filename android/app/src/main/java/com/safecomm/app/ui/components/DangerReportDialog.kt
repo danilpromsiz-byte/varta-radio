@@ -49,6 +49,7 @@ fun DangerReportDialog(
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -72,7 +73,7 @@ fun DangerReportDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "📍 ПОСТАВИТЬ МЕТКУ",
+                        text = com.safecomm.app.ui.i18n.I18n.placeDangerTitle(context),
                         style = MaterialTheme.typography.titleLarge,
                         color = AlertShellingRed,
                         fontWeight = FontWeight.Bold
@@ -83,7 +84,7 @@ fun DangerReportDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Закрыть",
+                            contentDescription = com.safecomm.app.ui.i18n.I18n.close(context),
                             tint = TelegramTextSecondary
                         )
                     }
@@ -91,7 +92,7 @@ fun DangerReportDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Выберите тип метки для оповещения всех участников группы:",
+                    text = com.safecomm.app.ui.i18n.I18n.chooseDangerDesc(context),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TelegramTextSecondary,
                     textAlign = TextAlign.Start,
@@ -142,7 +143,7 @@ fun DangerReportDialog(
                                         Text(text = cat.icon, fontSize = 28.sp)
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = cat.label,
+                                            text = com.safecomm.app.ui.i18n.I18n.alertTypeName(context, cat.rawValue),
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             color = if (isSelected) Color.White else TelegramTextSecondary
@@ -160,7 +161,7 @@ fun DangerReportDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    placeholder = { Text("Уточнение (напр. ул. Ленина, 5)", color = TelegramTextSecondary, fontSize = 13.sp) },
+                    placeholder = { Text(com.safecomm.app.ui.i18n.I18n.dangerDetailsHint(context), color = TelegramTextSecondary, fontSize = 13.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -193,7 +194,7 @@ fun DangerReportDialog(
                                         val stepMs = 50L
                                         var elapsed = 0L
                                         while (elapsed < totalMs && isHolding) {
-                                            delay(stepMs)
+                                             delay(stepMs)
                                             elapsed += stepMs
                                             holdProgress = (elapsed.toFloat() / totalMs).coerceIn(0f, 1f)
                                             if (elapsed % 300 == 0L) {
@@ -227,10 +228,10 @@ fun DangerReportDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isHolding) "УДЕРЖИВАЙТЕ (${(holdProgress * 100).toInt()}%)" else "УДЕРЖИВАЙТЕ 2 сек ДЛЯ ОТПРАВКИ МЕТКИ",
+                            text = if (isHolding) com.safecomm.app.ui.i18n.I18n.holdingProgress(context, (holdProgress * 100).toInt()) else com.safecomm.app.ui.i18n.I18n.holdToBroadcastPrompt(context),
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             letterSpacing = 0.5.sp
                         )
                     }
@@ -239,7 +240,7 @@ fun DangerReportDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 TextButton(onClick = onDismiss) {
-                    Text("Отмена", color = TelegramTextSecondary)
+                    Text(com.safecomm.app.ui.i18n.I18n.cancel(context), color = TelegramTextSecondary)
                 }
             }
         }

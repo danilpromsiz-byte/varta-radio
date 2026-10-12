@@ -247,22 +247,23 @@ fun PttButton(
                 }
 
                 // Button Labels & Tactical Icon
+                val context = androidx.compose.ui.platform.LocalContext.current
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Mic,
-                        contentDescription = "Микрофон рации",
+                        contentDescription = "PTT Microphone",
                         tint = Color.White,
                         modifier = Modifier.size(38.dp)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = when {
-                            isRecording -> "В ЭФИРЕ"
-                            isReceivingVoice -> "ПРИЁМ"
-                            else -> "РАЦИЯ"
+                            isRecording -> com.safecomm.app.ui.i18n.I18n.t(context, "В ЭФИРЕ", "В ЕФІРІ", "TRANSMIT")
+                            isReceivingVoice -> com.safecomm.app.ui.i18n.I18n.t(context, "ПРИЁМ", "ПРИЙОМ", "RECEIVING")
+                            else -> com.safecomm.app.ui.i18n.I18n.t(context, "РАЦИЯ", "РАЦІЯ", "RADIO")
                         },
                         color = Color.White,
                         fontWeight = FontWeight.ExtraBold,
@@ -271,12 +272,12 @@ fun PttButton(
                     )
                     Text(
                         text = when {
-                            isRecording -> "Говорите..."
-                            isReceivingVoice -> "Слушайте"
-                            else -> "Удерживайте"
+                            isRecording -> com.safecomm.app.ui.i18n.I18n.t(context, "Говорите...", "Говоріть...", "Speaking...")
+                            isReceivingVoice -> com.safecomm.app.ui.i18n.I18n.t(context, "Слушайте", "Слухайте", "Listening")
+                            else -> com.safecomm.app.ui.i18n.I18n.t(context, "Удерживайте", "Утримуйте", "Hold to talk")
                         },
                         color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }

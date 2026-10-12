@@ -31,6 +31,7 @@ fun AlertDetailDialog(
     onResolve: (Alert) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val distance = GeoUtils.distanceKm(userLat, userLng, alert.latitude, alert.longitude)
     val distText = GeoUtils.formatDistance(distance)
 
@@ -58,14 +59,14 @@ fun AlertDetailDialog(
                         Text(text = alert.typedCategory.icon, fontSize = 28.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = alert.typedCategory.label,
+                            text = com.safecomm.app.ui.i18n.I18n.alertTypeName(context, alert.typedCategory.rawValue),
                             style = MaterialTheme.typography.titleLarge,
                             color = TelegramTextPrimary,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть", tint = TelegramTextSecondary)
+                        Icon(imageVector = Icons.Default.Close, contentDescription = com.safecomm.app.ui.i18n.I18n.close(context), tint = TelegramTextSecondary)
                     }
                 }
 
@@ -82,7 +83,7 @@ fun AlertDetailDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text("Расстояние", fontSize = 11.sp, color = TelegramTextSecondary)
+                            Text(com.safecomm.app.ui.i18n.I18n.distanceLabel(context), fontSize = 11.sp, color = TelegramTextSecondary)
                             Text(distText, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TelegramBlue)
                         }
                     }
@@ -92,8 +93,8 @@ fun AlertDetailDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text("Сообщил", fontSize = 11.sp, color = TelegramTextSecondary)
-                            Text(alert.senderNick.ifBlank { "Участник" }, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TelegramTextPrimary)
+                            Text(com.safecomm.app.ui.i18n.I18n.reportedByLabel(context), fontSize = 11.sp, color = TelegramTextSecondary)
+                            Text(alert.senderNick.ifBlank { "User" }, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TelegramTextPrimary)
                         }
                     }
                 }
@@ -106,7 +107,7 @@ fun AlertDetailDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Описание:", fontSize = 11.sp, color = TelegramTextSecondary)
+                            Text(com.safecomm.app.ui.i18n.I18n.descriptionLabel(context), fontSize = 11.sp, color = TelegramTextSecondary)
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(alert.description, fontSize = 13.sp, color = TelegramTextPrimary)
                         }
@@ -119,7 +120,7 @@ fun AlertDetailDialog(
                     val fullPhotoUrl = if (alert.photoPath.startsWith("http")) alert.photoPath else "$baseUrl${alert.photoPath}"
                     AsyncImage(
                         model = fullPhotoUrl,
-                        contentDescription = "Фото опасности",
+                        contentDescription = "Photo",
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
@@ -141,13 +142,13 @@ fun AlertDetailDialog(
                 ) {
                     Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Снять тревогу (Опасность миновала)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(com.safecomm.app.ui.i18n.I18n.resolveAlertBtn(context), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TextButton(onClick = onDismiss) {
-                    Text("Закрыть", color = TelegramTextSecondary)
+                    Text(com.safecomm.app.ui.i18n.I18n.close(context), color = TelegramTextSecondary)
                 }
             }
         }

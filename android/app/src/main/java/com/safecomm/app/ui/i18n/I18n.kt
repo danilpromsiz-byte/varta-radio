@@ -6,8 +6,8 @@ object I18n {
 
     fun t(context: Context, ru: String, uk: String, en: String): String {
         return when (LanguageManager.getLanguage(context)) {
-            AppLanguage.UK -> uk
             AppLanguage.EN -> en
+            AppLanguage.UK -> uk
             AppLanguage.RU -> ru
         }
     }
@@ -20,15 +20,22 @@ object I18n {
         "Тактичний захищений радіозв'язок",
         "Tactical Secure Radio Communications"
     )
+    fun encryptionBadge(c: Context) = t(
+        c,
+        "AES-256 Защищённый P2P",
+        "AES-256 Захищений P2P",
+        "AES-256 Retained P2P"
+    )
 
     fun online(c: Context) = t(c, "В сети", "У мережі", "Online")
     fun offline(c: Context) = t(c, "Не подключено", "Не підключено", "Disconnected")
-    fun connecting(c: Context) = t(c, "Подключение...", "Підключення...", "Connecting...")
+    fun connecting(c: Context) = t(c, "Подключение к сети...", "Підключення до мережі...", "Connecting to network...")
     fun cancel(c: Context) = t(c, "Отмена", "Скасувати", "Cancel")
     fun save(c: Context) = t(c, "Сохранить", "Зберегти", "Save")
     fun close(c: Context) = t(c, "Закрыть", "Закрити", "Close")
     fun continueBtn(c: Context) = t(c, "Продолжить", "Продовжити", "Continue")
     fun you(c: Context) = t(c, "(Вы)", "(Ви)", "(You)")
+    fun copiedToClipboard(c: Context) = t(c, "Скопировано в буфер", "Скопійовано в буфер", "Copied to clipboard")
 
     // --- Language Selection ---
     fun selectLanguageTitle(c: Context) = t(
@@ -52,6 +59,7 @@ object I18n {
     fun roomLabel(c: Context) = t(c, "Номер или название комнаты", "Номер або назва кімнати", "Room Number or Name")
     fun roomHint(c: Context) = t(c, "Например: 24 или Штаб", "Наприклад: 24 або Штаб", "e.g. 24 or Base")
     fun passwordLabel(c: Context) = t(c, "Ключ доступа (пароль)", "Ключ доступу (пароль)", "Access Key (Password)")
+    fun passwordHint(c: Context) = t(c, "Пароль для защиты комнаты", "Пароль для захисту кімнати", "Password to protect room")
     fun enterRadioBtn(c: Context) = t(c, "Войти в эфир", "Увійти в ефір", "Enter Radio")
     fun createRoomBtn(c: Context) = t(c, "Создать комнату и войти", "Створити кімнату та увійти", "Create Room & Enter")
     fun darkRoomTitle(c: Context) = t(c, "🔒 Тёмная комната (по умолчанию)", "🔒 Темна кімната (за замовчуванням)", "🔒 Dark Room (default)")
@@ -68,7 +76,58 @@ object I18n {
         "Повідомлення, радіозаписи та мітки карти автоматично стираються через 24 години.",
         "Messages, voice records and map markers automatically vanish after 24 hours."
     )
-    fun superAdminQuickBtn(c: Context) = t(c, "⚡ Суперадмин", "⚡ Суперадмін", "⚡ Super Admin")
+    fun telegramBridgeTitle(c: Context) = t(c, "Трансляция в Telegram", "Трансляція в Telegram", "Relay to Telegram")
+    fun telegramBridgeDesc(c: Context) = t(
+        c,
+        "Дублировать голосовые сообщения и метки в Telegram",
+        "Дублювати голосові повідомлення та мітки в Telegram",
+        "Relay voice messages and markers to Telegram"
+    )
+    fun telegramAuthRequired(c: Context) = t(c, "Требуется авторизация в Telegram", "Потрібна авторизація в Telegram", "Telegram login required")
+    fun telegramLoginTitle(c: Context) = t(c, "Авторизация в Telegram (Опционально)", "Авторизація в Telegram (Опціонально)", "Telegram Login (Optional)")
+    fun phoneLabel(c: Context) = t(c, "Номер телефона", "Номер телефону", "Phone Number")
+    fun sendCodeBtn(c: Context) = t(c, "Получить код", "Отримати код", "Send Code")
+    fun codeLabel(c: Context) = t(c, "Код из Telegram", "Код із Telegram", "Telegram Code")
+    fun confirmCodeBtn(c: Context) = t(c, "Подтвердить код", "Підтвердити код", "Confirm Code")
+    fun password2faLabel(c: Context) = t(c, "Облачный пароль 2FA", "Хмарний пароль 2FA", "2FA Cloud Password")
+    fun confirmPasswordBtn(c: Context) = t(c, "Войти", "Увійти", "Sign In")
+    fun logOutTelegram(c: Context) = t(c, "Выйти из Telegram", "Вийти з Telegram", "Log Out Telegram")
+    fun checkingRoom(c: Context) = t(c, "Проверка комнаты...", "Перевірка кімнати...", "Checking room...")
+    fun roomAvailable(c: Context) = t(c, "Комната свободна для создания", "Кімната вільна для створення", "Room name is available")
+    fun roomExists(c: Context) = t(c, "Комната существует (введите пароль)", "Кімната існує (введіть пароль)", "Room exists (enter password)")
+    fun roomInvalidName(c: Context) = t(c, "Введите название комнаты", "Введіть назву кімнати", "Enter room name")
+    fun callSignRequired(c: Context) = t(c, "Укажите ваш позывной", "Вкажіть ваш позивний", "Enter your callsign")
+
+    // --- App Updates ---
+    fun updatesSection(c: Context) = t(c, "📦 Обновления приложения", "📦 Оновлення застосунку", "📦 App Updates")
+    fun currentVersionLabel(c: Context, v: String) = t(c, "Версия: v$v", "Версія: v$v", "Version: v$v")
+    fun checkForUpdatesBtn(c: Context) = t(c, "🔄 Проверить обновления", "🔄 Перевірити оновлення", "🔄 Check for Updates")
+    fun reinstallUpdateBtn(c: Context) = t(c, "Принудительно переустановить", "Примусово перевстановити", "Reinstall latest from GitHub")
+    fun checkingUpdatesStatus(c: Context) = t(c, "Проверка релизов на GitHub...", "Перевірка релізів на GitHub...", "Checking GitHub releases...")
+    fun updateAvailableStatus(c: Context, v: String) = t(c, "🎉 Доступна новая версия: $v!", "🎉 Доступна нова версія: $v!", "🎉 New version available: $v!")
+    fun upToDateStatus(c: Context, v: String) = t(c, "✅ Установлена актуальная версия (v$v)", "✅ Встановлена актуальна версія (v$v)", "✅ Up to date (v$v)")
+    fun downloadingUpdateStatus(c: Context, p: Int) = t(c, "⬇️ Загрузка обновления: $p%", "⬇️ Завантаження оновлення: $p%", "⬇️ Downloading: $p%")
+    fun readyToInstallStatus(c: Context) = t(c, "📦 Запуск установки APK...", "📦 Запуск встановлення APK...", "📦 Launching APK installer...")
+    fun installUpdateBtn(c: Context) = t(c, "⚡ Обновить сейчас", "⚡ Оновити зараз", "⚡ Update Now")
+    fun updateModalTitle(c: Context, v: String) = t(c, "⚡ Доступно обновление: $v", "⚡ Доступне оновлення: $v", "⚡ App Update Available: $v")
+    fun updateModalDesc(c: Context) = t(
+        c,
+        "Вышла новая версия приложения Varta GO.\nОбновитесь для стабильной связи и актуальной защиты.",
+        "Вийшла нова версія застосунку Varta GO.\nОновіться для стабільного зв'язку та актуального захисту.",
+        "A new version of Varta GO is available.\nPlease update for stable radio connectivity and enhanced security."
+    )
+    fun whatsNew(c: Context) = t(c, "Что нового:", "Що нового:", "What's new:")
+    fun downloadingUpdateTitle(c: Context) = t(c, "⬇️ Загрузка обновления...", "⬇️ Завантаження оновлення...", "⬇️ Downloading update...")
+    fun downloadProgressText(c: Context, p: Int) = t(c, "Загрузка новой версии: $p%", "Завантаження нової версії: $p%", "Downloading new version: $p%")
+    fun downloadWaitText(c: Context) = t(c, "Пожалуйста, подождите завершения загрузки. Установка начнется автоматически.", "Будь ласка, зачекайте завершення завантаження. Встановлення почнеться автоматично.", "Please wait for download to finish. Installation will start automatically.")
+    fun updateDownloadedTitle(c: Context) = t(c, "📦 Обновление загружено", "📦 Оновлення завантажено", "📦 Update Downloaded")
+    fun updateDownloadedDesc(c: Context) = t(c, "Файл обновления успешно загружен на устройство.", "Файл оновлення успішно завантажено на пристрій.", "Update file successfully downloaded.")
+    fun installNowPrompt(c: Context) = t(c, "Нажмите «Установить сейчас» для применения новой версии.", "Натисніть «Встановити зараз» для застосування нової версії.", "Tap «Install Now» to apply the new version.")
+    fun installNowBtn(c: Context) = t(c, "📦 Установить сейчас", "📦 Встановити зараз", "📦 Install Now")
+    fun updateErrorTitle(c: Context) = t(c, "⚠️ Ошибка обновления", "⚠️ Помилка оновлення", "⚠️ Update Error")
+    fun gotItBtn(c: Context) = t(c, "Понятно", "Зрозуміло", "Got it")
+    fun updateAvailableToast(c: Context) = t(c, "Найдено обновление! Нажмите «Обновить»", "Знайдено оновлення! Натисніть «Оновити»", "Update found! Tap to update")
+    fun downloadingApk(c: Context) = t(c, "Скачивание обновления...", "Завантаження оновлення...", "Downloading update...")
 
     // --- Room Entry History ---
     fun historyRoomsTitle(c: Context) = t(c, "📜 Недавние комнаты", "📜 Нещодавні кімнати", "📜 Recent Rooms")
@@ -87,26 +146,109 @@ object I18n {
     fun historyRoleMember(c: Context) = t(c, "👤 Участник", "👤 Учасник", "👤 Member")
     fun historyQuickEnter(c: Context) = t(c, "Войти", "Увійти", "Enter")
 
-    // --- Main Hub Screen ---
-    fun tabRadio(c: Context) = t(c, "Рация", "Рація", "Radio")
-    fun tabChat(c: Context) = t(c, "Чат", "Чат", "Chat")
-    fun tabMap(c: Context) = t(c, "Карта", "Карта", "Map")
-    fun tabSos(c: Context) = t(c, "SOS", "SOS", "SOS")
-
-    fun holdToTalk(c: Context) = t(c, "УДЕРЖИВАЙТЕ ДЛЯ СВЯЗИ", "УТРИМУЙТЕ ДЛЯ ЗВ'ЯЗКУ", "HOLD TO TALK")
-    fun transmitting(c: Context) = t(c, "В ЭФИРЕ...", "В ЕФІРІ...", "TRANSMITTING...")
-    fun receiving(c: Context, speaker: String) = t(
+    // --- Main Hub Screen (Waze Tactical) ---
+    fun membersOnlineCount(c: Context, count: Int) = t(c, "$count в сети", "$count у мережі", "$count online")
+    fun silentModeBadge(c: Context) = t(c, "🔇 Без звука", "🔇 Без звуку", "🔇 Muted")
+    fun loudspeakerBadge(c: Context) = t(c, "🔊 Рация", "🔊 Рація", "🔊 Radio")
+    fun switchRoomTooltip(c: Context) = t(c, "Сменить комнату", "Змінити кімнату", "Switch Room")
+    fun voiceHistoryTooltip(c: Context) = t(c, "История рации", "Історія рації", "Radio History")
+    fun membersTooltip(c: Context) = t(c, "Участники", "Учасники", "Members")
+    fun settingsTooltip(c: Context) = t(c, "Настройки", "Налаштування", "Settings")
+    fun channelClear(c: Context) = t(c, "Радиоэфир свободен", "Радіоефір вільний", "Channel is clear")
+    fun youAreTransmitting(c: Context) = t(c, "ВЫ В ЭФИРЕ (Передача)", "ВИ В ЕФІРІ (Передача)", "TRANSMITTING...")
+    fun activeSpeakerVoice(c: Context, speaker: String) = t(
         c,
-        "ПРИЁМ: $speaker",
-        "ПРИЙОМ: $speaker",
-        "RECEIVING: $speaker"
+        "ГОЛОС В ЭФИРЕ: $speaker",
+        "ГОЛОС В ЕФІРІ: $speaker",
+        "VOICE IN AIR: $speaker"
     )
-    fun chatInputHint(c: Context) = t(c, "Сообщение в эфир...", "Повідомлення в ефір...", "Message to room...")
-    fun send(c: Context) = t(c, "Отправить", "Надіслати", "Send")
-    fun dangerBtn(c: Context) = t(c, "Метка опасности", "Мітка небезпеки", "Danger Mark")
-    fun photoBtn(c: Context) = t(c, "Фото с места", "Фото з місця", "Photo Report")
-    fun sosBtn(c: Context) = t(c, "СИГНАЛ БЕДСТВИЯ", "СИГНАЛ БІДИ", "DISTRESS BEACON")
-    fun cancelSosBtn(c: Context) = t(c, "ОТМЕНА СИГНАЛА SOS", "СКАСУВАТИ СИГНАЛ SOS", "CANCEL SOS ALERT")
+    fun activeSpeakerBadge(c: Context) = t(c, "🔊 АКТИВНО", "🔊 АКТИВНО", "🔊 ACTIVE")
+    fun holdToTalk(c: Context) = t(c, "УДЕРЖИВАЙТЕ ДЛЯ СВЯЗИ", "УТРИМУЙТЕ ДЛЯ ЗВ'ЯЗКУ", "HOLD TO TALK")
+    fun dangerBtn(c: Context) = t(c, "МЕТКА", "МІТКА", "DANGER")
+    fun photoBtn(c: Context) = t(c, "ФОТО", "ФОТО", "PHOTO")
+    fun myLocationTooltip(c: Context) = t(c, "Моё местоположение", "Моє місцезнаходження", "My Location")
+
+    fun switchRoomConfirmTitle(c: Context) = t(c, "🚪 Сменить комнату?", "🚪 Змінити кімнату?", "🚪 Switch Room?")
+    fun switchRoomConfirmDesc(c: Context, roomName: String) = t(
+        c,
+        "Вы выйдете из текущего закрытого радиоканала «$roomName» и сможете выбрать другую группу или создать новый канал.\n\nВаша авторизация сохранится.",
+        "Ви вийдете з поточного закритого радіоканалу «$roomName» і зможете обрати іншу групу або створити новий канал.\n\nВаша авторизація збережеться.",
+        "You will disconnect from current channel «$roomName» and can switch to another room or create a new one.\n\nYour session remains saved."
+    )
+    fun switchRoomConfirmAction(c: Context) = t(c, "Сменить комнату", "Змінити кімнату", "Switch Room")
+
+    // --- Hazard & Danger Report Dialogs ---
+    fun placeDangerTitle(c: Context) = t(c, "📍 ПОСТАВИТЬ МЕТКУ", "📍 ПОСТАВИТИ МІТКУ", "📍 REPORT HAZARD")
+    fun chooseDangerDesc(c: Context) = t(
+        c,
+        "Выберите тип метки для оповещения всех участников группы:",
+        "Оберіть тип мітки для сповіщення всіх учасників групи:",
+        "Select hazard type to alert everyone in the room:"
+    )
+    fun dangerDetailsHint(c: Context) = t(
+        c,
+        "Уточнение (напр. ул. Ленина, 5)",
+        "Уточнення (напр. вул. Лесі Українки, 5)",
+        "Details (e.g. cross street or building)"
+    )
+    fun holdToBroadcastPrompt(c: Context) = t(
+        c,
+        "УДЕРЖИВАЙТЕ 2 сек ДЛЯ ОТПРАВКИ МЕТКИ",
+        "УТРИМУЙТЕ 2 сек ДЛЯ ВІДПРАВКИ МІТКИ",
+        "HOLD 2s TO BROADCAST HAZARD"
+    )
+    fun holdingProgress(c: Context, percent: Int) = t(
+        c,
+        "УДЕРЖИВАЙТЕ ($percent%)",
+        "УТРИМУЙТЕ ($percent%)",
+        "HOLDING ($percent%)"
+    )
+
+    fun photoFixationTitle(c: Context) = t(c, "📷 ФОТОФИКСАЦИЯ ОПАСНОСТИ", "📷 ФОТОФІКСАЦІЯ НЕБЕЗПЕКИ", "📷 HAZARD PHOTO REPORT")
+    fun tapToTakePhoto(c: Context) = t(c, "Нажмите, чтобы сделать фото", "Натисніть, щоб зробити фото", "Tap to take a photo")
+    fun photoHazardTypeLabel(c: Context) = t(c, "Тип опасности:", "Тип небезпеки:", "Hazard type:")
+    fun photoDetailsHint(c: Context) = t(
+        c,
+        "Описание (напр. беспилотник в небе)",
+        "Опис (напр. безпілотник у небі)",
+        "Description (e.g. drone spotted)"
+    )
+    fun holdToSendPhotoPrompt(c: Context) = t(
+        c,
+        "УДЕРЖИВАЙТЕ ДЛЯ ОТПРАВКИ",
+        "УТРИМУЙТЕ ДЛЯ ВІДПРАВКИ",
+        "HOLD TO SEND PHOTO"
+    )
+
+    // --- Alert Detail Dialog ---
+    fun distanceLabel(c: Context) = t(c, "Расстояние", "Відстань", "Distance")
+    fun reportedByLabel(c: Context) = t(c, "Сообщил", "Повідомив", "Reported by")
+    fun descriptionLabel(c: Context) = t(c, "Описание:", "Опис:", "Description:")
+    fun resolveAlertBtn(c: Context) = t(
+        c,
+        "Снять тревогу (Опасность миновала)",
+        "Зняти тривогу (Небезпека минула)",
+        "Resolve Hazard (All Clear)"
+    )
+
+    // --- Voice History Dialog ---
+    fun voiceHistoryTitle(c: Context) = t(c, "🎙 ИСТОРИЯ РАЦИИ", "🎙 ІСТОРІЯ РАЦІЇ", "🎙 RADIO HISTORY")
+    fun noVoiceMessages(c: Context) = t(
+        c,
+        "Голосовых сообщений пока нет",
+        "Голосових повідомлень поки немає",
+        "No voice messages yet"
+    )
+
+    // --- Hazard Category Names ---
+    fun alertTypeName(c: Context, rawValue: String): String = when (rawValue.lowercase()) {
+        "shelling" -> t(c, "Обстрел", "Обстріл", "Shelling")
+        "fire" -> t(c, "Пожар", "Пожежа", "Fire")
+        "medical" -> t(c, "Медпомощь", "Меддопомога", "Medical")
+        "police" -> t(c, "Полиция", "Поліція", "Police")
+        "military" -> t(c, "Военные", "Військові", "Military")
+        else -> t(c, "Другое", "Інше", "Other")
+    }
 
     // --- Settings Dialog ---
     fun settingsTitle(c: Context) = t(c, "Настройки комнаты", "Налаштування кімнати", "Room Settings")
@@ -204,4 +346,54 @@ object I18n {
         "Вас заблоковано в цій кімнаті назавжди",
         "You are permanently banned in this room"
     )
+
+    // --- Telegram Error Mapper ---
+    fun mapTelegramError(c: Context, raw: String): String {
+        val upper = raw.uppercase()
+        return when {
+            upper.contains("PHONE_NUMBER_INVALID") -> t(
+                c,
+                "Некорректный номер телефона. Введите номер в международном формате.",
+                "Некоректний номер телефону. Введіть номер у міжнародному форматі.",
+                "Invalid phone number. Please enter in international format."
+            )
+            upper.contains("PHONE_CODE_INVALID") -> t(
+                c,
+                "Неверный 5-значный код. Проверьте сообщение в приложении Telegram.",
+                "Невірний 5-значний код. Перевірте повідомлення у Telegram.",
+                "Invalid 5-digit code. Check your Telegram message."
+            )
+            upper.contains("PHONE_CODE_EXPIRED") -> t(
+                c,
+                "Срок действия кода истёк. Запросите новый код.",
+                "Термін дії коду минув. Запитайте новий код.",
+                "Code expired. Please request a new code."
+            )
+            upper.contains("PASSWORD_HASH_INVALID") -> t(
+                c,
+                "Неверный облачный пароль 2FA Telegram. Попробуйте снова.",
+                "Невірний хмарний пароль 2FA Telegram. Спробуйте знову.",
+                "Invalid 2FA Telegram password. Try again."
+            )
+            upper.contains("PHONE_NUMBER_BANNED") -> t(
+                c,
+                "Этот номер телефона заблокирован в Telegram.",
+                "Цей номер телефону заблоковано в Telegram.",
+                "This phone number is banned in Telegram."
+            )
+            upper.contains("FLOOD_WAIT") -> t(
+                c,
+                "Слишком много запросов. Пожалуйста, подождите несколько минут.",
+                "Забагато запитів. Будь ласка, зачекайте кілька хвилин.",
+                "Too many requests. Please wait a few minutes."
+            )
+            upper.contains("PHONE_NUMBER_UNREGISTERED") -> t(
+                c,
+                "Этот номер не зарегистрирован в Telegram.",
+                "Цей номер не зареєстровано в Telegram.",
+                "Phone number is not registered in Telegram."
+            )
+            else -> t(c, "Ошибка Telegram: $raw", "Помилка Telegram: $raw", "Telegram error: $raw")
+        }
+    }
 }
