@@ -258,13 +258,13 @@ fun AuthCommunityScreen(
 
                 // 3. Community Password
                 Text(
-                    text = "3. Пароль доступа к сектору:",
+                    text = "3. Пароль доступа к сектору (опционально):",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = TelegramTextPrimary
                 )
                 Text(
-                    text = "Ключ криптографической защиты (без него посторонний не попадёт в эфир)",
+                    text = "Для открытого канала оставьте пустым. Если задан — эфир закрыт и зашифрован.",
                     fontSize = 11.sp,
                     color = TelegramTextSecondary
                 )
@@ -274,7 +274,7 @@ fun AuthCommunityScreen(
                 OutlinedTextField(
                     value = groupPassword,
                     onValueChange = { groupPassword = it },
-                    placeholder = { Text("Пароль закрытого сообщества", color = TelegramTextSecondary) },
+                    placeholder = { Text("Оставьте пустым для открытого эфира", color = TelegramTextSecondary) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
@@ -293,11 +293,11 @@ fun AuthCommunityScreen(
 
                 Button(
                     onClick = {
-                        if (callSign.isNotBlank() && communityTarget.isNotBlank() && groupPassword.isNotBlank()) {
+                        if (callSign.isNotBlank() && communityTarget.isNotBlank()) {
                             onEnterCommunity(callSign.trim(), communityTarget.trim(), groupPassword.trim(), userAvatar)
                         }
                     },
-                    enabled = callSign.isNotBlank() && communityTarget.isNotBlank() && groupPassword.isNotBlank(),
+                    enabled = callSign.isNotBlank() && communityTarget.isNotBlank(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
