@@ -65,7 +65,14 @@ class AppUpdateManager(private val context: Context) {
     private val prefs = context.getSharedPreferences("varta_update_prefs", Context.MODE_PRIVATE)
 
     var githubRepo: String
-        get() = prefs.getString("github_repo", "danilpromsiz-byte/varta-radio") ?: "danilpromsiz-byte/varta-radio"
+        get() {
+            val saved = prefs.getString("github_repo", null)
+            return if (saved.isNullOrBlank() || saved.equals("your-repo/varta-radio", ignoreCase = true)) {
+                "danilpromsiz-byte/varta-radio"
+            } else {
+                saved
+            }
+        }
         set(value) = prefs.edit().putString("github_repo", value.trim()).apply()
 
     private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
