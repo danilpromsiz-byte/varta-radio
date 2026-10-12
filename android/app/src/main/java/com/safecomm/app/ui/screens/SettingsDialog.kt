@@ -49,6 +49,8 @@ fun SettingsDialog(
     onForceUpdate: (String) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     onSaveTelegramConfig: (radiusKm: Double, soundEnabled: Boolean, token: String, chat: String, pass: String) -> Unit,
+    onLeaveRoom: () -> Unit = {},
+    onLogOutTelegram: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var selectedRadius by remember { mutableDoubleStateOf(currentRadius) }
@@ -371,6 +373,46 @@ fun SettingsDialog(
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Сохранить и подключиться", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // --- SESSION & ROOM MANAGEMENT ---
+                Text(
+                    text = "🚪 УПРАВЛЕНИЕ СЕССИЕЙ И КОМНАТОЙ",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TelegramTextSecondary
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onLeaveRoom()
+                        },
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
+                    ) {
+                        Text("🔄 Сменить комнату", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onLogOutTelegram()
+                        },
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                    ) {
+                        Text("Выйти из Telegram", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

@@ -193,7 +193,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     systemLanguageCode = "ru"
                     deviceModel = "Android"
                     systemVersion = Build.VERSION.RELEASE
-                    applicationVersion = "1.0.9"
+                    applicationVersion = "1.1.0"
                 }
                 client?.send(params, this)
             }

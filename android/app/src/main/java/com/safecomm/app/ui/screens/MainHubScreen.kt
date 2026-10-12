@@ -65,6 +65,8 @@ fun MainHubScreen(
     onToggleMute: () -> Unit = {},
     onKickMember: (GroupMember) -> Unit,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
+    onLeaveRoom: () -> Unit = {},
+    onLogOutTelegram: () -> Unit = {},
     onHapticTick: () -> Unit
 ) {
     var showDangerDialog by remember { mutableStateOf(false) }
@@ -73,6 +75,7 @@ fun MainHubScreen(
     var showMembersDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showAvatarDialog by remember { mutableStateOf(false) }
+    var showLeaveRoomConfirm by remember { mutableStateOf(false) }
     var selectedAlertForDetail by remember { mutableStateOf<Alert?>(null) }
 
     val isAdmin = members.any { it.userId == currentUserId && it.role == "admin" }
@@ -100,16 +103,30 @@ fun MainHubScreen(
                                 .background(if (isConnected) AlertMedicalGreen else AlertShellingRed)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = group?.name ?: "SafeComm",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TelegramTextPrimary
-                            )
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showLeaveRoomConfirm = true }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = group?.name ?: "SafeComm",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TelegramTextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = "Сменить комнату",
+                                    tint = Color(0xFFFFD600),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             Text(
                                 text = if (isConnected) {
-                                    "${members.size} в сети" + (if (isMuted) " • 🔇 Без звука" else " • 🔊 Рация активна")
+                                    "${members.size} в сети" + (if (isMuted) " • 🔇 Без звука" else " • 🔊 Рация")
                                 } else "Подключение к сети...",
                                 fontSize = 11.sp,
                                 color = if (isConnected) (if (isMuted) Color(0xFFFFD600) else TelegramTextSecondary) else AlertShellingRed
@@ -118,6 +135,14 @@ fun MainHubScreen(
                     }
                 },
                 actions = {
+                    // Switch Room Button
+                    IconButton(onClick = { showLeaveRoomConfirm = true }) {
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = "Сменить комнату",
+                            tint = Color(0xFFFFD600)
+                        )
+                    }
                     // Mute / Live Audio Toggle Button
                     IconButton(onClick = onToggleMute) {
                         Icon(
@@ -334,7 +359,46 @@ fun MainHubScreen(
                 showSettingsDialog = false
                 onSaveSettings(r, s, t, c, p)
             },
+            onLeaveRoom = onLeaveRoom,
+            onLogOutTelegram = onLogOutTelegram,
             onDismiss = { showSettingsDialog = false }
+        )
+    }
+
+    if (showLeaveRoomConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLeaveRoomConfirm = false },
+            title = {
+                Text(
+                    text = "🚪 Сменить комнату?",
+                    fontWeight = FontWeight.Bold,
+                    color = TelegramTextPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Вы выйдете из текущего закрытого радиоканала «${group?.name}» и сможете выбрать другую группу или создать новый канал.\n\nВаша авторизация в Telegram сохранится.",
+                    color = TelegramTextSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLeaveRoomConfirm = false
+                        onLeaveRoom()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
+                ) {
+                    Text("Сменить комнату", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveRoomConfirm = false }) {
+                    Text("Отмена", color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
         )
     }
 

@@ -156,8 +156,8 @@ class TelegramClientManager(private val context: Context) {
     private var currentTopicBase: String = ""
 
     init {
-        // One-time forced migration: ensure clean login to Telegram MTProto and real closed channel
-        val isMigrated = prefs.getBoolean("tdlib_migrated_v109", false)
+        // One-time forced migration v110: ensure clean login to Telegram MTProto and evict from cached rooms
+        val isMigrated = prefs.getBoolean("tdlib_migrated_v110", false)
         if (!isMigrated) {
             prefs.edit()
                 .remove("session_token")
@@ -165,7 +165,7 @@ class TelegramClientManager(private val context: Context) {
                 .remove("active_invite_link")
                 .remove("community_link")
                 .remove("community_password")
-                .putBoolean("tdlib_migrated_v109", true)
+                .putBoolean("tdlib_migrated_v110", true)
                 .apply()
         }
 
@@ -179,7 +179,7 @@ class TelegramClientManager(private val context: Context) {
         scope.launch {
             tdlibEngine.authState.collect { tdState ->
                 when (tdState) {
-                    is TdAuthState.WaitPhoneNumber, is TdAuthState.WaitCode, is TdAuthState.WaitPassword, is TdAuthState.Error -> {
+                    is TdAuthState.WaitPhoneNumber, is TdAuthState.WaitCode, is TdAuthState.WaitPassword, is TdAuthState.Error, is TdAuthState.Initializing -> {
                         if (_authState.value !is TelegramAuthState.Unauthenticated) {
                             _authState.value = TelegramAuthState.Unauthenticated
                         }
@@ -198,7 +198,6 @@ class TelegramClientManager(private val context: Context) {
                             _authState.value = TelegramAuthState.Unauthenticated
                         }
                     }
-                    else -> {}
                 }
             }
         }
@@ -382,6 +381,16 @@ class TelegramClientManager(private val context: Context) {
             Log.e("VartaNetwork", "Failed to join Telegram channel", e)
             Result.failure(e)
         }
+    }
+
+    fun leaveRoom() {
+        disconnectFromSector()
+        sessionToken = ""
+        communityLinkOrTag = ""
+        communityPassword = ""
+        activeChatId = 0L
+        activeInviteLink = ""
+        _authState.value = TelegramAuthState.Unauthenticated
     }
 
     fun logout() {

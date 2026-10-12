@@ -412,228 +412,257 @@ fun AuthCommunityScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // =========================================================================
-        // BLOCK 2: CLOSED CHANNEL / SUPERGROUP SELECTION
-        // =========================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp)
+        if (!isAuthenticated) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface.copy(alpha = 0.6f))
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(text = "📢", fontSize = 20.sp)
+                    Text(text = "🔒", fontSize = 28.sp)
                     Text(
-                        text = "2. Закрытый канал связи (Комната)",
+                        text = "Вход в закрытые каналы заблокирован",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TelegramBlue
+                        color = Color(0xFFFFD600)
+                    )
+                    Text(
+                        text = "Сначала выполните вход в свой аккаунт Telegram на Шаге 1 выше.\nПосле авторизации здесь станет доступен выбор, создание и подключение к закрытым радиоканалам с паролем.",
+                        fontSize = 12.sp,
+                        color = TelegramTextSecondary,
+                        textAlign = TextAlign.Center
                     )
                 }
-                Text(
-                    text = "Комната = закрытый канал Telegram. Все подключенные устройства с одинаковым каналом и паролем ведут голосовую радиосвязь.",
-                    fontSize = 11.sp,
-                    color = TelegramTextSecondary
-                )
+            }
+        } else {
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Mode Tabs
-                Row(
+            // =========================================================================
+            // BLOCK 2: CLOSED CHANNEL / SUPERGROUP SELECTION
+            // =========================================================================
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(TelegramDarkCard, RoundedCornerShape(12.dp))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(18.dp)
                 ) {
-                    Button(
-                        onClick = { channelMode = 0 },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (channelMode == 0) Color(0xFFFFD600) else Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Text(text = "📢", fontSize = 20.sp)
                         Text(
-                            text = "Создать",
-                            fontSize = 12.sp,
+                            text = "2. Закрытый канал связи (Комната)",
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (channelMode == 0) Color.Black else TelegramTextSecondary
+                            color = TelegramBlue
                         )
                     }
+                    Text(
+                        text = "Комната = закрытый канал Telegram. Все подключенные устройства с одинаковым каналом и паролем ведут голосовую радиосвязь.",
+                        fontSize = 11.sp,
+                        color = TelegramTextSecondary
+                    )
 
-                    Button(
-                        onClick = { channelMode = 1 },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (channelMode == 1) TelegramBlue else Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Mode Tabs
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(TelegramDarkCard, RoundedCornerShape(12.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            text = "По ссылке / ID",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (channelMode == 1) Color.White else TelegramTextSecondary
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            channelMode = 2
-                            coroutineScope.launch {
-                                isLoadingRecentChats = true
-                                recentChats = loadRecentChats()
-                                isLoadingRecentChats = false
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (channelMode == 2) TelegramBlue else Color.Transparent
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "Мои группы",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (channelMode == 2) Color.White else TelegramTextSecondary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                when (channelMode) {
-                    0 -> {
-                        // MODE 0: Create new closed channel
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Button(
+                            onClick = { channelMode = 0 },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (channelMode == 0) Color(0xFFFFD600) else Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "Название нового канала:",
+                                text = "Создать",
                                 fontSize = 12.sp,
-                                color = TelegramTextPrimary,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold,
+                                color = if (channelMode == 0) Color.Black else TelegramTextSecondary
                             )
-                            TextButton(onClick = { newChannelTitle = "Канал-" + (10000..99999).random() }) {
-                                Text("🎲 Случайный ID", fontSize = 11.sp, color = TelegramBlue)
-                            }
                         }
 
-                        OutlinedTextField(
-                            value = newChannelTitle,
-                            onValueChange = { newChannelTitle = it.trim() },
-                            placeholder = { Text("Например: Дозор-Север или 74821", color = TelegramTextSecondary) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary,
-                                focusedBorderColor = Color(0xFFFFD600),
-                                unfocusedBorderColor = TelegramDivider,
-                                focusedContainerColor = TelegramDarkCard,
-                                unfocusedContainerColor = TelegramDarkCard
+                        Button(
+                            onClick = { channelMode = 1 },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (channelMode == 1) TelegramBlue else Color.Transparent
                             ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "По ссылке / ID",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (channelMode == 1) Color.White else TelegramTextSecondary
+                            )
+                        }
 
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "💡 При нажатии «Войти в эфир», в вашем Telegram будет автоматически создана закрытая группа с этой защищённой рацией.",
-                            fontSize = 10.sp,
-                            color = TelegramTextSecondary
-                        )
+                        Button(
+                            onClick = {
+                                channelMode = 2
+                                coroutineScope.launch {
+                                    isLoadingRecentChats = true
+                                    recentChats = loadRecentChats()
+                                    isLoadingRecentChats = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (channelMode == 2) TelegramBlue else Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Мои группы",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (channelMode == 2) Color.White else TelegramTextSecondary
+                            )
+                        }
                     }
 
-                    1 -> {
-                        // MODE 1: Enter existing channel by link or ID
-                        OutlinedTextField(
-                            value = channelTargetInput,
-                            onValueChange = { channelTargetInput = it.trim() },
-                            label = { Text("Ссылка приглашения или ID группы", color = TelegramTextSecondary, fontSize = 12.sp) },
-                            placeholder = { Text("https://t.me/+xyz... или -10012345678", color = TelegramTextSecondary) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TelegramTextPrimary,
-                                unfocusedTextColor = TelegramTextPrimary,
-                                focusedBorderColor = TelegramBlue,
-                                unfocusedBorderColor = TelegramDivider,
-                                focusedContainerColor = TelegramDarkCard,
-                                unfocusedContainerColor = TelegramDarkCard
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "💡 Вставьте ссылку-приглашение из Telegram (t.me/+...) со второго телефона.",
-                            fontSize = 10.sp,
-                            color = TelegramTextSecondary
-                        )
-                    }
-
-                    2 -> {
-                        // MODE 2: Select from user's Telegram groups
-                        if (isLoadingRecentChats) {
+                    when (channelMode) {
+                        0 -> {
+                            // MODE 0: Create new closed channel
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = TelegramBlue, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Загрузка ваших групп Telegram...", fontSize = 12.sp, color = TelegramTextSecondary)
+                                Text(
+                                    text = "Название нового канала:",
+                                    fontSize = 12.sp,
+                                    color = TelegramTextPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                TextButton(onClick = { newChannelTitle = "Канал-" + (10000..99999).random() }) {
+                                    Text("🎲 Случайный ID", fontSize = 11.sp, color = TelegramBlue)
+                                }
                             }
-                        } else if (recentChats.isEmpty()) {
+
+                            OutlinedTextField(
+                                value = newChannelTitle,
+                                onValueChange = { newChannelTitle = it.trim() },
+                                placeholder = { Text("Например: Дозор-Север или 74821", color = TelegramTextSecondary) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TelegramTextPrimary,
+                                    unfocusedTextColor = TelegramTextPrimary,
+                                    focusedBorderColor = Color(0xFFFFD600),
+                                    unfocusedBorderColor = TelegramDivider,
+                                    focusedContainerColor = TelegramDarkCard,
+                                    unfocusedContainerColor = TelegramDarkCard
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Группы не найдены или нет авторизации в Telegram. Создайте новый закрытый канал во вкладке «Создать».",
-                                fontSize = 11.sp,
+                                text = "💡 При нажатии «Войти в эфир», в вашем Telegram будет автоматически создана закрытая группа с этой защищённой рацией.",
+                                fontSize = 10.sp,
                                 color = TelegramTextSecondary
                             )
-                        } else {
-                            Text("Выберите группу для привязки к рации:", fontSize = 12.sp, color = TelegramTextSecondary)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                recentChats.take(6).forEach { chat ->
-                                    val isSelected = channelTargetInput == chat.id.toString() || channelTargetInput == chat.title
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                channelTargetInput = chat.id.toString()
-                                            },
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isSelected) Color(0x3326A5E4) else TelegramDarkCard
-                                        ),
-                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, TelegramBlue) else null
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                        }
+
+                        1 -> {
+                            // MODE 1: Enter existing channel by link or ID
+                            OutlinedTextField(
+                                value = channelTargetInput,
+                                onValueChange = { channelTargetInput = it.trim() },
+                                label = { Text("Ссылка приглашения или ID группы", color = TelegramTextSecondary, fontSize = 12.sp) },
+                                placeholder = { Text("https://t.me/+xyz... или -10012345678", color = TelegramTextSecondary) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TelegramTextPrimary,
+                                    unfocusedTextColor = TelegramTextPrimary,
+                                    focusedBorderColor = TelegramBlue,
+                                    unfocusedBorderColor = TelegramDivider,
+                                    focusedContainerColor = TelegramDarkCard,
+                                    unfocusedContainerColor = TelegramDarkCard
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "💡 Вставьте ссылку-приглашение из Telegram (t.me/+...) со второго телефона.",
+                                fontSize = 10.sp,
+                                color = TelegramTextSecondary
+                            )
+                        }
+
+                        2 -> {
+                            // MODE 2: Select from user's Telegram groups
+                            if (isLoadingRecentChats) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = TelegramBlue, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Загрузка ваших групп Telegram...", fontSize = 12.sp, color = TelegramTextSecondary)
+                                }
+                            } else if (recentChats.isEmpty()) {
+                                Text(
+                                    text = "Группы не найдены или нет авторизации в Telegram. Создайте новый закрытый канал во вкладке «Создать».",
+                                    fontSize = 11.sp,
+                                    color = TelegramTextSecondary
+                                )
+                            } else {
+                                Text("Выберите группу для привязки к рации:", fontSize = 12.sp, color = TelegramTextSecondary)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    recentChats.take(6).forEach { chat ->
+                                        val isSelected = channelTargetInput == chat.id.toString() || channelTargetInput == chat.title
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    channelTargetInput = chat.id.toString()
+                                                },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isSelected) Color(0x3326A5E4) else TelegramDarkCard
+                                            ),
+                                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, TelegramBlue) else null
                                         ) {
-                                            Text(
-                                                text = chat.title,
-                                                fontSize = 13.sp,
-                                                color = if (isSelected) Color.White else TelegramTextPrimary,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            if (isSelected) {
-                                                Text("Выбрано ✅", fontSize = 11.sp, color = Color(0xFF4CAF50))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = chat.title,
+                                                    fontSize = 13.sp,
+                                                    color = if (isSelected) Color.White else TelegramTextPrimary,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                if (isSelected) {
+                                                    Text("Выбрано ✅", fontSize = 11.sp, color = Color(0xFF4CAF50))
+                                                }
                                             }
                                         }
                                     }
@@ -643,132 +672,133 @@ fun AuthCommunityScreen(
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // =========================================================================
-        // BLOCK 3: MANDATORY CHANNEL PASSWORD
-        // =========================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp)
+            // =========================================================================
+            // BLOCK 3: MANDATORY CHANNEL PASSWORD
+            // =========================================================================
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp)
                 ) {
-                    Text(text = "🔒", fontSize = 20.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(text = "🔒", fontSize = 20.sp)
+                        Text(
+                            text = "3. Пароль канала (ОБЯЗАТЕЛЬНО)",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (groupPassword.isBlank()) Color(0xFFFFD600) else TelegramBlue
+                        )
+                    }
                     Text(
-                        text = "3. Пароль канала (ОБЯЗАТЕЛЬНО)",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (groupPassword.isBlank()) Color(0xFFFFD600) else TelegramBlue
-                    )
-                }
-                Text(
-                    text = "Пароль канала обязателен для всех участников. Он защищает эфир и используется для HMAC-SHA256 подписи каждого голосового сообщения.",
-                    fontSize = 11.sp,
-                    color = TelegramTextSecondary
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = groupPassword,
-                    onValueChange = { groupPassword = it },
-                    label = { Text("Секретный пароль канала *", color = TelegramTextSecondary, fontSize = 12.sp) },
-                    placeholder = { Text("Введите секретный пароль", color = TelegramTextSecondary) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TelegramTextPrimary,
-                        unfocusedTextColor = TelegramTextPrimary,
-                        focusedBorderColor = if (groupPassword.isBlank()) Color(0xFFFFD600) else TelegramBlue,
-                        unfocusedBorderColor = if (groupPassword.isBlank()) Color(0x88FFD600) else TelegramDivider,
-                        focusedContainerColor = TelegramDarkCard,
-                        unfocusedContainerColor = TelegramDarkCard
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                if (groupPassword.isBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "⚠️ Задайте секретный пароль доступа к каналу",
+                        text = "Пароль канала обязателен для всех участников. Он защищает эфир и используется для HMAC-SHA256 подписи каждого голосового сообщения.",
                         fontSize = 11.sp,
-                        color = Color(0xFFFFD600)
+                        color = TelegramTextSecondary
                     )
-                }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-        // =========================================================================
-        // SUBMIT BUTTON: ENTER TELEGRAM SECURE RADIO
-        // =========================================================================
-        val canSubmit = groupPassword.isNotBlank() && callSign.isNotBlank() && (
-                (channelMode == 0 && newChannelTitle.isNotBlank()) ||
-                (channelMode != 0 && channelTargetInput.isNotBlank())
-        )
+                    OutlinedTextField(
+                        value = groupPassword,
+                        onValueChange = { groupPassword = it },
+                        label = { Text("Секретный пароль канала *", color = TelegramTextSecondary, fontSize = 12.sp) },
+                        placeholder = { Text("Введите секретный пароль", color = TelegramTextSecondary) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = if (groupPassword.isBlank()) Color(0xFFFFD600) else TelegramBlue,
+                            unfocusedBorderColor = if (groupPassword.isBlank()) Color(0x88FFD600) else TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
 
-        Button(
-            onClick = {
-                if (canSubmit && !isOperating) {
-                    isOperating = true
-                    if (channelMode == 0) {
-                        onCreateChannel(newChannelTitle.trim(), groupPassword.trim())
-                    } else {
-                        onJoinChannel(channelTargetInput.trim(), groupPassword.trim())
+                    if (groupPassword.isBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "⚠️ Задайте секретный пароль доступа к каналу",
+                            fontSize = 11.sp,
+                            color = Color(0xFFFFD600)
+                        )
                     }
                 }
-            },
-            enabled = canSubmit && !isOperating,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = TelegramBlue,
-                disabledContainerColor = TelegramDarkCard
-            ),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            if (isOperating) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Text("Подключение к каналу Telegram...", fontSize = 14.sp, color = Color.White)
-            } else {
-                Text(
-                    text = if (channelMode == 0) "⚡ Создать закрытый канал и войти" else "Войти в закрытый канал Telegram",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = if (canSubmit) Color.White else TelegramTextSecondary
-                )
             }
-        }
 
-        if (!canSubmit) {
-            Spacer(modifier = Modifier.height(8.dp))
-            val missingReason = when {
-                callSign.isBlank() -> "Укажите ваш позывной"
-                groupPassword.isBlank() -> "Задайте обязательный секретный пароль канала"
-                channelMode == 0 && newChannelTitle.isBlank() -> "Укажите название нового канала"
-                channelMode != 0 && channelTargetInput.isBlank() -> "Укажите ссылку приглашения или ID группы"
-                else -> ""
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // =========================================================================
+            // SUBMIT BUTTON: ENTER TELEGRAM SECURE RADIO
+            // =========================================================================
+            val canSubmit = isAuthenticated && groupPassword.isNotBlank() && callSign.isNotBlank() && (
+                    (channelMode == 0 && newChannelTitle.isNotBlank()) ||
+                    (channelMode != 0 && channelTargetInput.isNotBlank())
+            )
+
+            Button(
+                onClick = {
+                    if (canSubmit && !isOperating) {
+                        isOperating = true
+                        if (channelMode == 0) {
+                            onCreateChannel(newChannelTitle.trim(), groupPassword.trim())
+                        } else {
+                            onJoinChannel(channelTargetInput.trim(), groupPassword.trim())
+                        }
+                    }
+                },
+                enabled = canSubmit && !isOperating,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TelegramBlue,
+                    disabledContainerColor = TelegramDarkCard
+                ),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                if (isOperating) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Подключение к каналу Telegram...", fontSize = 14.sp, color = Color.White)
+                } else {
+                    Text(
+                        text = if (channelMode == 0) "⚡ Создать закрытый канал и войти" else "Войти в закрытый канал Telegram",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (canSubmit) Color.White else TelegramTextSecondary
+                    )
+                }
             }
-            if (missingReason.isNotBlank()) {
-                Text(
-                    text = "⚠️ $missingReason",
-                    fontSize = 11.sp,
-                    color = Color(0xFFFFD600),
-                    textAlign = TextAlign.Center
-                )
+
+            if (!canSubmit) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val missingReason = when {
+                    !isAuthenticated -> "Требуется авторизация в Telegram на Шаге 1"
+                    callSign.isBlank() -> "Укажите ваш позывной"
+                    groupPassword.isBlank() -> "Задайте обязательный секретный пароль канала"
+                    channelMode == 0 && newChannelTitle.isBlank() -> "Укажите название нового канала"
+                    channelMode != 0 && channelTargetInput.isBlank() -> "Укажите ссылку приглашения или ID группы"
+                    else -> ""
+                }
+                if (missingReason.isNotBlank()) {
+                    Text(
+                        text = "⚠️ $missingReason",
+                        fontSize = 11.sp,
+                        color = Color(0xFFFFD600),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
 

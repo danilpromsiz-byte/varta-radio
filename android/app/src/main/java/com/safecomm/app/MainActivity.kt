@@ -441,6 +441,14 @@ class MainActivity : ComponentActivity() {
                     },
                     onHapticTick = {
                         alertNotificationManager.triggerHapticFeedback(isLong = false)
+                    },
+                    onLeaveRoom = {
+                        telegramClient.leaveRoom()
+                        Toast.makeText(this@MainActivity, "Вы вышли из комнаты", Toast.LENGTH_SHORT).show()
+                    },
+                    onLogOutTelegram = {
+                        telegramClient.logout()
+                        Toast.makeText(this@MainActivity, "Выход из Telegram выполнен", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
