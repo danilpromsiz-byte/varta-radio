@@ -10,14 +10,12 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -147,6 +145,8 @@ class MainActivity : ComponentActivity() {
 
         val isConnected by telegramClient.isSectorConnected.collectAsState()
         val connectionStatusText by telegramClient.connectionStatusText.collectAsState()
+        val pendingKnocks by telegramClient.pendingKnockRequests.collectAsState()
+        val currentDescriptor by telegramClient.currentChannelDescriptor.collectAsState()
         var alertRadiusKm by remember { mutableDoubleStateOf(2.0) }
         var soundEnabled by remember { mutableStateOf(true) }
 
@@ -160,6 +160,13 @@ class MainActivity : ComponentActivity() {
         val isPlayingVoice by walkieTalkieManager.isPlaying.collectAsState()
         val currentSpeaker by walkieTalkieManager.currentSpeaker.collectAsState()
         val amplitude by walkieTalkieManager.amplitude.collectAsState()
+
+        // Haptic notification when a guest knocks on the room door
+        LaunchedEffect(pendingKnocks) {
+            if (pendingKnocks.isNotEmpty()) {
+                alertNotificationManager.triggerHapticFeedback(isLong = true)
+            }
+        }
 
         // Auto-check GitHub updates on launch
         LaunchedEffect(Unit) {
@@ -220,15 +227,14 @@ class MainActivity : ComponentActivity() {
                     onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
                     onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
                     onLogOutTelegram = { telegramClient.logout() },
-                    onSmartConnect = { channelName, password, answer, enableVerif, question, answerForGuests ->
+                    onSmartConnect = { channelName, password, answer, enableVerif, question ->
                         coroutineScope.launch {
                             telegramClient.enterOrJoinSmartChannel(
                                 channelName = channelName,
                                 password = password,
                                 verificationAnswer = answer,
                                 enableVerification = enableVerif,
-                                newQuestion = question,
-                                newAnswer = answerForGuests
+                                newQuestion = question
                             ).onSuccess { (chatId, inviteLink) ->
                                 VartaRadioService.start(this@MainActivity, channelName, telegramClient.callSign)
                                 Toast.makeText(this@MainActivity, "Подключено к эфиру «$channelName»!", Toast.LENGTH_SHORT).show()
@@ -418,6 +424,20 @@ class MainActivity : ComponentActivity() {
                         walkieTalkieManager.stopPlayback()
                     },
                     onKickMember = {},
+                    isRoomOwner = currentDescriptor == null || currentDescriptor?.ownerId == telegramClient.mySenderId,
+                    initialVerificationEnabled = currentDescriptor?.authMode == "QUESTION",
+                    initialVerificationQuestion = currentDescriptor?.verificationQuestion ?: "",
+                    onSaveRoomModeration = { enabled, question ->
+                        coroutineScope.launch {
+                            telegramClient.updateRoomSecurity(enabled, question)
+                                .onSuccess {
+                                    Toast.makeText(this@MainActivity, "Настройки модерации комнаты сохранены", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка сохранения: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
                     onSaveSettings = { radius, sound, token, chat, pass ->
                         alertRadiusKm = radius
                         soundEnabled = sound
@@ -439,6 +459,97 @@ class MainActivity : ComponentActivity() {
                         Toast.makeText(this@MainActivity, "Выход из Telegram выполнен", Toast.LENGTH_SHORT).show()
                     }
                 )
+
+                // --- DOORBELL KNOCK APPROVAL DIALOG FOR ROOM OWNER ---
+                if (pendingKnocks.isNotEmpty()) {
+                    val req = pendingKnocks.first()
+                    AlertDialog(
+                        onDismissRequest = { /* Must explicitly approve or reject */ },
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🔔", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Запрос на вход в эфир",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TelegramTextPrimary
+                                )
+                            }
+                        },
+                        text = {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Позывной гостя:",
+                                    fontSize = 12.sp,
+                                    color = TelegramTextSecondary
+                                )
+                                Text(
+                                    text = req.guestCallSign,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFFFFD600)
+                                )
+
+                                if (req.question.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Ваш проверочный вопрос:",
+                                        fontSize = 12.sp,
+                                        color = TelegramTextSecondary
+                                    )
+                                    Text(
+                                        text = "«${req.question}»",
+                                        fontSize = 13.sp,
+                                        color = TelegramTextPrimary
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Ответ гостя:",
+                                    fontSize = 12.sp,
+                                    color = TelegramTextSecondary
+                                )
+                                Text(
+                                    text = if (req.answer.isNotBlank()) "«${req.answer}»" else "(Ответ не указан)",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = TelegramBlue
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Впустить участника в закрытую группу Telegram и подключить к рации?",
+                                    fontSize = 12.sp,
+                                    color = TelegramTextSecondary
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    telegramClient.approveKnock(req)
+                                    Toast.makeText(this@MainActivity, "Вход одобрен для ${req.guestCallSign}", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                            ) {
+                                Text("✅ Впустить", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            OutlinedButton(
+                                onClick = {
+                                    telegramClient.rejectKnock(req)
+                                    Toast.makeText(this@MainActivity, "Запрос ${req.guestCallSign} отклонён", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                            ) {
+                                Text("❌ Отклонить", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        containerColor = TelegramDarkSurface
+                    )
+                }
             }
         }
 

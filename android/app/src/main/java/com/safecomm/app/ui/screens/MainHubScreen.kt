@@ -65,6 +65,10 @@ fun MainHubScreen(
     onToggleMute: () -> Unit = {},
     onKickMember: (GroupMember) -> Unit,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
+    isRoomOwner: Boolean = false,
+    initialVerificationEnabled: Boolean = true,
+    initialVerificationQuestion: String = "",
+    onSaveRoomModeration: ((enabled: Boolean, question: String) -> Unit)? = null,
     onLeaveRoom: () -> Unit = {},
     onLogOutTelegram: () -> Unit = {},
     onHapticTick: () -> Unit
@@ -355,6 +359,10 @@ fun MainHubScreen(
             onCheckUpdate = onCheckUpdate,
             onForceUpdate = onForceUpdate,
             onInstallUpdate = onInstallUpdate,
+            isRoomOwner = isRoomOwner,
+            initialVerificationEnabled = initialVerificationEnabled,
+            initialVerificationQuestion = initialVerificationQuestion,
+            onSaveRoomModeration = onSaveRoomModeration,
             onSaveTelegramConfig = { r, s, t, c, p ->
                 showSettingsDialog = false
                 onSaveSettings(r, s, t, c, p)

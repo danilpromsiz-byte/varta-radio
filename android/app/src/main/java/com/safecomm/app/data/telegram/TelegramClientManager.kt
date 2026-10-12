@@ -149,6 +149,13 @@ class TelegramClientManager(private val context: Context) {
     private val _activeMembers = MutableStateFlow<List<GroupMember>>(emptyList())
     val activeMembers: StateFlow<List<GroupMember>> = _activeMembers.asStateFlow()
 
+    // Doorbell knock requests for room owner moderation
+    private val _pendingKnockRequests = MutableStateFlow<List<KnockRequest>>(emptyList())
+    val pendingKnockRequests: StateFlow<List<KnockRequest>> = _pendingKnockRequests.asStateFlow()
+
+    private val _currentChannelDescriptor = MutableStateFlow<ChannelDescriptor?>(null)
+    val currentChannelDescriptor: StateFlow<ChannelDescriptor?> = _currentChannelDescriptor.asStateFlow()
+
     private val membersSeen = ConcurrentHashMap<String, Triple<String, String, Long>>() // senderId -> Triple(callSign, avatar, lastSeenMs)
     private val processedPacketIds: MutableSet<String> = java.util.Collections.synchronizedSet(
         object : java.util.LinkedHashMap<String, Boolean>(100, 0.75f, true) {
@@ -340,12 +347,11 @@ class TelegramClientManager(private val context: Context) {
         password: String,
         verificationAnswer: String = "",
         enableVerification: Boolean = true,
-        newQuestion: String = "",
-        newAnswer: String = ""
+        newQuestion: String = ""
     ): Result<Pair<Long, String>> = withContext(Dispatchers.IO) {
         val cleanName = ChannelSecurity.normalizeChannelName(channelName)
         val pass = password.trim()
-        if (cleanName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Укажите название или номер канала"))
+        if (cleanName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Укажите номер или название комнаты"))
         if (pass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль обязателен для защиты эфира"))
 
         // 1. Check if channel already exists in the distributed registry
@@ -357,31 +363,53 @@ class TelegramClientManager(private val context: Context) {
             // Validate password
             val passHash = ChannelSecurity.hashString(pass)
             if (passHash != existing.passwordHash) {
-                return@withContext Result.failure(IllegalArgumentException("Неверный пароль канала «${existing.channelName}»!"))
+                return@withContext Result.failure(IllegalArgumentException("Неверный пароль комнаты «${existing.channelName}»!"))
             }
 
-            // Validate verification question if enabled by room owner
-            if (existing.authMode == "QUESTION" && existing.verificationAnswerHash.isNotBlank()) {
-                val ansHash = ChannelSecurity.hashAnswer(verificationAnswer)
-                if (ansHash != existing.verificationAnswerHash) {
-                    val prompt = if (existing.verificationQuestion.isNotBlank()) "«${existing.verificationQuestion}»" else "секретный вопрос"
-                    return@withContext Result.failure(IllegalArgumentException("Неверный ответ на проверочный вопрос создателя:\n$prompt"))
+            var decryptedLink: String? = null
+
+            // If room owner set verification question, and user is not the owner -> knock and wait for approval!
+            if (existing.authMode == "QUESTION" && existing.ownerId != mySenderId) {
+                _connectionStatusText.value = "Запрос на вход у создателя..."
+                val knockReq = KnockRequest(
+                    channelName = cleanName,
+                    guestCallSign = callSign,
+                    guestSenderId = mySenderId,
+                    question = existing.verificationQuestion,
+                    answer = verificationAnswer.trim()
+                )
+                val knockResult = channelRegistry.requestKnockApproval(knockReq)
+                val approval = knockResult.getOrElse { err ->
+                    return@withContext Result.failure(IllegalArgumentException(err.message ?: "Запрос на вход не одобрен"))
+                }
+                if (approval.status != "APPROVED") {
+                    val reason = approval.reason.ifBlank { "Создатель комнаты отклонил ваш запрос на вход." }
+                    return@withContext Result.failure(IllegalArgumentException(reason))
+                }
+                if (approval.encryptedInviteLink.isNotBlank()) {
+                    decryptedLink = ChannelSecurity.decryptInviteLink(approval.encryptedInviteLink, pass)
                 }
             }
 
-            // Decrypt Telegram invite link
-            val inviteLink = ChannelSecurity.decryptInviteLink(existing.encryptedInviteLink, pass)
-                ?: return@withContext Result.failure(IllegalStateException("Ошибка расшифровки доступа к каналу Telegram"))
+            if (decryptedLink.isNullOrBlank()) {
+                decryptedLink = ChannelSecurity.decryptInviteLink(existing.encryptedInviteLink, pass)
+            }
+
+            if (decryptedLink.isNullOrBlank()) {
+                return@withContext Result.failure(IllegalStateException("Ошибка расшифровки ссылки доступа к группе Telegram"))
+            }
+
+            _currentChannelDescriptor.value = existing
 
             // Join the exact same Telegram channel
-            val chatRes = tdlibEngine.joinOrOpenChannel(inviteLink)
+            val chatRes = tdlibEngine.joinOrOpenChannel(decryptedLink)
             val chat = chatRes.getOrThrow()
             activeChatId = chat.id
             communityLinkOrTag = chat.title
             communityPassword = pass
             sessionToken = "tdlib_${chat.id}"
 
-            val secureToken = VartaChannelToken.encode(chat.id, inviteLink, chat.title)
+            val secureToken = VartaChannelToken.encode(chat.id, decryptedLink, chat.title)
             activeInviteLink = secureToken
 
             val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
@@ -414,20 +442,21 @@ class TelegramClientManager(private val context: Context) {
             val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
             activeInviteLink = secureToken
 
-            // Register channel in distributed registry so all peers join this exact channel
+            // Register channel in distributed registry
             val descriptor = ChannelDescriptor(
                 channelName = cleanName,
                 ownerCallSign = callSign,
                 ownerId = mySenderId,
                 passwordHash = ChannelSecurity.hashString(pass),
-                authMode = if (enableVerification && newQuestion.isNotBlank() && newAnswer.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
+                authMode = if (enableVerification && newQuestion.isNotBlank()) "QUESTION" else "PASSWORD_ONLY",
                 verificationQuestion = if (enableVerification) newQuestion.trim() else "",
-                verificationAnswerHash = if (enableVerification && newAnswer.isNotBlank()) ChannelSecurity.hashAnswer(newAnswer) else "",
+                verificationAnswerHash = "",
                 telegramChatId = chat.id,
                 encryptedInviteLink = ChannelSecurity.encryptInviteLink(rawInviteLink, pass),
                 createdAt = System.currentTimeMillis()
             )
             channelRegistry.registerChannel(descriptor)
+            _currentChannelDescriptor.value = descriptor
 
             val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
                 listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
@@ -445,6 +474,52 @@ class TelegramClientManager(private val context: Context) {
 
             Result.success(Pair(chat.id, secureToken))
         }
+    }
+
+    fun approveKnock(request: KnockRequest) {
+        scope.launch {
+            val pass = communityPassword
+            val inviteLinkRes = tdlibEngine.getInviteLink(activeChatId)
+            val rawLink = inviteLinkRes.getOrNull()
+                ?: VartaChannelToken.decode(activeInviteLink)?.inviteLink
+                ?: activeInviteLink
+            val encryptedLink = ChannelSecurity.encryptInviteLink(rawLink, pass)
+
+            val response = KnockResponse(
+                requestId = request.requestId,
+                status = "APPROVED",
+                encryptedInviteLink = encryptedLink,
+                ownerCallSign = callSign
+            )
+            channelRegistry.sendKnockResponse(request.channelName, request.guestSenderId, response)
+            _pendingKnockRequests.value = _pendingKnockRequests.value.filter { it.requestId != request.requestId }
+        }
+    }
+
+    fun rejectKnock(request: KnockRequest) {
+        scope.launch {
+            val response = KnockResponse(
+                requestId = request.requestId,
+                status = "REJECTED",
+                reason = "Запрос на вход отклонён создателем комнаты",
+                ownerCallSign = callSign
+            )
+            channelRegistry.sendKnockResponse(request.channelName, request.guestSenderId, response)
+            _pendingKnockRequests.value = _pendingKnockRequests.value.filter { it.requestId != request.requestId }
+        }
+    }
+
+    suspend fun updateRoomSecurity(enableVerification: Boolean, verificationQuestion: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+        val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
+            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+
+        val updated = existing.copy(
+            authMode = if (enableVerification) "QUESTION" else "PASSWORD_ONLY",
+            verificationQuestion = if (enableVerification) verificationQuestion.trim() else ""
+        )
+        _currentChannelDescriptor.value = updated
+        channelRegistry.registerChannel(updated)
     }
 
     suspend fun verifyCodeAndSignIn(code: String, targetCommunity: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -592,6 +667,16 @@ class TelegramClientManager(private val context: Context) {
         // 2. Connect to resilient real-time mesh broker cluster for ultra-low latency PTT
         scope.launch {
             try {
+                if (_currentChannelDescriptor.value == null && sector.isNotBlank()) {
+                    try {
+                        val clean = ChannelSecurity.normalizeChannelName(sector)
+                        val desc = channelRegistry.queryChannel(clean)
+                        if (desc != null) {
+                            _currentChannelDescriptor.value = desc
+                        }
+                    } catch (_: Exception) {}
+                }
+
                 disconnectMqtt()
 
                 currentTopicBase = deriveTopicBase(sector, password)
@@ -644,7 +729,12 @@ class TelegramClientManager(private val context: Context) {
 
                     override fun messageArrived(topic: String?, message: MqttMessage?) {
                         if (topic == null || message == null) return
-                        handleIncomingPacket(String(message.payload, Charsets.UTF_8))
+                        val payload = String(message.payload, Charsets.UTF_8)
+                        if (topic.startsWith("varta/knock/")) {
+                            handleIncomingKnock(payload)
+                        } else {
+                            handleIncomingPacket(payload)
+                        }
                     }
 
                     override fun deliveryComplete(token: IMqttDeliveryToken?) {}
@@ -691,29 +781,53 @@ class TelegramClientManager(private val context: Context) {
     private fun subscribeToSectorTopics() {
         val client = mqttClient ?: return
         try {
+            val roomName = communityLinkOrTag.ifBlank { activeChatId.toString() }
+            val knockTopic = channelRegistry.getKnockTopic(roomName)
             val topics = arrayOf(
                 "$currentTopicBase/presence",
                 "$currentTopicBase/voice",
                 "$currentTopicBase/alert",
                 "$currentTopicBase/control",
-                "$currentTopicBase/+"
+                "$currentTopicBase/+",
+                knockTopic
             )
-            val qos = intArrayOf(1, 1, 1, 1, 1)
+            val qos = intArrayOf(1, 1, 1, 1, 1, 1)
             client.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("VartaNetwork", "Subscribed successfully to sector topics!")
+                    Log.d("VartaNetwork", "Subscribed successfully to sector topics and knock: $knockTopic")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                     Log.e("VartaNetwork", "Failed to subscribe to sector topics array, falling back to wildcard", exception)
                     try {
                         client.subscribe("$currentTopicBase/#", 1)
+                        client.subscribe(knockTopic, 1)
                     } catch (_: Exception) {}
                 }
             })
             Log.d("VartaNetwork", "Subscribing to topics: ${topics.joinToString()}")
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Subscribe error", e)
+        }
+    }
+
+    private fun handleIncomingKnock(payloadStr: String) {
+        try {
+            val knock = json.decodeFromString<KnockRequest>(payloadStr)
+            val desc = _currentChannelDescriptor.value
+            // Only process knock if we are the owner or no descriptor yet (default host)
+            if (desc != null && desc.ownerId != mySenderId) {
+                Log.d("VartaNetwork", "Ignored knock: we are not room owner (owner=${desc.ownerId}, me=$mySenderId)")
+                return
+            }
+
+            val currentList = _pendingKnockRequests.value
+            if (currentList.none { it.requestId == knock.requestId }) {
+                Log.d("VartaNetwork", "Doorbell knock received from ${knock.guestCallSign}: ${knock.answer}")
+                _pendingKnockRequests.value = currentList + knock
+            }
+        } catch (e: Exception) {
+            Log.e("VartaNetwork", "Failed to parse incoming knock request", e)
         }
     }
 

@@ -20,12 +20,33 @@ data class ChannelDescriptor(
     val ownerCallSign: String,
     val ownerId: String,
     val passwordHash: String,
-    val authMode: String = "QUESTION", // "QUESTION" or "PASSWORD_ONLY"
+    val authMode: String = "QUESTION", // "QUESTION" (manual approval) or "PASSWORD_ONLY"
     val verificationQuestion: String = "",
     val verificationAnswerHash: String = "",
     val telegramChatId: Long = 0L,
     val encryptedInviteLink: String = "",
     val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class KnockRequest(
+    val requestId: String = java.util.UUID.randomUUID().toString(),
+    val channelName: String,
+    val guestCallSign: String,
+    val guestSenderId: String,
+    val question: String = "",
+    val answer: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class KnockResponse(
+    val requestId: String,
+    val status: String, // "APPROVED" or "REJECTED"
+    val reason: String = "",
+    val encryptedInviteLink: String = "",
+    val ownerCallSign: String = "",
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 object ChannelSecurity {
@@ -226,5 +247,165 @@ class VartaChannelRegistry {
         }
 
         foundDescriptor
+    }
+
+    fun getKnockTopic(channelName: String): String {
+        val clean = ChannelSecurity.normalizeChannelName(channelName)
+        return "varta/knock/$clean"
+    }
+
+    fun getKnockReplyTopic(channelName: String, guestSenderId: String): String {
+        val clean = ChannelSecurity.normalizeChannelName(channelName)
+        return "varta/knock_reply/$clean/$guestSenderId"
+    }
+
+    /**
+     * Guest sends a knock request to the room owner and waits for an APPROVED or REJECTED response.
+     */
+    suspend fun requestKnockApproval(request: KnockRequest, timeoutMs: Long = 45000L): Result<KnockResponse> = withContext(Dispatchers.IO) {
+        val knockTopic = getKnockTopic(request.channelName)
+        val replyTopic = getKnockReplyTopic(request.channelName, request.guestSenderId)
+        val payload = json.encodeToString(request)
+        var client: MqttAsyncClient? = null
+        var response: KnockResponse? = null
+
+        try {
+            val clientId = "Knock_" + java.util.UUID.randomUUID().toString().take(8)
+            client = MqttAsyncClient(brokerUrls[0], clientId, MemoryPersistence())
+            val connOpts = MqttConnectOptions().apply {
+                serverURIs = brokerUrls
+                connectionTimeout = 5
+                keepAliveInterval = 10
+                isCleanSession = true
+            }
+
+            withTimeout(timeoutMs) {
+                suspendCancellableCoroutine<Unit> { cont ->
+                    client.setCallback(object : MqttCallback {
+                        override fun connectionLost(cause: Throwable?) {}
+                        override fun messageArrived(incomingTopic: String?, message: MqttMessage?) {
+                            if (message != null && incomingTopic == replyTopic) {
+                                val str = String(message.payload, Charsets.UTF_8).trim()
+                                try {
+                                    val resp = json.decodeFromString<KnockResponse>(str)
+                                    if (resp.requestId == request.requestId || resp.requestId.isNotBlank()) {
+                                        response = resp
+                                        if (cont.isActive) cont.resume(Unit)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.w("VartaRegistry", "Error parsing knock response: ${e.message}")
+                                }
+                            }
+                        }
+                        override fun deliveryComplete(token: IMqttDeliveryToken?) {}
+                    })
+
+                    client.connect(connOpts, null, object : IMqttActionListener {
+                        override fun onSuccess(asyncActionToken: IMqttToken?) {
+                            try {
+                                client.subscribe(replyTopic, 1, null, object : IMqttActionListener {
+                                    override fun onSuccess(t: IMqttToken?) {
+                                        // Once subscribed to reply, publish the knock request
+                                        val msg = MqttMessage(payload.toByteArray(Charsets.UTF_8)).apply {
+                                            qos = 1
+                                            isRetained = false
+                                        }
+                                        client.publish(knockTopic, msg, null, object : IMqttActionListener {
+                                            override fun onSuccess(pubToken: IMqttToken?) {
+                                                Log.d("VartaRegistry", "Knock request published to $knockTopic")
+                                            }
+                                            override fun onFailure(pubToken: IMqttToken?, exception: Throwable?) {
+                                                Log.w("VartaRegistry", "Failed to publish knock request: ${exception?.message}")
+                                                if (cont.isActive) cont.resume(Unit)
+                                            }
+                                        })
+                                    }
+                                    override fun onFailure(t: IMqttToken?, e: Throwable?) {
+                                        if (cont.isActive) cont.resume(Unit)
+                                    }
+                                })
+                            } catch (_: Exception) {
+                                if (cont.isActive) cont.resume(Unit)
+                            }
+                        }
+
+                        override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                    })
+                }
+            }
+
+            if (response != null) {
+                Result.success(response!!)
+            } else {
+                Result.failure(Exception("Создатель комнаты не ответил на запрос"))
+            }
+        } catch (e: TimeoutCancellationException) {
+            Result.failure(Exception("Создатель комнаты не ответил на запрос в течение 45 сек. Возможно, он сейчас занят или оффлайн."))
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try {
+                if (client?.isConnected == true) client?.disconnect()
+                client?.close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Room owner sends an approval or rejection response to the guest.
+     */
+    suspend fun sendKnockResponse(channelName: String, guestSenderId: String, response: KnockResponse): Result<Unit> = withContext(Dispatchers.IO) {
+        val replyTopic = getKnockReplyTopic(channelName, guestSenderId)
+        val payload = json.encodeToString(response)
+        var client: MqttAsyncClient? = null
+
+        try {
+            val clientId = "KnockResp_" + java.util.UUID.randomUUID().toString().take(8)
+            client = MqttAsyncClient(brokerUrls[0], clientId, MemoryPersistence())
+            val connOpts = MqttConnectOptions().apply {
+                serverURIs = brokerUrls
+                connectionTimeout = 5
+                keepAliveInterval = 10
+                isCleanSession = true
+            }
+
+            suspendCancellableCoroutine<Unit> { cont ->
+                client.connect(connOpts, null, object : IMqttActionListener {
+                    override fun onSuccess(asyncActionToken: IMqttToken?) {
+                        try {
+                            val msg = MqttMessage(payload.toByteArray(Charsets.UTF_8)).apply {
+                                qos = 1
+                                isRetained = false
+                            }
+                            client.publish(replyTopic, msg, null, object : IMqttActionListener {
+                                override fun onSuccess(t: IMqttToken?) {
+                                    Log.d("VartaRegistry", "Knock response published to $replyTopic")
+                                    if (cont.isActive) cont.resume(Unit)
+                                }
+                                override fun onFailure(t: IMqttToken?, e: Throwable?) {
+                                    if (cont.isActive) cont.resume(Unit)
+                                }
+                            })
+                        } catch (_: Exception) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                    }
+                    override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                })
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try {
+                if (client?.isConnected == true) client?.disconnect()
+                client?.close()
+            } catch (_: Exception) {}
+        }
     }
 }

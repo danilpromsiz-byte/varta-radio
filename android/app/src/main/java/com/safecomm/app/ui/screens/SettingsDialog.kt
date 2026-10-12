@@ -48,6 +48,10 @@ fun SettingsDialog(
     onCheckUpdate: (String) -> Unit = {},
     onForceUpdate: (String) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
+    isRoomOwner: Boolean = false,
+    initialVerificationEnabled: Boolean = true,
+    initialVerificationQuestion: String = "",
+    onSaveRoomModeration: ((enabled: Boolean, question: String) -> Unit)? = null,
     onSaveTelegramConfig: (radiusKm: Double, soundEnabled: Boolean, token: String, chat: String, pass: String) -> Unit,
     onLeaveRoom: () -> Unit = {},
     onLogOutTelegram: () -> Unit = {},
@@ -58,6 +62,8 @@ fun SettingsDialog(
     var tokenInput by remember { mutableStateOf(botToken) }
     var chatIdInput by remember { mutableStateOf(chatId) }
     var passwordInput by remember { mutableStateOf(groupPassword) }
+    var isVerificationEnabled by remember { mutableStateOf(initialVerificationEnabled) }
+    var verificationQuestionInput by remember { mutableStateOf(initialVerificationQuestion) }
 
     val scrollState = rememberScrollState()
 
@@ -260,6 +266,87 @@ fun SettingsDialog(
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
+
+                // --- ROOM MODERATION SECTION ---
+                if (isRoomOwner || onSaveRoomModeration != null) {
+                    Text(
+                        text = "🛡️ МОДЕРАЦИЯ ВХОДА В КОМНАТУ",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TelegramTextPrimary
+                    )
+                    Text(
+                        text = "Управление проверочным вопросом и ручным допуском гостей в эфир.",
+                        fontSize = 11.sp,
+                        color = TelegramTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = "Требовать подтверждение входа",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TelegramTextPrimary
+                            )
+                            Text(
+                                text = if (isVerificationEnabled) "Включён: ручной допуск создателем" else "Выключен: вход только по паролю",
+                                fontSize = 11.sp,
+                                color = if (isVerificationEnabled) Color(0xFFFFD600) else TelegramTextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = isVerificationEnabled,
+                            onCheckedChange = { isVerificationEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = TelegramBlue
+                            )
+                        )
+                    }
+
+                    if (isVerificationEnabled) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = verificationQuestionInput,
+                            onValueChange = { verificationQuestionInput = it },
+                            label = { Text("Вопрос создателя для гостей *", color = TelegramTextSecondary, fontSize = 12.sp) },
+                            placeholder = { Text("Например: Ваш позывной или подразделение?", color = TelegramTextSecondary) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TelegramTextPrimary,
+                                unfocusedTextColor = TelegramTextPrimary,
+                                focusedBorderColor = Color(0xFFFFD600),
+                                unfocusedBorderColor = TelegramDivider,
+                                focusedContainerColor = TelegramDarkCard,
+                                unfocusedContainerColor = TelegramDarkCard
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            onSaveRoomModeration?.invoke(isVerificationEnabled, verificationQuestionInput)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("💾 Применить настройки модерации", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
 
                 // --- GITHUB AUTO-UPDATE SECTION ---
                 Text(

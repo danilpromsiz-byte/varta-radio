@@ -89,8 +89,7 @@ fun AuthCommunityScreen(
         password: String,
         verificationAnswer: String,
         enableVerification: Boolean,
-        newQuestion: String,
-        newAnswer: String
+        newQuestion: String
     ) -> Unit,
     onCheckChannelExists: suspend (channelName: String) -> ChannelDescriptor?,
     loadRecentChats: suspend () -> List<TdApi.Chat>,
@@ -117,7 +116,6 @@ fun AuthCommunityScreen(
     // Owner verification settings (by default: TRUE as requested!)
     var enableVerification by remember { mutableStateOf(true) }
     var newVerificationQuestion by remember { mutableStateOf("") }
-    var newVerificationAnswer by remember { mutableStateOf("") }
 
     // Channel discovery state
     var existingChannelDescriptor by remember { mutableStateOf<ChannelDescriptor?>(null) }
@@ -889,13 +887,13 @@ fun AuthCommunityScreen(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Проверочный вопрос (По умолчанию)",
+                                            text = "Проверочный вопрос для гостей (По умолчанию)",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = TelegramTextPrimary
                                         )
                                         Text(
-                                            text = "Гости смогут войти в комнату, только ответив на ваш вопрос",
+                                            text = "Гости увидят ваш вопрос и напишут ответ. Вы лично решите: впустить или отклонить.",
                                             fontSize = 10.sp,
                                             color = TelegramTextSecondary
                                         )
@@ -909,28 +907,9 @@ fun AuthCommunityScreen(
                                         value = newVerificationQuestion,
                                         onValueChange = { newVerificationQuestion = it },
                                         label = { Text("Секретный вопрос для гостей *", color = TelegramTextSecondary, fontSize = 11.sp) },
-                                        placeholder = { Text("Например: Номер нашего батальона?", color = TelegramTextSecondary) },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TelegramTextPrimary,
-                                            unfocusedTextColor = TelegramTextPrimary,
-                                            focusedBorderColor = TelegramBlue,
-                                            unfocusedBorderColor = TelegramDivider,
-                                            focusedContainerColor = TelegramDarkCard,
-                                            unfocusedContainerColor = TelegramDarkCard
-                                        ),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    OutlinedTextField(
-                                        value = newVerificationAnswer,
-                                        onValueChange = { newVerificationAnswer = it },
-                                        label = { Text("Правильный ответ *", color = TelegramTextSecondary, fontSize = 11.sp) },
-                                        placeholder = { Text("Секретный ответ для сверки", color = TelegramTextSecondary) },
-                                        singleLine = true,
+                                        placeholder = { Text("Например: Ваш позывной или подразделение?", color = TelegramTextSecondary) },
+                                        singleLine = false,
+                                        maxLines = 3,
                                         modifier = Modifier.fillMaxWidth(),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedTextColor = TelegramTextPrimary,
@@ -1022,7 +1001,7 @@ fun AuthCommunityScreen(
             val hasValidQuestionOrAnswer = if (existingChannelDescriptor != null) {
                 existingChannelDescriptor?.authMode != "QUESTION" || guestVerificationAnswer.isNotBlank()
             } else {
-                !enableVerification || (newVerificationQuestion.isNotBlank() && newVerificationAnswer.isNotBlank())
+                !enableVerification || newVerificationQuestion.isNotBlank()
             }
 
             val canSubmit = isAuthenticated &&
@@ -1040,8 +1019,7 @@ fun AuthCommunityScreen(
                             groupPassword.trim(),
                             guestVerificationAnswer.trim(),
                             enableVerification,
-                            newVerificationQuestion.trim(),
-                            newVerificationAnswer.trim()
+                            newVerificationQuestion.trim()
                         )
                     }
                 },
@@ -1056,10 +1034,20 @@ fun AuthCommunityScreen(
                 if (isOperating) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Подключение к эфиру...", fontSize = 14.sp, color = Color.White)
+                    Text(
+                        text = if (existingChannelDescriptor != null && existingChannelDescriptor?.authMode == "QUESTION") {
+                            "Ожидание одобрения создателя..."
+                        } else "Подключение к эфиру...",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
                 } else {
                     val buttonText = if (existingChannelDescriptor != null) {
-                        "⚡ Войти в комнату «${channelNameInput.trim()}»"
+                        if (existingChannelDescriptor?.authMode == "QUESTION") {
+                            "🔔 Запросить вход в комнату «${channelNameInput.trim()}»"
+                        } else {
+                            "⚡ Войти в комнату «${channelNameInput.trim()}»"
+                        }
                     } else {
                         "⚡ Создать комнату «${channelNameInput.trim().ifBlank { "Новая" }}» и войти"
                     }
@@ -1080,9 +1068,9 @@ fun AuthCommunityScreen(
                     channelNameInput.isBlank() -> "Укажите номер или название комнаты"
                     groupPassword.isBlank() -> "Задайте обязательный секретный пароль комнаты"
                     existingChannelDescriptor != null && existingChannelDescriptor?.authMode == "QUESTION" && guestVerificationAnswer.isBlank() ->
-                        "Ответьте на проверочный вопрос создателя комнаты"
-                    existingChannelDescriptor == null && enableVerification && (newVerificationQuestion.isBlank() || newVerificationAnswer.isBlank()) ->
-                        "Заполните проверочный вопрос и ответ для гостей"
+                        "Напишите ответ на вопрос создателя комнаты"
+                    existingChannelDescriptor == null && enableVerification && newVerificationQuestion.isBlank() ->
+                        "Заполните проверочный вопрос для гостей"
                     else -> ""
                 }
                 if (missingReason.isNotBlank()) {
