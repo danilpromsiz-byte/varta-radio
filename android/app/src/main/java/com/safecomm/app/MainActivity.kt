@@ -144,7 +144,8 @@ class MainActivity : ComponentActivity() {
         val mainPrefs = remember { getSharedPreferences("varta_main_prefs", android.content.Context.MODE_PRIVATE) }
         var isMuted by remember { mutableStateOf(mainPrefs.getBoolean("is_muted", false)) }
 
-        var isConnected by remember { mutableStateOf(false) }
+        val isConnected by telegramClient.isSectorConnected.collectAsState()
+        val connectionStatusText by telegramClient.connectionStatusText.collectAsState()
         var alertRadiusKm by remember { mutableDoubleStateOf(2.0) }
         var soundEnabled by remember { mutableStateOf(true) }
 
@@ -169,7 +170,7 @@ class MainActivity : ComponentActivity() {
             telegramClient.events.collect { event ->
                 when (event) {
                     is TelegramLiveEvent.ConnectionState -> {
-                        isConnected = event.isConnected
+                        // Handled directly via isSectorConnected StateFlow
                     }
                     is TelegramLiveEvent.LiveVoice -> {
                         // Play loud over loudspeaker unless muted!

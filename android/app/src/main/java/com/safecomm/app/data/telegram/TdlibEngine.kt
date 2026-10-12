@@ -62,7 +62,10 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
     private val _authState = MutableStateFlow<TdAuthState>(TdAuthState.Initializing)
     val authState: StateFlow<TdAuthState> = _authState.asStateFlow()
 
-    private val _events = MutableSharedFlow<TdRadioEvent>(replay = 0, extraBufferCapacity = 64)
+    private val _isConnectionReady = MutableStateFlow(false)
+    val isConnectionReady: StateFlow<Boolean> = _isConnectionReady.asStateFlow()
+
+    private val _events = MutableSharedFlow<TdRadioEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TdRadioEvent> = _events.asSharedFlow()
 
     private var currentChatId: Long = 0L
@@ -270,7 +273,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
                     systemLanguageCode = "ru"
                     deviceModel = "Android"
                     systemVersion = Build.VERSION.RELEASE
-                    applicationVersion = "1.1.2"
+                    applicationVersion = "1.1.3"
                 }
                 client?.send(params, this)
             }
@@ -288,6 +291,7 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             }
 
             is TdApi.AuthorizationStateReady -> {
+                _isConnectionReady.value = true
                 scope.launch {
                     try {
                         val me = send(TdApi.GetMe())
@@ -301,11 +305,13 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
             }
 
             is TdApi.AuthorizationStateClosed -> {
+                _isConnectionReady.value = false
                 _authState.value = TdAuthState.WaitPhoneNumber
                 client = null
             }
 
             is TdApi.AuthorizationStateLoggingOut -> {
+                _isConnectionReady.value = false
                 _authState.value = TdAuthState.Initializing
             }
         }
@@ -314,15 +320,19 @@ class TdlibEngine(private val context: Context) : Client.ResultHandler {
     private fun handleConnectionState(state: TdApi.ConnectionState) {
         when (state) {
             is TdApi.ConnectionStateReady -> {
+                _isConnectionReady.value = true
                 scope.launch { _events.emit(TdRadioEvent.ConnectionStatus(true, "Подключено к серверам Telegram")) }
             }
             is TdApi.ConnectionStateConnecting -> {
+                _isConnectionReady.value = false
                 scope.launch { _events.emit(TdRadioEvent.ConnectionStatus(false, "Подключение к Telegram...")) }
             }
             is TdApi.ConnectionStateWaitingForNetwork -> {
+                _isConnectionReady.value = false
                 scope.launch { _events.emit(TdRadioEvent.ConnectionStatus(false, "Ожидание сети...")) }
             }
             is TdApi.ConnectionStateUpdating -> {
+                _isConnectionReady.value = true
                 scope.launch { _events.emit(TdRadioEvent.ConnectionStatus(true, "Синхронизация Telegram...")) }
             }
         }

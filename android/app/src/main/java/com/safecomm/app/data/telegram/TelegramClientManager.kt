@@ -135,7 +135,13 @@ class TelegramClientManager(private val context: Context) {
     )
     val authState: StateFlow<TelegramAuthState> = _authState.asStateFlow()
 
-    private val _events = MutableSharedFlow<TelegramLiveEvent>(replay = 0, extraBufferCapacity = 64)
+    private val _isSectorConnected = MutableStateFlow(false)
+    val isSectorConnected: StateFlow<Boolean> = _isSectorConnected.asStateFlow()
+
+    private val _connectionStatusText = MutableStateFlow("Подключение к сети...")
+    val connectionStatusText: StateFlow<String> = _connectionStatusText.asStateFlow()
+
+    private val _events = MutableSharedFlow<TelegramLiveEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TelegramLiveEvent> = _events.asSharedFlow()
 
     // Dynamic list of active online members in this sector
@@ -186,7 +192,7 @@ class TelegramClientManager(private val context: Context) {
                         }
                     }
                     is TdAuthState.Authenticated -> {
-                        if (activeChatId != 0L && communityPassword.isNotBlank()) {
+                        if (activeChatId != 0L) {
                             val userTitle = tdState.user.let { u ->
                                 listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
                                     u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
@@ -194,10 +200,24 @@ class TelegramClientManager(private val context: Context) {
                             } ?: callSign
                             _authState.value = TelegramAuthState.Ready(userTitle, communityLinkOrTag)
                             tdlibEngine.setActiveChatId(activeChatId)
-                            connectToSector(activeChatId.toString(), communityPassword)
+                            _isSectorConnected.value = true
+                            _connectionStatusText.value = "В эфире (Telegram)"
+                            connectToSector(activeChatId.toString(), communityPassword.ifBlank { "varta_default" })
                         } else {
                             _authState.value = TelegramAuthState.Unauthenticated
                         }
+                    }
+                }
+            }
+        }
+
+        // Synchronize TDLib connection status with sector connectivity
+        scope.launch {
+            tdlibEngine.isConnectionReady.collect { isReady ->
+                if (isReady && activeChatId != 0L) {
+                    _isSectorConnected.value = true
+                    if (_connectionStatusText.value.contains("Подключение") || _connectionStatusText.value.contains("Переподключение")) {
+                        _connectionStatusText.value = "В эфире (Telegram)"
                     }
                 }
             }
@@ -236,6 +256,9 @@ class TelegramClientManager(private val context: Context) {
                         _events.emit(TelegramLiveEvent.LiveAlert(alert))
                     }
                     is TdRadioEvent.ConnectionStatus -> {
+                        if (tdEvent.isConnected && activeChatId != 0L) {
+                            _isSectorConnected.value = true
+                        }
                         _events.emit(TelegramLiveEvent.ConnectionState(tdEvent.isConnected, tdEvent.message))
                     }
                     is TdRadioEvent.MemberJoined -> {
@@ -268,10 +291,6 @@ class TelegramClientManager(private val context: Context) {
                     }
                 }
             }
-        }
-
-        if (_authState.value is TelegramAuthState.Ready) {
-            connectToSector(communityLinkOrTag, communityPassword)
         }
     }
 
@@ -340,15 +359,20 @@ class TelegramClientManager(private val context: Context) {
             val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
             activeInviteLink = secureToken
 
-            connectToSector(chat.id.toString(), password)
-
             val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
                 listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
                     u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
                 }
             } ?: callSign
 
+            _isSectorConnected.value = true
+            _connectionStatusText.value = "Канал «${chat.title}» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «${chat.title}» в эфире"))
+
             _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
+
+            connectToSector(chat.id.toString(), password)
+
             Result.success(Pair(chat.id, secureToken))
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Failed to create Telegram channel", e)
@@ -370,15 +394,20 @@ class TelegramClientManager(private val context: Context) {
             val secureToken = VartaChannelToken.encode(chat.id, rawInviteLink, chat.title)
             activeInviteLink = secureToken
 
-            connectToSector(chat.id.toString(), password)
-
             val userTitle = tdlibEngine.getCurrentUser()?.let { u ->
                 listOfNotNull(u.firstName, u.lastName).joinToString(" ").ifBlank {
                     u.usernames?.activeUsernames?.firstOrNull()?.let { "@$it" }
                 }
             } ?: callSign
 
+            _isSectorConnected.value = true
+            _connectionStatusText.value = "Канал «${chat.title}» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «${chat.title}» в эфире"))
+
             _authState.value = TelegramAuthState.Ready(userTitle, chat.title)
+
+            connectToSector(chat.id.toString(), password)
+
             Result.success(Pair(chat.id, secureToken))
         } catch (e: Exception) {
             Log.e("VartaNetwork", "Failed to join Telegram channel", e)
@@ -388,6 +417,8 @@ class TelegramClientManager(private val context: Context) {
 
     fun leaveRoom() {
         disconnectFromSector()
+        _isSectorConnected.value = false
+        _connectionStatusText.value = "Не подключено"
         sessionToken = ""
         communityLinkOrTag = ""
         communityPassword = ""
@@ -398,6 +429,8 @@ class TelegramClientManager(private val context: Context) {
 
     fun logout() {
         disconnectFromSector()
+        _isSectorConnected.value = false
+        _connectionStatusText.value = "Не подключено"
         tdlibEngine.logOut()
         sessionToken = ""
         communityLinkOrTag = ""
@@ -419,6 +452,14 @@ class TelegramClientManager(private val context: Context) {
         communityLinkOrTag = sector
         communityPassword = password
 
+        // Immediately mark sector connected if TDLib is authenticated with active chat
+        if (activeChatId != 0L) {
+            _isSectorConnected.value = true
+            if (_connectionStatusText.value.contains("Подключение") || _connectionStatusText.value.contains("Переподключение")) {
+                _connectionStatusText.value = "В эфире (Telegram)"
+            }
+        }
+
         // 1. Configure and start Telegram Direct client for Telegram Group channels
         telegramDirectClient.chatId = sector
         telegramDirectClient.botToken = botToken
@@ -439,7 +480,7 @@ class TelegramClientManager(private val context: Context) {
                 currentTopicBase = deriveTopicBase(sector, password)
                 Log.d("VartaNetwork", "Connecting to sector topic: $currentTopicBase")
 
-                // Multi-broker failover cluster: EMQX, HiveMQ, and Mosquitto across TCP & TLS
+                // Multi-broker failover cluster: EMQX, HiveMQ, and Mosquitto across standard TCP
                 val brokerUrl = "tcp://broker.emqx.io:1883"
                 val clientId = "Varta_${mySenderId}"
 
@@ -449,35 +490,21 @@ class TelegramClientManager(private val context: Context) {
                 val connOpts = MqttConnectOptions().apply {
                     serverURIs = arrayOf(
                         "tcp://broker.emqx.io:1883",
-                        "ssl://broker.emqx.io:8883",
                         "tcp://broker.hivemq.com:1883",
-                        "ssl://broker.hivemq.com:8883",
                         "tcp://test.mosquitto.org:1883"
                     )
                     isAutomaticReconnect = true
                     isCleanSession = true
-                    connectionTimeout = 10
+                    connectionTimeout = 8
                     keepAliveInterval = 15
                     maxInflight = 50
-
-                    try {
-                        val trustAll = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
-                            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
-                            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
-                            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-                        })
-                        val sslCtx = javax.net.ssl.SSLContext.getInstance("TLS")
-                        sslCtx.init(null, trustAll, java.security.SecureRandom())
-                        socketFactory = sslCtx.socketFactory
-                        isHttpsHostnameVerificationEnabled = false
-                    } catch (e: Exception) {
-                        Log.w("VartaNetwork", "SSL setup warning: ${e.message}")
-                    }
                 }
 
                 client.setCallback(object : MqttCallbackExtended {
                     override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                         Log.d("VartaNetwork", "MQTT Connected! server=$serverURI, reconnect=$reconnect")
+                        _isSectorConnected.value = true
+                        _connectionStatusText.value = "Сектор «$sector» в эфире"
                         scope.launch {
                             _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
                         }
@@ -488,7 +515,10 @@ class TelegramClientManager(private val context: Context) {
 
                     override fun connectionLost(cause: Throwable?) {
                         Log.w("VartaNetwork", "MQTT connection lost: ${cause?.message}")
-                        if (telegramDirectClient.botToken.isBlank()) {
+                        val tgReady = activeChatId != 0L && tdlibEngine.isConnectionReady.value
+                        _isSectorConnected.value = tgReady
+                        _connectionStatusText.value = if (tgReady) "В эфире (Telegram)" else "Переподключение к эфиру..."
+                        if (!tgReady && telegramDirectClient.botToken.isBlank()) {
                             scope.launch {
                                 _events.emit(TelegramLiveEvent.ConnectionState(false, "Переподключение к эфиру..."))
                             }
@@ -506,6 +536,8 @@ class TelegramClientManager(private val context: Context) {
                 client.connect(connOpts, null, object : IMqttActionListener {
                     override fun onSuccess(asyncActionToken: IMqttToken?) {
                         Log.d("VartaNetwork", "Connected successfully to mesh broker on initial attempt")
+                        _isSectorConnected.value = true
+                        _connectionStatusText.value = "Сектор «$sector» в эфире"
                         scope.launch {
                             _events.emit(TelegramLiveEvent.ConnectionState(true, "Сектор «$sector» в эфире"))
                         }
@@ -515,9 +547,13 @@ class TelegramClientManager(private val context: Context) {
                     }
 
                     override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                        Log.e("VartaNetwork", "Mesh broker connect failed", exception)
+                        Log.e("VartaNetwork", "Mesh broker connect failed: ${exception?.message}")
+                        if (activeChatId != 0L) {
+                            _isSectorConnected.value = true
+                            _connectionStatusText.value = "В эфире (Telegram)"
+                        }
                         scope.launch {
-                            delay(3000)
+                            delay(4000)
                             if (isActive && _authState.value is TelegramAuthState.Ready) {
                                 connectToSector(sector, password)
                             }
@@ -527,6 +563,10 @@ class TelegramClientManager(private val context: Context) {
 
             } catch (e: Exception) {
                 Log.e("VartaNetwork", "Error connecting to sector", e)
+                if (activeChatId != 0L) {
+                    _isSectorConnected.value = true
+                    _connectionStatusText.value = "В эфире (Telegram)"
+                }
             }
         }
     }
