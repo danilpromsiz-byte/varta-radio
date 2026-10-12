@@ -35,6 +35,9 @@ import com.safecomm.app.service.UpdateStatus
 import com.safecomm.app.service.WalkieTalkieManager
 import com.safecomm.app.ui.screens.AuthCommunityScreen
 import com.safecomm.app.service.VartaRadioService
+import com.safecomm.app.ui.i18n.AppLanguage
+import com.safecomm.app.ui.i18n.LanguageManager
+import com.safecomm.app.ui.i18n.LanguageSelectionDialog
 import com.safecomm.app.ui.screens.MainHubScreen
 import com.safecomm.app.ui.theme.*
 import kotlinx.coroutines.launch
@@ -130,12 +133,26 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun VartaAppContent() {
         val coroutineScope = rememberCoroutineScope()
+        var appLanguage by remember { mutableStateOf(LanguageManager.getLanguage(this@MainActivity)) }
+        var showLanguagePrompt by remember { mutableStateOf(LanguageManager.shouldPromptLanguage(this@MainActivity)) }
+
         val authState by telegramClient.authState.collectAsState()
         val tdAuthState by telegramClient.tdlibEngine.authState.collectAsState()
         val activeMembers by telegramClient.activeMembers.collectAsState()
 
         val appUpdateManager = remember { AppUpdateManager(this@MainActivity) }
         val updateStatus by appUpdateManager.updateStatus.collectAsState()
+
+        if (showLanguagePrompt) {
+            LanguageSelectionDialog(
+                currentLanguage = appLanguage,
+                onLanguageSelected = { chosen ->
+                    LanguageManager.setLanguage(this@MainActivity, chosen)
+                    appLanguage = chosen
+                    showLanguagePrompt = false
+                }
+            )
+        }
 
         var alerts by remember { mutableStateOf<List<Alert>>(emptyList()) }
         var voiceMessages by remember { mutableStateOf<List<VoiceMessage>>(emptyList()) }
@@ -216,6 +233,26 @@ class MainActivity : ComponentActivity() {
                     initialCommunity = telegramClient.communityLinkOrTag,
                     initialPassword = telegramClient.communityPassword,
                     currentDeviceId = telegramClient.deviceId,
+                    currentLanguage = appLanguage,
+                    onLanguageChange = { lang ->
+                        LanguageManager.setLanguage(this@MainActivity, lang)
+                        appLanguage = lang
+                    },
+                    isSuperAdmin = telegramClient.isSuperAdmin(),
+                    onUnlockSuperAdmin = { key ->
+                        telegramClient.unlockSuperAdmin(key)
+                    },
+                    onWipeAllRooms = {
+                        coroutineScope.launch {
+                            telegramClient.wipeAllRooms()
+                                .onSuccess { count ->
+                                    Toast.makeText(this@MainActivity, "Все комнаты сети удалены ($count)", Toast.LENGTH_LONG).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
                     onSendPhoneNumber = { phone -> telegramClient.tdlibEngine.sendPhoneNumber(phone) },
                     onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
                     onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
@@ -451,7 +488,39 @@ class MainActivity : ComponentActivity() {
                                 }
                         }
                     },
-                    isRoomOwner = currentDescriptor == null || telegramClient.isRoomOwner(currentDescriptor),
+                    isRoomOwner = currentDescriptor == null || telegramClient.canDeleteRoom(currentDescriptor),
+                    onDelegateAdmin = { member, grant ->
+                        coroutineScope.launch {
+                            telegramClient.delegateAdmin(member, grant)
+                                .onSuccess {
+                                    val action = if (grant) "назначен администратором" else "лишён прав администратора"
+                                    Toast.makeText(this@MainActivity, "${member.nickname} $action", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    isSuperAdmin = telegramClient.isSuperAdmin(),
+                    onUnlockSuperAdmin = { key ->
+                        telegramClient.unlockSuperAdmin(key)
+                    },
+                    onWipeAllRooms = {
+                        coroutineScope.launch {
+                            telegramClient.wipeAllRooms()
+                                .onSuccess { count ->
+                                    Toast.makeText(this@MainActivity, "Все комнаты сети удалены ($count)", Toast.LENGTH_LONG).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    currentLanguage = appLanguage,
+                    onLanguageChange = { lang ->
+                        LanguageManager.setLanguage(this@MainActivity, lang)
+                        appLanguage = lang
+                    },
                     initialAutoDeleteEnabled = (currentDescriptor?.autoDeleteTtl ?: 86400) > 0,
                     initialTelegramBridgeEnabled = currentDescriptor?.telegramBridgeEnabled ?: false,
                     initialRedirectionMessage = currentDescriptor?.redirectionMessage ?: "",

@@ -31,6 +31,7 @@ data class ChannelDescriptor(
     val isAbandoned: Boolean = false,    // Marked true when owner leaves/closes room
     val ownerDeviceId: String = "",      // Persistent device ID of the room creator
     val bannedUsers: Map<String, Long> = emptyMap(), // key: senderId/deviceId/lowercase nickname, value: banUntilMs (-1 for permanent)
+    val adminIds: Set<String> = emptySet(), // Set of senderIds / normalized callsigns of delegated admins
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -187,56 +188,95 @@ class VartaChannelRegistry {
      */
     suspend fun unregisterChannel(channelName: String): Result<Unit> = withContext(Dispatchers.IO) {
         val topic = getTopicForChannel(channelName)
-        var client: MqttAsyncClient? = null
+        for (broker in brokerUrls) {
+            var client: MqttAsyncClient? = null
+            try {
+                val clientId = "RegDel_" + java.util.UUID.randomUUID().toString().take(8)
+                client = MqttAsyncClient(broker, clientId, MemoryPersistence())
+                val connOpts = MqttConnectOptions().apply {
+                    connectionTimeout = 4
+                    keepAliveInterval = 10
+                    isCleanSession = true
+                }
+                val token = client.connect(connOpts)
+                token.waitForCompletion(4000)
 
-        try {
-            val clientId = "RegDel_" + java.util.UUID.randomUUID().toString().take(8)
-            client = MqttAsyncClient(brokerUrls[0], clientId, MemoryPersistence())
-            val connOpts = MqttConnectOptions().apply {
-                serverURIs = brokerUrls
-                connectionTimeout = 5
-                keepAliveInterval = 10
-                isCleanSession = true
+                val msg = MqttMessage(ByteArray(0)).apply {
+                    qos = 1
+                    isRetained = true
+                }
+                val pubToken = client.publish(topic, msg)
+                pubToken.waitForCompletion(3000)
+                Log.d("VartaRegistry", "Channel deleted from registry on $broker: $topic")
+            } catch (e: Exception) {
+                Log.w("VartaRegistry", "Failed to delete on $broker: $topic", e)
+            } finally {
+                try {
+                    if (client?.isConnected == true) client?.disconnect()
+                    client?.close()
+                } catch (_: Exception) {}
             }
+        }
+        Result.success(Unit)
+    }
 
-            suspendCancellableCoroutine<Unit> { cont ->
-                client.connect(connOpts, null, object : IMqttActionListener {
-                    override fun onSuccess(asyncActionToken: IMqttToken?) {
-                        try {
-                            val msg = MqttMessage(ByteArray(0)).apply {
-                                qos = 1
-                                isRetained = true
+    /**
+     * Super Admin feature: Wipes all registered channels across all MQTT brokers.
+     */
+    suspend fun wipeAllChannels(): Result<Int> = withContext(Dispatchers.IO) {
+        var count = 0
+        for (broker in brokerUrls) {
+            var client: MqttAsyncClient? = null
+            try {
+                val clientId = "RegWipe_" + java.util.UUID.randomUUID().toString().take(8)
+                client = MqttAsyncClient(broker, clientId, MemoryPersistence())
+                val connOpts = MqttConnectOptions().apply {
+                    connectionTimeout = 4
+                    keepAliveInterval = 10
+                    isCleanSession = true
+                }
+                val token = client.connect(connOpts)
+                token.waitForCompletion(4000)
+
+                val foundTopics = mutableListOf<String>()
+                client.setCallback(object : MqttCallback {
+                    override fun connectionLost(cause: Throwable?) {}
+                    override fun messageArrived(incomingTopic: String?, message: MqttMessage?) {
+                        if (incomingTopic != null && incomingTopic.startsWith("varta/registry/")) {
+                            if (message != null && message.payload.isNotEmpty()) {
+                                foundTopics.add(incomingTopic)
                             }
-                            client.publish(topic, msg, null, object : IMqttActionListener {
-                                override fun onSuccess(t: IMqttToken?) {
-                                    Log.d("VartaRegistry", "Channel deleted from registry: $topic")
-                                    if (cont.isActive) cont.resume(Unit)
-                                }
-                                override fun onFailure(t: IMqttToken?, e: Throwable?) {
-                                    Log.w("VartaRegistry", "Failed to publish delete on $topic", e)
-                                    if (cont.isActive) cont.resume(Unit)
-                                }
-                            })
-                        } catch (e: Exception) {
-                            if (cont.isActive) cont.resume(Unit)
                         }
                     }
-                    override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                        if (cont.isActive) cont.resume(Unit)
-                    }
+                    override fun deliveryComplete(token: IMqttDeliveryToken?) {}
                 })
-            }
 
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e("VartaRegistry", "Error unregistering channel", e)
-            Result.failure(e)
-        } finally {
-            try {
-                if (client?.isConnected == true) client?.disconnect()
-                client?.close()
-            } catch (_: Exception) {}
+                val subToken = client.subscribe("varta/registry/#", 1)
+                subToken.waitForCompletion(3000)
+                delay(1500)
+
+                for (t in foundTopics) {
+                    try {
+                        val emptyMsg = MqttMessage(ByteArray(0)).apply {
+                            qos = 1
+                            isRetained = true
+                        }
+                        val pubToken = client.publish(t, emptyMsg)
+                        pubToken.waitForCompletion(2000)
+                        count++
+                        Log.d("VartaRegistry", "Wiped retained topic on $broker: $t")
+                    } catch (_: Exception) {}
+                }
+            } catch (e: Exception) {
+                Log.w("VartaRegistry", "Error wiping on $broker", e)
+            } finally {
+                try {
+                    if (client?.isConnected == true) client?.disconnect()
+                    client?.close()
+                } catch (_: Exception) {}
+            }
         }
+        Result.success(count)
     }
 
     /**

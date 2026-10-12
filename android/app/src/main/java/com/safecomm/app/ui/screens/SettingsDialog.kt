@@ -1,5 +1,6 @@
 package com.safecomm.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,11 +16,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.safecomm.app.ui.i18n.AppLanguage
+import com.safecomm.app.ui.i18n.I18n
+import com.safecomm.app.ui.i18n.LanguageManager
 import com.safecomm.app.ui.theme.*
 
 data class RadiusPreset(val label: String, val radiusKm: Double, val subtitle: String)
@@ -40,7 +45,7 @@ fun SettingsDialog(
     chatId: String,
     groupPassword: String,
     githubRepo: String = "danilpromsiz-byte/varta-radio",
-    appVersion: String = "1.0.0",
+    appVersion: String = "1.2.1",
     updateStatusText: String = "",
     isUpdateAvailable: Boolean = false,
     isDownloadingUpdate: Boolean = false,
@@ -49,6 +54,11 @@ fun SettingsDialog(
     onForceUpdate: (String) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
     isRoomOwner: Boolean = false,
+    isSuperAdmin: Boolean = false,
+    onUnlockSuperAdmin: ((String) -> Boolean)? = null,
+    onWipeAllRooms: (() -> Unit)? = null,
+    currentLanguage: AppLanguage = AppLanguage.RU,
+    onLanguageChange: (AppLanguage) -> Unit = {},
     bannedUsers: Map<String, Long> = emptyMap(),
     initialAutoDeleteEnabled: Boolean = true,
     initialTelegramBridgeEnabled: Boolean = false,
@@ -64,6 +74,7 @@ fun SettingsDialog(
     onLogOutTelegram: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var selectedRadius by remember { mutableDoubleStateOf(currentRadius) }
     var isSoundOn by remember { mutableStateOf(soundEnabled) }
     var tokenInput by remember { mutableStateOf(botToken) }
@@ -74,6 +85,11 @@ fun SettingsDialog(
     var isTelegramBridgeEnabled by remember { mutableStateOf(initialTelegramBridgeEnabled) }
     var showLegacyTelegramSettings by remember { mutableStateOf(false) }
     var redirectionMessageInput by remember { mutableStateOf(initialRedirectionMessage) }
+    var superAdminKeyInput by remember { mutableStateOf("") }
+    var isSuperAdminActive by remember { mutableStateOf(isSuperAdmin) }
+
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showWipeConfirmDialog by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
 
@@ -81,8 +97,8 @@ fun SettingsDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(vertical = 16.dp),
+                .fillMaxHeight(0.88f)
+                .padding(vertical = 12.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
         ) {
@@ -99,33 +115,81 @@ fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "⚙️ НАСТРОЙКИ СВЯЗИ",
+                        text = "⚙️ ${I18n.settingsTitle(context)}",
                         style = MaterialTheme.typography.titleMedium,
                         color = TelegramTextPrimary,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть", tint = TelegramTextSecondary)
+                        Icon(imageVector = Icons.Default.Close, contentDescription = I18n.close(context), tint = TelegramTextSecondary)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // =====================================================================
+                // 1. LANGUAGE SELECTOR
+                // =====================================================================
                 Text(
-                    text = "Радиус звукового оповещения опасности:",
+                    text = "🌍 ${I18n.languageSection(context)}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AppLanguage.entries.forEach { lang ->
+                        val isSelected = currentLanguage == lang
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) TelegramBlue else TelegramDivider,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable { onLanguageChange(lang) },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) TelegramBlue.copy(alpha = 0.2f) else TelegramDarkCard
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(lang.flag, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = lang.name,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) TelegramBlue else TelegramTextPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // =====================================================================
+                // 2. SOUND & ALERTS RADIUS
+                // =====================================================================
                 Text(
-                    text = "Звуковая сирена сработает, если опасность находится в пределах:",
-                    fontSize = 11.sp,
-                    color = TelegramTextSecondary
+                    text = "Радиус оповещения опасности:",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TelegramTextPrimary
                 )
+                Spacer(modifier = Modifier.height(6.dp))
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Presets row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -137,7 +201,7 @@ fun SettingsDialog(
                         Card(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(56.dp)
+                                .height(52.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .border(
                                     1.dp,
@@ -157,7 +221,7 @@ fun SettingsDialog(
                             ) {
                                 Text(
                                     text = preset.label,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isSelected) TelegramBlue else TelegramTextPrimary
                                 )
@@ -171,7 +235,7 @@ fun SettingsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Sound alerts toggle
                 Card(
@@ -186,18 +250,16 @@ fun SettingsDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Звуковая сирена", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TelegramTextPrimary)
-                            Text("Громкий сигнал тревоги при опасности рядом", fontSize = 11.sp, color = TelegramTextSecondary)
+                            Text("Сигнал тревоги при опасности", fontSize = 11.sp, color = TelegramTextSecondary)
                         }
                         Switch(
                             checked = isSoundOn,
                             onCheckedChange = { isSoundOn = it },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = TelegramBlue,
-                                uncheckedThumbColor = TelegramTextSecondary,
-                                uncheckedTrackColor = TelegramDarkSurface
+                                checkedTrackColor = TelegramBlue
                             )
                         )
                     }
@@ -205,403 +267,233 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // =====================================================================
+                // 3. SECURITY & ROOM SETTINGS
+                // =====================================================================
+                Text(
+                    text = "🔒 ${I18n.storageSection(context)}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TelegramTextPrimary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showLegacyTelegramSettings = !showLegacyTelegramSettings },
+                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
+                        // Ephemeral messages
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "🤖 Прямой бот Telegram (опционально)",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TelegramTextSecondary
-                            )
-                            Text(
-                                text = if (showLegacyTelegramSettings) "▲" else "▼",
-                                fontSize = 12.sp,
-                                color = TelegramTextSecondary
-                            )
-                        }
-
-                        if (showLegacyTelegramSettings) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Токен бота и ID группы для прямого резервного опроса без TDLib:",
-                                fontSize = 10.sp,
-                                color = TelegramTextSecondary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = tokenInput,
-                                onValueChange = { tokenInput = it.trim() },
-                                label = { Text("Токен бота Telegram (@BotFather)", color = TelegramTextSecondary, fontSize = 11.sp) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TelegramTextPrimary,
-                                    unfocusedTextColor = TelegramTextPrimary,
-                                    focusedBorderColor = TelegramBlue,
-                                    unfocusedBorderColor = TelegramDivider,
-                                    focusedContainerColor = TelegramDarkSurface,
-                                    unfocusedContainerColor = TelegramDarkSurface
-                                ),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            OutlinedTextField(
-                                value = chatIdInput,
-                                onValueChange = { chatIdInput = it.trim() },
-                                label = { Text("ID группы/канала (-100...)", color = TelegramTextSecondary, fontSize = 11.sp) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TelegramTextPrimary,
-                                    unfocusedTextColor = TelegramTextPrimary,
-                                    focusedBorderColor = TelegramBlue,
-                                    unfocusedBorderColor = TelegramDivider,
-                                    focusedContainerColor = TelegramDarkSurface,
-                                    unfocusedContainerColor = TelegramDarkSurface
-                                ),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            OutlinedTextField(
-                                value = passwordInput,
-                                onValueChange = { passwordInput = it },
-                                label = { Text("Пароль сообщества", color = TelegramTextSecondary, fontSize = 11.sp) },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TelegramTextPrimary,
-                                    unfocusedTextColor = TelegramTextPrimary,
-                                    focusedBorderColor = TelegramBlue,
-                                    unfocusedBorderColor = TelegramDivider,
-                                    focusedContainerColor = TelegramDarkSurface,
-                                    unfocusedContainerColor = TelegramDarkSurface
-                                ),
-                                shape = RoundedCornerShape(10.dp)
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text(
+                                    text = I18n.autoDeleteToggle(context),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TelegramTextPrimary
+                                )
+                                Text(
+                                    text = I18n.ephemeralDesc(context),
+                                    fontSize = 11.sp,
+                                    color = TelegramTextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = isAutoDeleteEnabled,
+                                onCheckedChange = {
+                                    isAutoDeleteEnabled = it
+                                    onToggleAutoDelete?.invoke(it)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = TelegramBlue
+                                )
                             )
                         }
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                // --- ROOM SETTINGS & SECURITY (FOR OWNER) ---
-                if (isRoomOwner) {
-                    Text(
-                        text = "🛡️ НАСТРОЙКИ КОМНАТЫ (СОЗДАТЕЛЬ)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TelegramTextPrimary
-                    )
-                    Text(
-                        text = "Управление безопасностью, временными сообщениями и шлюзом Telegram.",
-                        fontSize = 11.sp,
-                        color = TelegramTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // 1. Смена пароля комнаты
-                    Text(
-                        text = "🔑 Смена пароля комнаты",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TelegramTextPrimary
-                    )
-                    OutlinedTextField(
-                        value = newRoomPasswordInput,
-                        onValueChange = { newRoomPasswordInput = it },
-                        label = { Text("Новый секретный пароль", color = TelegramTextSecondary, fontSize = 12.sp) },
-                        placeholder = { Text("Введите новый пароль", color = TelegramTextSecondary) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TelegramTextPrimary,
-                            unfocusedTextColor = TelegramTextPrimary,
-                            focusedBorderColor = TelegramBlue,
-                            unfocusedBorderColor = TelegramDivider,
-                            focusedContainerColor = TelegramDarkCard,
-                            unfocusedContainerColor = TelegramDarkCard
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    if (newRoomPasswordInput.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedButton(
-                            onClick = {
-                                onChangeRoomPassword?.invoke(newRoomPasswordInput)
-                                newRoomPasswordInput = ""
-                            },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
-                        ) {
-                            Text("🔑 Сохранить новый пароль", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 2. Временные сообщения (Автоудаление 24ч) - по умолчанию ВКЛЮЧЕНО
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            Text(
-                                text = "⏳ Временные сообщения (24 часа)",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TelegramTextPrimary
-                            )
-                            Text(
-                                text = if (isAutoDeleteEnabled) "Включено: автоудаление через 24 часа" else "Выключено: история бессрочна",
-                                fontSize = 11.sp,
-                                color = if (isAutoDeleteEnabled) Color(0xFF4CAF50) else TelegramTextSecondary
-                            )
-                        }
-                        Switch(
-                            checked = isAutoDeleteEnabled,
-                            onCheckedChange = {
-                                isAutoDeleteEnabled = it
-                                onToggleAutoDelete?.invoke(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = TelegramBlue
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 3. Трансляция в Telegram (Закрытый канал) - по умолчанию ВЫКЛЮЧЕНО
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            Text(
-                                text = "✈️ Трансляция в Telegram",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TelegramTextPrimary
-                            )
-                            Text(
-                                text = if (isTelegramBridgeEnabled) "Включено: канал виден в Telegram" else "Выключено: Dark Room — общение только в Varta GO",
-                                fontSize = 11.sp,
-                                color = if (isTelegramBridgeEnabled) TelegramBlue else Color(0xFFFFD600)
-                            )
-                        }
-                        Switch(
-                            checked = isTelegramBridgeEnabled,
-                            onCheckedChange = {
-                                isTelegramBridgeEnabled = it
-                                onToggleTelegramBridge?.invoke(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = TelegramBlue
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 4. Заблокированные участники (Чёрный список)
-                    Text(
-                        text = "🚫 Заблокированные участники (${bannedUsers.size})",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TelegramTextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (bannedUsers.isEmpty()) {
+                        // Redirection message for visitors
                         Text(
-                            text = "Чёрный список комнаты пуст. Все участники могут подключаться по паролю.",
-                            fontSize = 11.sp,
-                            color = TelegramTextSecondary
+                            text = I18n.redirectionSection(context),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TelegramTextPrimary
                         )
-                    } else {
-                        Column(
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = redirectionMessageInput,
+                            onValueChange = { redirectionMessageInput = it },
+                            placeholder = { Text(I18n.redirectionHint(context), color = TelegramTextSecondary, fontSize = 11.sp) },
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TelegramTextPrimary,
+                                unfocusedTextColor = TelegramTextPrimary,
+                                focusedBorderColor = AlertFireOrange,
+                                unfocusedBorderColor = TelegramDivider,
+                                focusedContainerColor = TelegramDarkSurface,
+                                unfocusedContainerColor = TelegramDarkSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Button(
+                            onClick = {
+                                onSaveRedirectionMessage?.invoke(redirectionMessageInput)
+                                Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.align(Alignment.End).height(36.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
+                            Text(I18n.saveRedirectionBtn(context), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Banned members section
+                        Text(
+                            text = "${I18n.bannedMembersSection(context)} (${bannedUsers.size})",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TelegramTextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        if (bannedUsers.isEmpty()) {
+                            Text(I18n.noBannedUsers(context), fontSize = 11.sp, color = TelegramTextSecondary)
+                        } else {
                             bannedUsers.forEach { (userKey, banUntil) ->
                                 val isPermanent = (banUntil == -1L || banUntil == Long.MAX_VALUE)
                                 val remainingMins = if (!isPermanent) {
                                     ((banUntil - System.currentTimeMillis()) / 60000L).coerceAtLeast(1)
                                 } else 0L
 
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
-                                    shape = RoundedCornerShape(10.dp)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = userKey,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = TelegramTextPrimary
-                                            )
-                                            Text(
-                                                text = if (isPermanent) "🚫 Забанен навсегда" else "⏳ Бан ещё на $remainingMins мин.",
-                                                fontSize = 10.sp,
-                                                color = if (isPermanent) AlertShellingRed else Color(0xFFFFB74D)
-                                            )
-                                        }
-
-                                        TextButton(
-                                            onClick = { onUnbanUser?.invoke(userKey) }
-                                        ) {
-                                            Text("Разблокировать", fontSize = 11.sp, color = TelegramBlue, fontWeight = FontWeight.Bold)
-                                        }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(userKey, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = TelegramTextPrimary)
+                                        Text(
+                                            text = if (isPermanent) "Навсегда" else "$remainingMins мин",
+                                            fontSize = 10.sp,
+                                            color = if (isPermanent) AlertShellingRed else Color(0xFFFFB74D)
+                                        )
+                                    }
+                                    TextButton(onClick = { onUnbanUser?.invoke(userKey) }) {
+                                        Text(I18n.unbanBtn(context), fontSize = 11.sp, color = TelegramBlue, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 5. Записка / перенаправление для гостей
-                    Text(
-                        text = "📢 Записка для гостей (если вышли / перешли)",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TelegramTextPrimary
-                    )
-                    Text(
-                        text = "Увидят те, кто стучится в комнату (например: «Мы перешли в комнату 24»)",
-                        fontSize = 11.sp,
-                        color = TelegramTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = redirectionMessageInput,
-                        onValueChange = { redirectionMessageInput = it },
-                        label = { Text("Сообщение для стучащихся в комнату", color = TelegramTextSecondary, fontSize = 11.sp) },
-                        placeholder = { Text("Например: Мы перешли в комнату 24, пароль тот же", color = TelegramTextSecondary) },
-                        singleLine = false,
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TelegramTextPrimary,
-                            unfocusedTextColor = TelegramTextPrimary,
-                            focusedBorderColor = AlertFireOrange,
-                            unfocusedBorderColor = TelegramDivider,
-                            focusedContainerColor = TelegramDarkCard,
-                            unfocusedContainerColor = TelegramDarkCard
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    if (redirectionMessageInput.trim() != initialRedirectionMessage.trim()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedButton(
-                            onClick = {
-                                onSaveRedirectionMessage?.invoke(redirectionMessageInput.trim())
-                            },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertFireOrange)
-                        ) {
-                            Text("📢 Сохранить записку для гостей", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
                 }
 
-                // --- GITHUB AUTO-UPDATE SECTION ---
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // =====================================================================
+                // 4. SUPER ADMIN SECTION
+                // =====================================================================
                 Text(
-                    text = "🚀 ОБНОВЛЕНИЕ ПРИЛОЖЕНИЯ",
+                    text = I18n.superAdminSection(context),
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
                 )
-                Text(
-                    text = "Текущая версия: v$appVersion",
-                    fontSize = 12.sp,
-                    color = TelegramTextSecondary
-                )
-
-                if (updateStatusText.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = updateStatusText,
-                        fontSize = 12.sp,
-                        color = when {
-                            isUpdateAvailable -> AlertFireOrange
-                            updateStatusText.contains("⚠️") -> AlertShellingRed
-                            updateStatusText.contains("✅") -> Color(0xFF4CAF50)
-                            else -> TelegramTextSecondary
-                        },
-                        fontWeight = if (isUpdateAvailable || updateStatusText.contains("⚠️") || updateStatusText.contains("✅")) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-
-                if (isDownloadingUpdate) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { downloadProgress / 100f },
-                        modifier = Modifier.fillMaxWidth().height(6.dp),
-                        color = TelegramBlue
-                    )
-                    Text(
-                        text = "Загрузка обновления: $downloadProgress%",
-                        fontSize = 11.sp,
-                        color = TelegramTextSecondary
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (isUpdateAvailable) {
-                    Button(
-                        onClick = onInstallUpdate,
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("📦 Скачать и обновить", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { onCheckUpdate(githubRepo) },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("🔄 Проверить обновления", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        if (isSuperAdminActive) {
+                            Text(
+                                text = I18n.superAdminStatusActive(context),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD600)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = I18n.superAdminDesc(context),
+                                fontSize = 11.sp,
+                                color = TelegramTextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Button(
+                                onClick = { showWipeConfirmDialog = true },
+                                modifier = Modifier.fillMaxWidth().height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(I18n.wipeAllRoomsBtn(context), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        } else {
+                            Text(
+                                text = "Введите мастер-ключ для активации суперадмина:",
+                                fontSize = 11.sp,
+                                color = TelegramTextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = superAdminKeyInput,
+                                    onValueChange = { superAdminKeyInput = it },
+                                    placeholder = { Text(I18n.superAdminKeyPlaceholder(context), fontSize = 11.sp, color = TelegramTextSecondary) },
+                                    singleLine = true,
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    modifier = Modifier.weight(1f),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TelegramTextPrimary,
+                                        unfocusedTextColor = TelegramTextPrimary,
+                                        focusedBorderColor = TelegramBlue,
+                                        unfocusedBorderColor = TelegramDivider,
+                                        focusedContainerColor = TelegramDarkSurface,
+                                        unfocusedContainerColor = TelegramDarkSurface
+                                    ),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+
+                                Button(
+                                    onClick = {
+                                        val ok = onUnlockSuperAdmin?.invoke(superAdminKeyInput) ?: false
+                                        if (ok) {
+                                            isSuperAdminActive = true
+                                            Toast.makeText(context, "⚡ Super Admin Activated", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Invalid key", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.height(46.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text(I18n.superAdminActivateBtn(context), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // Save General Config button
                 Button(
                     onClick = {
                         onSaveTelegramConfig(selectedRadius, isSoundOn, tokenInput, chatIdInput, passwordInput)
@@ -610,22 +502,16 @@ fun SettingsDialog(
                         .fillMaxWidth()
                         .height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("💾 Сохранить настройки", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(I18n.save(context), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // --- SESSION & ROOM MANAGEMENT ---
-                Text(
-                    text = "🚪 УПРАВЛЕНИЕ СЕССИЕЙ И КОМНАТОЙ",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TelegramTextSecondary
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
+                // =====================================================================
+                // 5. SESSION & ROOM ACTIONS
+                // =====================================================================
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -639,36 +525,83 @@ fun SettingsDialog(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD600))
                     ) {
-                        Text("🚪 Сменить комнату", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(I18n.leaveRoomBtn(context), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    if (isRoomOwner && onDeleteRoom != null) {
-                        OutlinedButton(
-                            onClick = {
-                                onDismiss()
-                                onDeleteRoom()
-                            },
+                    // Only Chief Admin / Creator (or Superadmin) can delete the room!
+                    if ((isRoomOwner || isSuperAdminActive) && onDeleteRoom != null) {
+                        Button(
+                            onClick = { showDeleteConfirmDialog = true },
                             modifier = Modifier.fillMaxWidth().height(44.dp),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                            colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
                         ) {
-                            Text("🗑️ Удалить комнату из сети", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(I18n.deleteRoomBtn(context), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            onDismiss()
-                            onLogOutTelegram()
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
-                    ) {
-                        Text("🔴 Выйти из радиоэфира", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
+    }
+
+    // Modal Confirmation: Delete Room
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = {
+                Text(I18n.deleteRoomConfirmTitle(context), fontWeight = FontWeight.Bold, color = AlertShellingRed)
+            },
+            text = {
+                Text(I18n.deleteRoomConfirmText(context), color = TelegramTextPrimary, fontSize = 14.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDismiss()
+                        onDeleteRoom?.invoke()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
+                ) {
+                    Text(I18n.deleteRoomConfirmAction(context), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
+    }
+
+    // Modal Confirmation: Wipe ALL rooms
+    if (showWipeConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showWipeConfirmDialog = false },
+            title = {
+                Text(I18n.wipeAllRoomsConfirmTitle(context), fontWeight = FontWeight.Bold, color = AlertShellingRed)
+            },
+            text = {
+                Text(I18n.wipeAllRoomsConfirmText(context), color = TelegramTextPrimary, fontSize = 14.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showWipeConfirmDialog = false
+                        onWipeAllRooms?.invoke()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
+                ) {
+                    Text(I18n.wipeAllRoomsConfirmAction(context), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWipeConfirmDialog = false }) {
+                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
     }
 }

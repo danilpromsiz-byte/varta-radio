@@ -31,6 +31,10 @@ import com.safecomm.app.data.telegram.TdAuthState
 import com.safecomm.app.data.telegram.TdlibEngine
 import com.safecomm.app.ui.components.AvatarSelectionDialog
 import com.safecomm.app.ui.components.UserAvatarView
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import com.safecomm.app.ui.i18n.AppLanguage
+import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -65,6 +69,11 @@ fun AuthCommunityScreen(
     initialCommunity: String,
     initialPassword: String,
     currentDeviceId: String = "",
+    currentLanguage: AppLanguage = AppLanguage.RU,
+    onLanguageChange: (AppLanguage) -> Unit = {},
+    isSuperAdmin: Boolean = false,
+    onUnlockSuperAdmin: ((String) -> Boolean)? = null,
+    onWipeAllRooms: (() -> Unit)? = null,
     onSendPhoneNumber: (String) -> Unit,
     onCheckAuthCode: (String) -> Unit,
     onCheckAuthPassword: (String) -> Unit,
@@ -108,6 +117,11 @@ fun AuthCommunityScreen(
     var inputCode by remember { mutableStateOf("") }
     var input2faPassword by remember { mutableStateOf("") }
 
+    var showSuperAdminModal by remember { mutableStateOf(false) }
+    var superAdminKeyInput by remember { mutableStateOf("") }
+    var isSuperAdminActive by remember { mutableStateOf(isSuperAdmin) }
+    var showWipeConfirmDialog by remember { mutableStateOf(false) }
+
     val isAuthenticated = tdAuthState is TdAuthState.Authenticated
     val scrollState = rememberScrollState()
 
@@ -133,17 +147,57 @@ fun AuthCommunityScreen(
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(6.dp))
+        // Top control bar: Language and Super Admin
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Language selector chips
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AppLanguage.entries.forEach { lang ->
+                    val isSel = currentLanguage == lang
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSel) TelegramBlue.copy(alpha = 0.25f) else TelegramDarkCard)
+                            .border(1.dp, if (isSel) TelegramBlue else TelegramDivider, RoundedCornerShape(8.dp))
+                            .clickable { onLanguageChange(lang) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(lang.flag, fontSize = 16.sp)
+                    }
+                }
+            }
+
+            // Super Admin quick access button
+            OutlinedButton(
+                onClick = { showSuperAdminModal = true },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (isSuperAdminActive) Color(0xFFFFD600) else TelegramTextSecondary
+                )
+            ) {
+                Text(
+                    text = if (isSuperAdminActive) "⚡ ROOT" else "⚡ Admin",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // App Header
         Text(
-            text = "🛡️ Varta GO",
+            text = "🛡️ ${I18n.appTitle(context)}",
             style = MaterialTheme.typography.headlineLarge,
             color = TelegramTextPrimary,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Защищённая оперативная радиосеть PTT\nШифрование эфира AES-256",
+            text = I18n.appSubtitle(context) + "\nAES-256 Retained P2P",
             style = MaterialTheme.typography.bodyMedium,
             color = TelegramTextSecondary,
             textAlign = TextAlign.Center
@@ -834,6 +888,107 @@ fun AuthCommunityScreen(
                 showAvatarPicker = false
             },
             onDismiss = { showAvatarPicker = false }
+        )
+    }
+
+    if (showSuperAdminModal) {
+        AlertDialog(
+            onDismissRequest = { showSuperAdminModal = false },
+            title = {
+                Text(I18n.superAdminSection(context), fontWeight = FontWeight.Bold, color = Color(0xFFFFD600))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (isSuperAdminActive) {
+                        Text(I18n.superAdminStatusActive(context), fontWeight = FontWeight.Bold, color = Color(0xFFFFD600))
+                        Text(I18n.superAdminDesc(context), fontSize = 12.sp, color = TelegramTextSecondary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = {
+                                showSuperAdminModal = false
+                                showWipeConfirmDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(I18n.wipeAllRoomsBtn(context), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    } else {
+                        Text("Введите мастер-ключ суперадмина:", fontSize = 12.sp, color = TelegramTextSecondary)
+                        OutlinedTextField(
+                            value = superAdminKeyInput,
+                            onValueChange = { superAdminKeyInput = it },
+                            placeholder = { Text(I18n.superAdminKeyPlaceholder(context), color = TelegramTextSecondary) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TelegramTextPrimary,
+                                unfocusedTextColor = TelegramTextPrimary,
+                                focusedBorderColor = TelegramBlue,
+                                unfocusedBorderColor = TelegramDivider,
+                                focusedContainerColor = TelegramDarkSurface,
+                                unfocusedContainerColor = TelegramDarkSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (!isSuperAdminActive) {
+                    Button(
+                        onClick = {
+                            val ok = onUnlockSuperAdmin?.invoke(superAdminKeyInput) ?: false
+                            if (ok) {
+                                isSuperAdminActive = true
+                                Toast.makeText(context, "⚡ Super Admin Activated", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Invalid Key", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
+                    ) {
+                        Text(I18n.superAdminActivateBtn(context), fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSuperAdminModal = false }) {
+                    Text(I18n.close(context), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
+    }
+
+    if (showWipeConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showWipeConfirmDialog = false },
+            title = {
+                Text(I18n.wipeAllRoomsConfirmTitle(context), fontWeight = FontWeight.Bold, color = AlertShellingRed)
+            },
+            text = {
+                Text(I18n.wipeAllRoomsConfirmText(context), color = TelegramTextPrimary, fontSize = 14.sp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showWipeConfirmDialog = false
+                        onWipeAllRooms?.invoke()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertShellingRed)
+                ) {
+                    Text(I18n.wipeAllRoomsConfirmAction(context), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWipeConfirmDialog = false }) {
+                    Text(I18n.cancel(context), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
         )
     }
 }

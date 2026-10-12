@@ -65,6 +65,12 @@ fun MainHubScreen(
     onToggleMute: () -> Unit = {},
     onKickMember: (GroupMember) -> Unit,
     onBanMember: (GroupMember, Long) -> Unit = { _, _ -> },
+    onDelegateAdmin: (GroupMember, Boolean) -> Unit = { _, _ -> },
+    isSuperAdmin: Boolean = false,
+    onUnlockSuperAdmin: ((String) -> Boolean)? = null,
+    onWipeAllRooms: (() -> Unit)? = null,
+    currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.RU,
+    onLanguageChange: (com.safecomm.app.ui.i18n.AppLanguage) -> Unit = {},
     bannedUsers: Map<String, Long> = emptyMap(),
     onUnbanUser: ((String) -> Unit)? = null,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
@@ -90,7 +96,11 @@ fun MainHubScreen(
     var showLeaveRoomConfirm by remember { mutableStateOf(false) }
     var selectedAlertForDetail by remember { mutableStateOf<Alert?>(null) }
 
-    val isAdmin = members.any { it.userId == currentUserId && it.role == "admin" }
+    val isChiefAdmin = isRoomOwner || isSuperAdmin
+    val isCurrentAdmin = isChiefAdmin || members.any {
+        (it.userId == currentUserId || it.nickname.contains("(Вы)") || it.nickname.contains("(Ви)") || it.nickname.contains("(You)")) &&
+        (it.role == "admin" || it.role == "owner")
+    }
 
     Scaffold(
         topBar = {
@@ -345,7 +355,9 @@ fun MainHubScreen(
             group = group,
             members = members,
             currentUserId = currentUserId,
-            isAdmin = isAdmin,
+            isChiefAdmin = isChiefAdmin,
+            isAdmin = isCurrentAdmin,
+            onDelegateAdmin = onDelegateAdmin,
             onKickMember = onKickMember,
             onBanMember = onBanMember,
             onDismiss = { showMembersDialog = false }
@@ -368,7 +380,12 @@ fun MainHubScreen(
             onCheckUpdate = onCheckUpdate,
             onForceUpdate = onForceUpdate,
             onInstallUpdate = onInstallUpdate,
-            isRoomOwner = isRoomOwner,
+            isRoomOwner = isChiefAdmin,
+            isSuperAdmin = isSuperAdmin,
+            onUnlockSuperAdmin = onUnlockSuperAdmin,
+            onWipeAllRooms = onWipeAllRooms,
+            currentLanguage = currentLanguage,
+            onLanguageChange = onLanguageChange,
             bannedUsers = bannedUsers,
             initialAutoDeleteEnabled = initialAutoDeleteEnabled,
             initialTelegramBridgeEnabled = initialTelegramBridgeEnabled,

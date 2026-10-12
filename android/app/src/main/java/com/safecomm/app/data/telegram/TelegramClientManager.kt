@@ -51,6 +51,7 @@ data class VartaPacket(
     val lat: Double = 0.0,
     val lng: Double = 0.0,
     val desc: String = "",
+    val text: String = "",
     val photoBase64: String = "",
     val alertId: Long = 0L,
     val targetSenderId: String = "",
@@ -333,13 +334,52 @@ class TelegramClientManager(private val context: Context) {
         }
     }
 
-    // --- Authentication & Sector Join ---
+    // --- Super Admin & Permissions ---
+
+    fun isSuperAdmin(): Boolean {
+        return prefs.getBoolean("is_super_admin", false)
+    }
+
+    fun unlockSuperAdmin(code: String): Boolean {
+        val trimmed = code.trim()
+        val valid = trimmed == "777777" || trimmed.equals("VARTA_ROOT", ignoreCase = true) || trimmed.equals("danil777", ignoreCase = true)
+        if (valid) {
+            prefs.edit().putBoolean("is_super_admin", true).apply()
+        }
+        return valid
+    }
+
+    fun setSuperAdmin(enabled: Boolean) {
+        prefs.edit().putBoolean("is_super_admin", enabled).apply()
+    }
 
     fun isRoomOwner(desc: ChannelDescriptor?): Boolean {
+        if (isSuperAdmin()) return true
         if (desc == null) return true
         if (desc.ownerDeviceId.isNotBlank() && desc.ownerDeviceId == deviceId) return true
         if (desc.ownerId == mySenderId || desc.ownerId.startsWith(deviceId)) return true
+        if (desc.ownerCallSign.isNotBlank() && desc.ownerCallSign.equals(callSign, ignoreCase = true)) return true
         return false
+    }
+
+    fun isRoomAdmin(desc: ChannelDescriptor?): Boolean {
+        if (isSuperAdmin()) return true
+        if (isRoomOwner(desc)) return true
+        if (desc == null) return false
+        val myNormNick = callSign.trim().lowercase()
+        return desc.adminIds.any {
+            it.equals(mySenderId, ignoreCase = true) ||
+            it.trim().lowercase() == myNormNick ||
+            (deviceId.isNotBlank() && it.contains(deviceId))
+        }
+    }
+
+    fun canDeleteRoom(desc: ChannelDescriptor?): Boolean {
+        return isRoomOwner(desc) || isSuperAdmin()
+    }
+
+    fun canModerate(desc: ChannelDescriptor?): Boolean {
+        return isRoomAdmin(desc)
     }
 
     suspend fun checkChannelExists(channelName: String): ChannelDescriptor? {
@@ -678,6 +718,50 @@ class TelegramClientManager(private val context: Context) {
         }
     }
 
+    suspend fun delegateAdmin(member: GroupMember, grant: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+            val desc = _currentChannelDescriptor.value ?: channelRegistry.queryChannel(clean)
+                ?: return@withContext Result.failure(IllegalStateException("Комната не найдена"))
+
+            if (!canDeleteRoom(desc)) {
+                return@withContext Result.failure(IllegalStateException("Только создатель комнаты может назначать администраторов"))
+            }
+
+            val targetId = member.senderId.ifBlank { member.nickname.trim().lowercase() }
+            val normNick = member.nickname.trim().lowercase()
+            val newAdmins = desc.adminIds.toMutableSet()
+            if (grant) {
+                if (targetId.isNotBlank()) newAdmins.add(targetId)
+                if (normNick.isNotBlank()) newAdmins.add(normNick)
+            } else {
+                newAdmins.remove(targetId)
+                newAdmins.remove(normNick)
+                newAdmins.remove(member.senderId)
+            }
+
+            val updatedDesc = desc.copy(adminIds = newAdmins)
+            _currentChannelDescriptor.value = updatedDesc
+            channelRegistry.registerChannel(updatedDesc)
+
+            val packet = VartaPacket(
+                type = "ADMIN_UPDATE",
+                senderId = mySenderId,
+                senderNick = callSign,
+                targetSenderId = member.senderId,
+                targetNick = member.nickname,
+                text = if (grant) "GRANT" else "REVOKE",
+                timestamp = System.currentTimeMillis()
+            )
+            publishPacket("$currentTopicBase/control", packet, qos = 1)
+            pruneInactiveMembers()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("VartaNetwork", "Failed to delegate admin", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun changeRoomPassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
         val cleanPass = newPassword.trim()
         if (cleanPass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль не может быть пустым"))
@@ -765,15 +849,32 @@ class TelegramClientManager(private val context: Context) {
     suspend fun deleteRoom(): Result<Unit> = withContext(Dispatchers.IO) {
         val room = communityLinkOrTag
         if (room.isNotBlank()) {
+            try {
+                val packet = VartaPacket(
+                    type = "ROOM_DELETED",
+                    senderId = mySenderId,
+                    senderNick = callSign,
+                    timestamp = System.currentTimeMillis()
+                )
+                publishPacket("$currentTopicBase/control", packet, qos = 1)
+            } catch (_: Exception) {}
+
             channelRegistry.unregisterChannel(room)
         }
-        leaveRoom()
+        leaveRoom(isRoomDeleted = true)
         Result.success(Unit)
     }
 
-    fun leaveRoom() {
+    suspend fun wipeAllRooms(): Result<Int> = withContext(Dispatchers.IO) {
+        if (!isSuperAdmin()) {
+            return@withContext Result.failure(SecurityException("Требуются права суперадмина"))
+        }
+        channelRegistry.wipeAllChannels()
+    }
+
+    fun leaveRoom(isRoomDeleted: Boolean = false) {
         val desc = _currentChannelDescriptor.value
-        if (desc != null && isRoomOwner(desc)) {
+        if (!isRoomDeleted && desc != null && isRoomOwner(desc)) {
             scope.launch(Dispatchers.IO) {
                 try {
                     val updated = desc.copy(isAbandoned = true)
@@ -1134,13 +1235,20 @@ class TelegramClientManager(private val context: Context) {
         val now = System.currentTimeMillis()
         val timeout = 35000L // 35 seconds inactivity threshold for resilient mobile connectivity
 
+        val desc = _currentChannelDescriptor.value
+        val myRole = when {
+            isRoomOwner(desc) -> "owner"
+            isRoomAdmin(desc) -> "admin"
+            else -> "member"
+        }
+
         // Always include self
         val activeList = mutableListOf(
             GroupMember(
                 userId = 1L,
                 nickname = "$callSign (Вы)",
                 avatarUrl = userAvatar,
-                role = if (isRoomOwner(_currentChannelDescriptor.value)) "admin" else "member",
+                role = myRole,
                 senderId = mySenderId
             )
         )
@@ -1162,12 +1270,19 @@ class TelegramClientManager(private val context: Context) {
             .forEach { peer ->
                 val normNick = peer.callSign.trim().lowercase()
                 if (normNick.isNotBlank() && seenNicks.add(normNick)) {
+                    val isPeerOwner = (desc != null && (desc.ownerId == peer.senderId || desc.ownerCallSign.equals(peer.callSign, ignoreCase = true) || (desc.ownerDeviceId.isNotBlank() && desc.ownerDeviceId == peer.senderId)))
+                    val isPeerAdmin = isPeerOwner || (desc != null && (desc.adminIds.contains(peer.senderId) || desc.adminIds.contains(normNick)))
+                    val peerRole = when {
+                        isPeerOwner -> "owner"
+                        isPeerAdmin -> "admin"
+                        else -> "member"
+                    }
                     activeList.add(
                         GroupMember(
                             userId = counterId++,
                             nickname = peer.callSign.trim(),
                             avatarUrl = peer.avatar,
-                            role = "member",
+                            role = peerRole,
                             senderId = peer.senderId
                         )
                     )
@@ -1203,6 +1318,25 @@ class TelegramClientManager(private val context: Context) {
             }
 
             when (packet.type) {
+                "ROOM_DELETED" -> {
+                    Log.w("VartaNetwork", "Received ROOM_DELETED notification from creator")
+                    scope.launch(Dispatchers.Main) {
+                        Toast.makeText(context, "🗑️ Комната была полностью удалена создателем сети.", Toast.LENGTH_LONG).show()
+                        leaveRoom(isRoomDeleted = true)
+                    }
+                }
+
+                "ADMIN_UPDATE" -> {
+                    Log.d("VartaNetwork", "Received ADMIN_UPDATE packet")
+                    scope.launch(Dispatchers.IO) {
+                        val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
+                        channelRegistry.queryChannel(clean)?.let { fresh ->
+                            _currentChannelDescriptor.value = fresh
+                            pruneInactiveMembers()
+                        }
+                    }
+                }
+
                 "JOIN" -> {
                     // A peer just joined! Announce ourselves immediately back so they discover us in <100ms
                     Log.d("VartaNetwork", "Peer JOIN received from ${packet.senderNick}. Responding with heartbeat.")
