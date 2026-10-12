@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.safecomm.app.data.model.*
+import com.safecomm.app.data.telegram.TdAuthState
 import com.safecomm.app.data.telegram.TelegramAuthState
 import com.safecomm.app.data.telegram.TelegramClientManager
 import com.safecomm.app.data.telegram.TelegramConfig
@@ -125,6 +126,7 @@ class MainActivity : ComponentActivity() {
     private fun VartaAppContent() {
         val coroutineScope = rememberCoroutineScope()
         val authState by telegramClient.authState.collectAsState()
+        val tdAuthState by telegramClient.tdlibEngine.authState.collectAsState()
         val activeMembers by telegramClient.activeMembers.collectAsState()
 
         val appUpdateManager = remember { AppUpdateManager(this@MainActivity) }
@@ -199,37 +201,62 @@ class MainActivity : ComponentActivity() {
 
         when (val state = authState) {
             is TelegramAuthState.Unauthenticated, is TelegramAuthState.CodeRequested, is TelegramAuthState.Error -> {
-                // Screen 1: Enter custom call-sign and exact community sector (no chat listing)
+                // Screen 1: Official Telegram MTProto Login & Closed Channel Setup
                 AuthCommunityScreen(
+                    tdAuthState = tdAuthState,
                     currentCallSign = telegramClient.callSign,
                     currentAvatar = telegramClient.userAvatar,
                     initialCommunity = telegramClient.communityLinkOrTag,
                     initialPassword = telegramClient.communityPassword,
-                    initialTelegramUsername = telegramClient.telegramUsername,
-                    initialBotToken = telegramClient.botToken,
-                    onEnterCommunity = { callSign, communityTarget, groupPassword, avatar, tgUsername, botToken ->
+                    onSendPhoneNumber = { phone -> telegramClient.tdlibEngine.sendPhoneNumber(phone) },
+                    onCheckAuthCode = { code -> telegramClient.tdlibEngine.checkAuthCode(code) },
+                    onCheckAuthPassword = { pass -> telegramClient.tdlibEngine.checkAuthPassword(pass) },
+                    onLogOutTelegram = { telegramClient.logout() },
+                    onCreateChannel = { title, password ->
+                        coroutineScope.launch {
+                            telegramClient.createTelegramChannel(title, password)
+                                .onSuccess { (chatId, inviteLink) ->
+                                    VartaRadioService.start(this@MainActivity, title, telegramClient.callSign)
+                                    Toast.makeText(this@MainActivity, "Закрытый канал «$title» создан!", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure { err ->
+                                    Toast.makeText(this@MainActivity, "Ошибка создания: ${err.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    onJoinChannel = { input, password ->
+                        coroutineScope.launch {
+                            telegramClient.joinTelegramChannel(input, password)
+                                .onSuccess { (chatId, inviteLink) ->
+                                    VartaRadioService.start(this@MainActivity, telegramClient.communityLinkOrTag, telegramClient.callSign)
+                                    Toast.makeText(this@MainActivity, "Канал подключён!", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure { err ->
+                                    Toast.makeText(this@MainActivity, "Ошибка подключения: ${err.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    },
+                    onEnterFallback = { callSign, sector, password, avatar ->
                         coroutineScope.launch {
                             telegramClient.callSign = callSign
                             telegramClient.userAvatar = avatar
-                            telegramClient.telegramUsername = tgUsername
-                            if (botToken.isNotBlank()) {
-                                telegramClient.botToken = botToken
-                            }
-                            telegramClient.verifyCodeAndSignIn("OK", communityTarget, groupPassword)
+                            telegramClient.verifyCodeAndSignIn("OK", sector, password)
                                 .onSuccess {
-                                    VartaRadioService.start(this@MainActivity, communityTarget, callSign)
-                                    Toast.makeText(this@MainActivity, "Сектор «$communityTarget» подключён", Toast.LENGTH_SHORT).show()
+                                    VartaRadioService.start(this@MainActivity, sector, callSign)
                                 }
                         }
+                    },
+                    loadRecentChats = {
+                        telegramClient.tdlibEngine.loadRecentChats()
                     }
                 )
             }
             is TelegramAuthState.Ready -> {
                 // Screen 2: Active Walkie-Talkie & Map Operations Hub
                 val activeGroup = Group(
-                    id = 1L,
+                    id = telegramClient.activeChatId.takeIf { it != 0L } ?: 1L,
                     name = state.activeCommunityName,
-                    inviteCode = state.activeCommunityName
+                    inviteCode = telegramClient.activeInviteLink.ifBlank { state.activeCommunityName }
                 )
 
                 val currentMembers = activeMembers.ifEmpty {

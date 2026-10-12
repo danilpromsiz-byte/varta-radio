@@ -12,8 +12,8 @@ android {
         applicationId = "com.safecomm.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.0.7"
+        versionCode = 8
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -90,6 +90,9 @@ dependencies {
 
     // Map
     implementation(libs.osmdroid)
+
+    // Telegram MTProto & TDLib Client
+    implementation("io.github.tdlibx:td-ktx:1.8.56")
 
     testImplementation(libs.junit)
 }

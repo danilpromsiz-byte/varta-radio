@@ -1,6 +1,7 @@
 package com.safecomm.app.ui.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -128,35 +130,8 @@ fun PttButton(
                         spotColor = Color.Black
                     )
                     .clip(CircleShape)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = when {
-                                isRecording -> listOf(
-                                    Color(0xFFFF8A80), // Brilliant top convex crest
-                                    Color(0xFFFF5252),
-                                    Color(0xFFD32F2F),
-                                    Color(0xFF850000),
-                                    Color(0xFF3B0000)  // Deep bottom convex shadow
-                                )
-                                isReceivingVoice -> listOf(
-                                    Color(0xFFFFF59D), // Brilliant top convex crest
-                                    Color(0xFFFFD54F),
-                                    Color(0xFFFFA726),
-                                    Color(0xFFE65100),
-                                    Color(0xFF5D1A00)  // Deep bottom convex shadow
-                                )
-                                else -> listOf(
-                                    Color(0xFFB3E5FC), // Brilliant top convex crest
-                                    Color(0xFF4FC3F7),
-                                    Color(0xFF1976D2),
-                                    Color(0xFF0D47A1),
-                                    Color(0xFF031B4D)  // Deep bottom convex shadow
-                                )
-                            }
-                        )
-                    )
                     .border(
-                        width = 2.dp,
+                        width = 1.5.dp,
                         brush = Brush.verticalGradient(
                             colors = listOf(
                                 Color(0xFFFFFFFF), // Pure white razor-sharp top specular edge
@@ -178,42 +153,98 @@ fun PttButton(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // --- LAYER 3: Full-Surface 3D Spherical Convex Glare Overlay ---
-                // Covering 100% of the dome surface from top rim to bottom shadow
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x88FFFFFF), // Luminous specular light across the entire top rim
-                                    Color(0x35FFFFFF), // Smooth mid-dome falloff
-                                    Color(0x00FFFFFF), // Natural clear equator
-                                    Color(0x40000000), // Spherical curvature shadow
-                                    Color(0x80000000)  // Deep bottom shadow rim
-                                )
-                            )
-                        )
-                )
+                // 3D Spherical Convex Dome Graphics
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val centerX = w * 0.5f
+                    val lightY = h * 0.32f
+                    val domeRadius = w * 0.68f
 
-                // Secondary top-crest light halo (top 45% arc)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .fillMaxHeight(0.48f)
-                        .align(Alignment.TopCenter)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x66FFFFFF),
-                                    Color(0x15FFFFFF),
-                                    Color(0x00FFFFFF)
-                                )
-                            )
+                    // 1. 3D Spherical Convex Radial Base (Light radiating from top-center)
+                    val domeColors = when {
+                        isRecording -> listOf(
+                            Color(0xFFFF8A80), // Brilliant top convex crest
+                            Color(0xFFFF5252),
+                            Color(0xFFD32F2F),
+                            Color(0xFF850000),
+                            Color(0xFF3B0000)  // Deep bottom convex shadow
                         )
-                )
+                        isReceivingVoice -> listOf(
+                            Color(0xFFFFF59D), // Brilliant top convex crest
+                            Color(0xFFFFD54F),
+                            Color(0xFFFFA726),
+                            Color(0xFFE65100),
+                            Color(0xFF5D1A00)  // Deep bottom convex shadow
+                        )
+                        else -> listOf(
+                            Color(0xFFB3E5FC), // Brilliant top convex crest
+                            Color(0xFF4FC3F7),
+                            Color(0xFF1976D2),
+                            Color(0xFF0D47A1),
+                            Color(0xFF031B4D)  // Deep bottom convex shadow
+                        )
+                    }
+
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = domeColors,
+                            center = Offset(centerX, lightY),
+                            radius = domeRadius
+                        ),
+                        radius = w / 2f,
+                        center = Offset(w / 2f, h / 2f)
+                    )
+
+                    // 2. Full-perimeter Ambient Occlusion Edge Bevel (Darkens 360-deg rim so dome physically pops out)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Transparent,
+                                Color(0x33000000),
+                                Color(0x88000000)
+                            ),
+                            center = Offset(w / 2f, h / 2f),
+                            radius = w / 2f
+                        ),
+                        radius = w / 2f,
+                        center = Offset(w / 2f, h / 2f)
+                    )
+
+                    // 3. 3D Specular Highlight Bulb at top (Luminous spherical gloss)
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xDDFFFFFF),
+                                Color(0x66FFFFFF),
+                                Color(0x18FFFFFF),
+                                Color.Transparent
+                            ),
+                            center = Offset(centerX, lightY),
+                            radius = w * 0.36f
+                        ),
+                        radius = w * 0.36f,
+                        center = Offset(centerX, lightY)
+                    )
+
+                    // 4. Razor-sharp upper rim light bevel arc along top contour
+                    drawArc(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xEEFFFFFF),
+                                Color(0x55FFFFFF),
+                                Color.Transparent
+                            ),
+                            startY = 0f,
+                            endY = h * 0.30f
+                        ),
+                        startAngle = 180f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        style = Stroke(width = 2.5f * density)
+                    )
+                }
 
                 // Button Labels & Tactical Icon
                 Column(

@@ -26,7 +26,7 @@
 
     <!-- Inner Tactical Radar Ring -->
     <path
-        android:strokeColor="#FF6D00"
+        android:strokeColor="#FFD600"
         android:strokeWidth="0.8"
         android:strokeAlpha="0.4"
         android:fillColor="#00000000"
