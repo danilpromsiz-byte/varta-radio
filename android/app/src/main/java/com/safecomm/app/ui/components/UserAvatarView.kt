@@ -127,16 +127,12 @@ fun UserAvatarView(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(preset.bgStart, preset.bgEnd)
-                        )
-                    ),
+                    .background(Color.Transparent),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = preset.emoji,
-                    fontSize = (size.value * 0.48f).sp,
+                    fontSize = (size.value * 0.62f).sp,
                     textAlign = TextAlign.Center
                 )
             }
@@ -245,23 +241,24 @@ fun AvatarSelectionDialog(
                         val isSelected = selectedId == preset.id
                         Box(
                             modifier = Modifier
-                                .aspectRatio(1f)
-                                .clip(CircleShape)
-                                .border(
-                                    if (isSelected) 3.dp else 1.dp,
-                                    if (isSelected) Color(0xFFFF9800) else Color.Transparent,
-                                    CircleShape
-                                )
-                                .clickable {
-                                    selectedId = preset.id
-                                    onSelectAvatar(preset.id)
-                                    onDismiss()
-                                },
+                                 .aspectRatio(1f)
+                                 .clip(RoundedCornerShape(14.dp))
+                                 .background(TelegramDarkCard)
+                                 .border(
+                                     if (isSelected) 2.dp else 1.dp,
+                                     if (isSelected) TelegramBlue else TelegramDivider.copy(alpha = 0.4f),
+                                     RoundedCornerShape(14.dp)
+                                 )
+                                 .clickable {
+                                     selectedId = preset.id
+                                     onSelectAvatar(preset.id)
+                                     onDismiss()
+                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             UserAvatarView(
                                 avatarString = preset.id,
-                                size = 46.dp,
+                                size = 42.dp,
                                 borderWidth = 0.dp
                             )
                         }

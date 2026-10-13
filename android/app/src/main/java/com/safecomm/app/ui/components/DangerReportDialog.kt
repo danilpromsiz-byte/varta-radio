@@ -8,8 +8,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -44,6 +46,10 @@ fun DangerReportDialog(
     initialLng: Double = 0.0,
     userLat: Double = 0.0,
     userLng: Double = 0.0,
+    initialType: AlertType? = null,
+    initialDurationMinutes: Int = 30,
+    initialDescription: String = "",
+    onStateChange: ((type: AlertType, duration: Int, desc: String) -> Unit)? = null,
     onMoveMarkerOnMap: () -> Unit = {},
     onDismiss: () -> Unit,
     onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double) -> Unit,
@@ -55,9 +61,9 @@ fun DangerReportDialog(
     val topCategory = sortedCategories.first()
     val otherCategories = sortedCategories.drop(1)
 
-    var selectedType by remember { mutableStateOf(topCategory) }
-    var selectedDurationMinutes by remember { mutableIntStateOf(30) } // Default: 30 minutes
-    var description by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf(initialType ?: topCategory) }
+    var selectedDurationMinutes by remember { mutableIntStateOf(initialDurationMinutes) }
+    var description by remember { mutableStateOf(initialDescription) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
 
@@ -67,14 +73,16 @@ fun DangerReportDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp),
+                .fillMaxHeight(0.88f)
+                .padding(vertical = 12.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header
@@ -318,60 +326,59 @@ fun DangerReportDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // Location & Move Marker on Map Card
+                // Compact Location Pill Row (Clean, minimal text, tactical icons)
                 val hasCustomLocation = initialLat != 0.0 && initialLng != 0.0 && (initialLat != userLat || initialLng != userLng)
                 val distanceMeters = if (hasCustomLocation && userLat != 0.0 && userLng != 0.0) {
                     (com.safecomm.app.util.GeoUtils.distanceKm(userLat, userLng, initialLat, initialLng) * 1000).toInt()
                 } else 0
 
-                Card(
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { onMoveMarkerOnMap() },
-                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
-                    border = BorderStroke(1.dp, if (hasCustomLocation) Color(0xFFFFD600) else TelegramDivider)
+                        .background(TelegramDarkCard)
+                        .border(1.dp, if (hasCustomLocation) Color(0xFFFFD600).copy(alpha = 0.6f) else TelegramDivider, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "📍", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (hasCustomLocation) {
+                                if (distanceMeters > 0) "+${distanceMeters}м (${com.safecomm.app.ui.i18n.I18n.fromYouLabel(currentLanguage)})" else com.safecomm.app.ui.i18n.I18n.customLocationSet(currentLanguage)
+                            } else {
+                                "GPS"
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasCustomLocation) Color(0xFFFFD600) else TelegramTextPrimary
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = TelegramBlue.copy(alpha = 0.16f),
+                        border = BorderStroke(1.dp, TelegramBlue.copy(alpha = 0.5f)),
+                        modifier = Modifier.clickable {
+                            onStateChange?.invoke(selectedType, selectedDurationMinutes, description)
+                            onMoveMarkerOnMap()
+                        }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(text = "📍", fontSize = 18.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = com.safecomm.app.ui.i18n.I18n.markerLocationLabel(currentLanguage),
-                                    fontSize = 10.sp,
-                                    color = TelegramTextSecondary
-                                )
-                                Text(
-                                    text = if (hasCustomLocation) {
-                                        if (distanceMeters > 0) "${distanceMeters}м " + com.safecomm.app.ui.i18n.I18n.fromYouLabel(currentLanguage) else com.safecomm.app.ui.i18n.I18n.customLocationSet(currentLanguage)
-                                    } else {
-                                        com.safecomm.app.ui.i18n.I18n.nearYouLabel(currentLanguage)
-                                    },
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (hasCustomLocation) Color(0xFFFFD600) else Color.White
-                                )
-                            }
-                        }
-                        TextButton(
-                            onClick = onMoveMarkerOnMap,
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
+                            Text(text = "🎯", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = com.safecomm.app.ui.i18n.I18n.moveMarkerBtn(currentLanguage),
+                                text = com.safecomm.app.ui.i18n.I18n.moveMarkerShort(currentLanguage),
                                 fontSize = 11.sp,
-                                color = TelegramBlue,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = TelegramBlue
                             )
                         }
                     }

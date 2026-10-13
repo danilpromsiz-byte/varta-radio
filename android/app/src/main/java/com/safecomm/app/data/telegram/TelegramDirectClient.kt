@@ -91,8 +91,19 @@ class TelegramDirectClient(private val context: Context) {
         set(value) = prefs.edit().putString("group_password", value).apply()
 
     var callSign: String
-        get() = prefs.getString("call_sign", "Позывной-" + (100..999).random()) ?: "Позывной-1"
-        set(value) = prefs.edit().putString("call_sign", value.trim()).apply()
+        get() {
+            val saved = prefs.getString("call_sign", null)
+            if (!saved.isNullOrBlank()) return saved
+            val generated = "Позывной-" + (100..999).random()
+            prefs.edit().putString("call_sign", generated).apply()
+            return generated
+        }
+        set(value) {
+            val trimmed = value.trim()
+            if (trimmed.isNotBlank()) {
+                prefs.edit().putString("call_sign", trimmed).apply()
+            }
+        }
 
     var userAvatar: String
         get() = prefs.getString("user_avatar", "shield") ?: "shield"

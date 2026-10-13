@@ -64,14 +64,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var photoReadyCallback: ((Uri?, File?) -> Unit)? = null
+
     // Camera take picture launcher
     private val takePictureLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
-        if (!success) {
+        if (success) {
+            photoReadyCallback?.invoke(currentPhotoUri, currentPhotoFile)
+        } else {
             currentPhotoFile?.delete()
             currentPhotoFile = null
             currentPhotoUri = null
+            photoReadyCallback?.invoke(null, null)
         }
     }
 
@@ -146,7 +151,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun launchCameraCapture(onUriReady: (Uri) -> Unit) {
+    private fun launchCameraCapture(onResult: (Uri?, File?) -> Unit) {
         val cacheDir = cacheDir
         val photoFile = File(cacheDir, "alert_photo_${System.currentTimeMillis()}.jpg")
         currentPhotoFile = photoFile
@@ -156,7 +161,7 @@ class MainActivity : ComponentActivity() {
             photoFile
         )
         currentPhotoUri = uri
-        onUriReady(uri)
+        photoReadyCallback = onResult
         takePictureLauncher.launch(uri)
     }
 
@@ -198,6 +203,7 @@ class MainActivity : ComponentActivity() {
         var soundEnabled by remember { mutableStateOf(true) }
 
         var capturedUri by remember { mutableStateOf<Uri?>(null) }
+        var capturedFile by remember { mutableStateOf<File?>(null) }
 
         val location by locationHelper.currentLocation.collectAsState()
         val userLat = location?.latitude ?: 0.0
@@ -479,6 +485,7 @@ class MainActivity : ComponentActivity() {
                     groupPassword = telegramClient.communityPassword,
                     currentUserId = 1L,
                     capturedPhotoUri = capturedUri,
+                    capturedPhotoFile = capturedFile,
                     githubRepo = appUpdateManager.githubRepo,
                     appVersion = BuildConfig.VERSION_NAME,
                     updateStatusText = when (val s = updateStatus) {
@@ -554,7 +561,10 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onLaunchCamera = {
-                        launchCameraCapture { uri -> capturedUri = uri }
+                        launchCameraCapture { uri, file ->
+                            capturedUri = uri
+                            capturedFile = file
+                        }
                     },
                     onConfirmAlert = { type, desc, durationMinutes, targetLat, targetLng ->
                         alertNotificationManager.triggerHapticFeedback(isLong = true)
@@ -576,11 +586,12 @@ class MainActivity : ComponentActivity() {
                         coroutineScope.launch {
                             val alertLat = if (targetLat != 0.0) targetLat else if (userLat != 0.0) userLat else (locationHelper.currentLocation.value?.latitude ?: 50.4501)
                             val alertLng = if (targetLng != 0.0) targetLng else if (userLng != 0.0) userLng else (locationHelper.currentLocation.value?.longitude ?: 30.5234)
-                            val photoToSend = currentPhotoFile
+                            val photoToSend = capturedFile ?: currentPhotoFile
                             telegramClient.broadcastAlert(type, alertLat, alertLng, desc, photoToSend, 30)
                                 .onSuccess { alert ->
                                     alerts = listOf(alert) + alerts.filter { it.id != alert.id }
                                     capturedUri = null
+                                    capturedFile = null
                                     currentPhotoFile = null
                                     Toast.makeText(this@MainActivity, "Фотофиксация передана!", Toast.LENGTH_SHORT).show()
                                 }

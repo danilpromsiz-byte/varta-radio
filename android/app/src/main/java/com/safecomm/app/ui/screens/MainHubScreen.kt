@@ -46,6 +46,7 @@ fun MainHubScreen(
     groupPassword: String = "",
     currentUserId: Long,
     capturedPhotoUri: Uri?,
+    capturedPhotoFile: java.io.File? = null,
     githubRepo: String = "danilpromsiz-byte/varta-radio",
     appVersion: String = "1.2.3",
     updateStatusText: String = "",
@@ -108,6 +109,14 @@ fun MainHubScreen(
     var customAlertLng by remember { mutableDoubleStateOf(0.0) }
     var pendingDialogType by remember { mutableStateOf<String?>(null) }
 
+    // Preserved dialog state so user selection is never lost when picking location on map
+    var dangerSelectedType by remember { mutableStateOf<AlertType?>(null) }
+    var dangerDurationMinutes by remember { mutableIntStateOf(30) }
+    var dangerDescription by remember { mutableStateOf("") }
+
+    var photoSelectedType by remember { mutableStateOf<AlertType?>(null) }
+    var photoDescription by remember { mutableStateOf("") }
+
     val isChiefAdmin = isRoomOwner || isSuperAdmin
     val isCurrentAdmin = isChiefAdmin || members.any {
         (it.userId == currentUserId || it.nickname.contains("(Вы)") || it.nickname.contains("(Ви)") || it.nickname.contains("(You)")) &&
@@ -159,7 +168,7 @@ fun MainHubScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 84.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = 98.dp, start = 14.dp, end = 14.dp)
             ) {
                 ActiveAlertsBanner(
                     alerts = alerts,
@@ -172,16 +181,53 @@ fun MainHubScreen(
 
         // --- 3. TOP FLOATING WAZE TACTICAL CAPSULE ---
         if (!isPickingLocationOnMap) {
-            Box(
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(start = 14.dp, end = 14.dp, top = 32.dp)
+                    .padding(start = 14.dp, end = 14.dp, top = 26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Room Name Floating Pill ABOVE Top Bar (Does not crowd functional buttons)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = TelegramDarkSurface.copy(alpha = 0.88f),
+                    border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.6f)),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showLeaveRoomConfirm = true }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = group?.name ?: I18n.appTitle(currentLanguage),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TelegramTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = I18n.switchRoomTooltip(currentLanguage),
+                            tint = Color(0xFFFFD600),
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Slim Operational Capsule: Left = Avatar & [🟢 2]; Right = Audio, History, Settings
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    color = TelegramDarkSurface.copy(alpha = 0.72f),
+                    color = TelegramDarkSurface.copy(alpha = 0.75f),
                     shadowElevation = 8.dp,
                     border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.5f))
                 ) {
@@ -192,14 +238,9 @@ fun MainHubScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Left: Avatar + Room Name + Swap Icon + [🟢 2] Counter (No redundant "Рация" / "у мережі")
+                        // Left: Avatar + [🟢 2] Counter
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showLeaveRoomConfirm = true }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             com.safecomm.app.ui.components.UserAvatarView(
                                 avatarString = userAvatar,
@@ -209,23 +250,6 @@ fun MainHubScreen(
                                 modifier = Modifier.clickable { showAvatarDialog = true }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = group?.name ?: I18n.appTitle(currentLanguage),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TelegramTextPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = I18n.switchRoomTooltip(currentLanguage),
-                                tint = Color(0xFFFFD600),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
                             // Green Circle + Member Count (e.g. 🟢 2) instead of text "2 в сети"
                             if (isConnected) {
                                 Row(
@@ -234,14 +258,14 @@ fun MainHubScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(Color(0xFF00E676).copy(alpha = 0.16f))
                                         .clickable { showMembersDialog = true }
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .padding(horizontal = 7.dp, vertical = 3.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .size(7.dp)
                                             .background(Color(0xFF00E676), CircleShape)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = "${members.size}",
                                         fontSize = 12.sp,
@@ -255,7 +279,7 @@ fun MainHubScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(AlertShellingRed.copy(alpha = 0.16f))
-                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        .padding(horizontal = 6.dp, vertical = 3.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier
@@ -459,6 +483,14 @@ fun MainHubScreen(
             initialLng = customAlertLng,
             userLat = userLat,
             userLng = userLng,
+            initialType = dangerSelectedType,
+            initialDurationMinutes = dangerDurationMinutes,
+            initialDescription = dangerDescription,
+            onStateChange = { type, dur, desc ->
+                dangerSelectedType = type
+                dangerDurationMinutes = dur
+                dangerDescription = desc
+            },
             onMoveMarkerOnMap = {
                 showDangerDialog = false
                 pendingDialogType = "DANGER"
@@ -468,11 +500,15 @@ fun MainHubScreen(
                 showDangerDialog = false
                 customAlertLat = 0.0
                 customAlertLng = 0.0
+                dangerSelectedType = null
+                dangerDescription = ""
             },
             onConfirmAlert = { type, desc, dur, lat, lng ->
                 showDangerDialog = false
                 customAlertLat = 0.0
                 customAlertLng = 0.0
+                dangerSelectedType = null
+                dangerDescription = ""
                 onConfirmAlert(type, desc, dur, lat, lng)
             },
             onHapticTick = onHapticTick,
@@ -483,10 +519,17 @@ fun MainHubScreen(
     if (showPhotoDialog) {
         PhotoReportDialog(
             photoUri = capturedPhotoUri,
+            photoFile = capturedPhotoFile,
             initialLat = customAlertLat,
             initialLng = customAlertLng,
             userLat = userLat,
             userLng = userLng,
+            initialType = photoSelectedType,
+            initialDescription = photoDescription,
+            onStateChange = { type, desc ->
+                photoSelectedType = type
+                photoDescription = desc
+            },
             onMoveMarkerOnMap = {
                 showPhotoDialog = false
                 pendingDialogType = "PHOTO"
@@ -497,11 +540,15 @@ fun MainHubScreen(
                 showPhotoDialog = false
                 customAlertLat = 0.0
                 customAlertLng = 0.0
+                photoSelectedType = null
+                photoDescription = ""
             },
             onConfirmReport = { type, desc, lat, lng ->
                 showPhotoDialog = false
                 customAlertLat = 0.0
                 customAlertLng = 0.0
+                photoSelectedType = null
+                photoDescription = ""
                 onConfirmPhotoReport(type, desc, lat, lng)
             },
             onHapticTick = onHapticTick,

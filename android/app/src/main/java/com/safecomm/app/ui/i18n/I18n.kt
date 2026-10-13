@@ -259,6 +259,8 @@ object I18n {
     fun voiceNotificationChannel(c: Context) = voiceNotificationChannel(LanguageManager.getLanguage(c))
     fun playVoiceAction(lang: AppLanguage) = t(lang, "▶ Прослушать", "▶ Прослухати", "▶ Listen")
     fun playVoiceAction(c: Context) = playVoiceAction(LanguageManager.getLanguage(c))
+    fun unplayedVoiceNotificationTitle(lang: AppLanguage) = t(lang, "Голосовое сообщение", "Голосове повідомлення", "Voice message")
+    fun unplayedVoiceNotificationTitle(c: Context) = unplayedVoiceNotificationTitle(LanguageManager.getLanguage(c))
 
     // Alert Expiry & Threat Clear
     fun alertDurationTitle(lang: AppLanguage) = t(lang, "Срок действия метки:", "Термін дії мітки:", "Alert Duration:")
@@ -289,6 +291,20 @@ object I18n {
     fun moveMarkerBtn(lang: AppLanguage) = t(lang, "📍 Подвинуть на карте", "📍 Посунути на карті", "📍 Move on map")
     fun moveMarkerBtn(c: Context) = moveMarkerBtn(LanguageManager.getLanguage(c))
 
+    fun moveMarkerShort(lang: AppLanguage) = t(lang, "На карте", "На карті", "On map")
+    fun moveMarkerShort(c: Context) = moveMarkerShort(LanguageManager.getLanguage(c))
+
+    fun photoMarkupHint(lang: AppLanguage) = t(
+        lang,
+        "🏹 Проведите по фото для стрелки",
+        "🏹 Проведіть по фото для стрілки",
+        "🏹 Swipe on photo to add arrow"
+    )
+    fun photoMarkupHint(c: Context) = photoMarkupHint(LanguageManager.getLanguage(c))
+
+    fun photoMarkupClear(lang: AppLanguage) = t(lang, "↩️ Сбросить", "↩️ Скинути", "↩️ Clear")
+    fun photoMarkupClear(c: Context) = photoMarkupClear(LanguageManager.getLanguage(c))
+
     fun nearYouLabel(lang: AppLanguage) = t(lang, "Рядом с вами (GPS)", "Поряд з вами (GPS)", "Near you (GPS)")
     fun nearYouLabel(c: Context) = nearYouLabel(LanguageManager.getLanguage(c))
 
@@ -301,7 +317,7 @@ object I18n {
     fun panMapHint(lang: AppLanguage) = t(lang, "📍 Переместите карту под метку", "📍 Перемістіть карту під мітку", "📍 Pan map under marker pin")
     fun panMapHint(c: Context) = panMapHint(LanguageManager.getLanguage(c))
 
-    fun confirmLocationBtn(lang: AppLanguage) = t(lang, "✓ Подтвердить место", "✓ Підтвердити місце", "✓ Confirm location")
+    fun confirmLocationBtn(lang: AppLanguage) = t(lang, "✓ Разместить", "✓ Розмістити", "✓ Place")
     fun confirmLocationBtn(c: Context) = confirmLocationBtn(LanguageManager.getLanguage(c))
 
     fun cancelLocationBtn(lang: AppLanguage) = t(lang, "Отмена", "Скасувати", "Cancel")

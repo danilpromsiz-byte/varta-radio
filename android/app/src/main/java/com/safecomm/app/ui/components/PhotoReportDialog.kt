@@ -1,12 +1,18 @@
 package com.safecomm.app.ui.components
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
@@ -15,34 +21,53 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.AlertUsageTracker
 import com.safecomm.app.ui.theme.*
+import com.safecomm.app.util.NormalizedArrow
+import com.safecomm.app.util.PhotoMarkupHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
 
 /**
- * Photo Fixation Dialog:
- * Captures image of danger with GPS coordinates and distributes to all community members.
+ * Tactical Photo Fixation Dialog:
+ * - Photo Preview with interactive markup (draw modern tactical arrows)
+ * - State preservation (category never resets on location adjustments)
+ * - Compact location pill & full scrollable interface
  */
 @Composable
 fun PhotoReportDialog(
     photoUri: Uri?,
+    photoFile: File? = null,
     initialLat: Double = 0.0,
     initialLng: Double = 0.0,
     userLat: Double = 0.0,
     userLng: Double = 0.0,
+    initialType: AlertType? = null,
+    initialDescription: String = "",
+    onStateChange: ((type: AlertType, desc: String) -> Unit)? = null,
     onMoveMarkerOnMap: () -> Unit = {},
     onLaunchCamera: () -> Unit,
     onDismiss: () -> Unit,
@@ -52,10 +77,16 @@ fun PhotoReportDialog(
 ) {
     val context = LocalContext.current
     val sortedCategories = remember { AlertUsageTracker.getSortedCategories(context) }
-    var selectedType by remember { mutableStateOf(sortedCategories.first()) }
-    var description by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf(initialType ?: sortedCategories.first()) }
+    var description by remember { mutableStateOf(initialDescription) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
+
+    // Tactical Arrows Markup
+    val arrows = remember { mutableStateListOf<NormalizedArrow>() }
+    var currentDragStart by remember { mutableStateOf<Offset?>(null) }
+    var currentDragEnd by remember { mutableStateOf<Offset?>(null) }
+    var previewSize by remember { mutableStateOf(IntSize.Zero) }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -63,14 +94,16 @@ fun PhotoReportDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp),
+                .fillMaxHeight(0.92f)
+                .padding(vertical = 10.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header
@@ -94,32 +127,182 @@ fun PhotoReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Photo Preview or Camera Button
+                // Photo Preview with Interactive Tactical Arrow Markup
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp)
+                        .height(200.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(TelegramDarkCard)
-                        .clickable { onLaunchCamera() },
+                        .border(1.dp, TelegramDivider, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (photoUri != null) {
-                        AsyncImage(
-                            model = photoUri,
-                            contentDescription = "Photo",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onSizeChanged { previewSize = it }
+                        ) {
+                            // 1. The Captured Image
+                            AsyncImage(
+                                model = photoUri,
+                                contentDescription = "Captured Photo",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+
+                            // 2. Interactive Gesture Overlay for Tactical Arrows
+                            Canvas(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(previewSize) {
+                                        detectDragGestures(
+                                            onDragStart = { offset ->
+                                                currentDragStart = offset
+                                                currentDragEnd = offset
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                currentDragEnd = change.position
+                                            },
+                                            onDragEnd = {
+                                                val start = currentDragStart
+                                                val end = currentDragEnd
+                                                val pw = previewSize.width.toFloat()
+                                                val ph = previewSize.height.toFloat()
+                                                if (start != null && end != null && pw > 0 && ph > 0) {
+                                                    val dist = hypot(end.x - start.x, end.y - start.y)
+                                                    if (dist > 16f) {
+                                                        // Drawn arrow
+                                                        arrows.add(
+                                                            NormalizedArrow(
+                                                                startX = (start.x / pw).coerceIn(0f, 1f),
+                                                                startY = (start.y / ph).coerceIn(0f, 1f),
+                                                                endX = (end.x / pw).coerceIn(0f, 1f),
+                                                                endY = (end.y / ph).coerceIn(0f, 1f)
+                                                            )
+                                                        )
+                                                    } else {
+                                                        // Tap: place tactical arrow pointing at tap spot
+                                                        val tapX = end.x
+                                                        val tapY = end.y
+                                                        val arrowLen = (pw * 0.18f).coerceAtLeast(45f)
+                                                        val sx = (tapX - arrowLen * 0.7f).coerceAtLeast(10f)
+                                                        val sy = (tapY - arrowLen * 0.7f).coerceAtLeast(10f)
+                                                        arrows.add(
+                                                            NormalizedArrow(
+                                                                startX = (sx / pw).coerceIn(0f, 1f),
+                                                                startY = (sy / ph).coerceIn(0f, 1f),
+                                                                endX = (tapX / pw).coerceIn(0f, 1f),
+                                                                endY = (tapY / ph).coerceIn(0f, 1f)
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                currentDragStart = null
+                                                currentDragEnd = null
+                                            },
+                                            onDragCancel = {
+                                                currentDragStart = null
+                                                currentDragEnd = null
+                                            }
+                                        )
+                                    }
+                            ) {
+                                val pw = size.width
+                                val ph = size.height
+
+                                fun drawTacticalArrow(sx: Float, sy: Float, ex: Float, ey: Float) {
+                                    val angle = atan2((ey - sy).toDouble(), (ex - sx).toDouble())
+                                    val arrowAngle = Math.toRadians(26.0)
+                                    val headLen = (pw * 0.07f).coerceAtLeast(26f)
+
+                                    // Line outline (black)
+                                    drawLine(
+                                        color = Color.Black.copy(alpha = 0.85f),
+                                        start = Offset(sx, sy),
+                                        end = Offset(ex, ey),
+                                        strokeWidth = 9f,
+                                        cap = StrokeCap.Round
+                                    )
+                                    // Neon yellow line
+                                    drawLine(
+                                        color = Color(0xFFFFD600),
+                                        start = Offset(sx, sy),
+                                        end = Offset(ex, ey),
+                                        strokeWidth = 5f,
+                                        cap = StrokeCap.Round
+                                    )
+
+                                    // Arrowhead points
+                                    val x1 = (ex - headLen * cos(angle - arrowAngle)).toFloat()
+                                    val y1 = (ey - headLen * sin(angle - arrowAngle)).toFloat()
+                                    val x2 = (ex - headLen * cos(angle + arrowAngle)).toFloat()
+                                    val y2 = (ey - headLen * sin(angle + arrowAngle)).toFloat()
+
+                                    val headPath = Path().apply {
+                                        moveTo(ex, ey)
+                                        lineTo(x1, y1)
+                                        lineTo(x2, y2)
+                                        close()
+                                    }
+
+                                    drawPath(
+                                        path = headPath,
+                                        color = Color.Black.copy(alpha = 0.85f),
+                                        style = Stroke(width = 6f, join = StrokeJoin.Round)
+                                    )
+                                    drawPath(
+                                        path = headPath,
+                                        color = Color(0xFFFFD600)
+                                    )
+                                }
+
+                                // Draw confirmed arrows
+                                for (arr in arrows) {
+                                    drawTacticalArrow(arr.startX * pw, arr.startY * ph, arr.endX * pw, arr.endY * ph)
+                                }
+
+                                // Draw arrow being dragged
+                                val ds = currentDragStart
+                                val de = currentDragEnd
+                                if (ds != null && de != null && hypot(de.x - ds.x, de.y - ds.y) > 10f) {
+                                    drawTacticalArrow(ds.x, ds.y, de.x, de.y)
+                                }
+                            }
+
+                            // Re-take photo button floating in top-right
+                            IconButton(
+                                onClick = onLaunchCamera,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(36.dp)
+                                    .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "Retake",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Empty photo placeholder
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clickable { onLaunchCamera() }
+                                .padding(16.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
                                 contentDescription = "Camera",
                                 tint = PhotoActionBlue,
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier.size(46.dp)
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
@@ -132,9 +315,37 @@ fun PhotoReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Markup Guidance & Clear Button
+                if (photoUri != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = com.safecomm.app.ui.i18n.I18n.photoMarkupHint(currentLanguage),
+                            fontSize = 11.sp,
+                            color = TelegramTextSecondary
+                        )
+                        if (arrows.isNotEmpty()) {
+                            Text(
+                                text = com.safecomm.app.ui.i18n.I18n.photoMarkupClear(currentLanguage),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AlertShellingRed,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { arrows.clear() }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
 
-                // Danger Type Selection
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Danger Type Selection Chips
                 Text(
                     text = com.safecomm.app.ui.i18n.I18n.photoHazardTypeLabel(currentLanguage),
                     style = MaterialTheme.typography.bodyMedium,
@@ -154,9 +365,12 @@ fun PhotoReportDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(if (isSelected) PhotoActionBlue else TelegramDarkCard)
-                                .clickable { selectedType = cat },
+                                .clickable {
+                                    selectedType = cat
+                                    onStateChange?.invoke(selectedType, description)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(text = cat.icon, fontSize = 20.sp)
@@ -164,13 +378,22 @@ fun PhotoReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Description
+                // Description Field
                 OutlinedTextField(
                     value = description,
-                    onValueChange = { description = it },
-                    placeholder = { Text(com.safecomm.app.ui.i18n.I18n.photoDetailsHint(currentLanguage), color = TelegramTextSecondary, fontSize = 13.sp) },
+                    onValueChange = {
+                        description = it
+                        onStateChange?.invoke(selectedType, description)
+                    },
+                    placeholder = {
+                        Text(
+                            com.safecomm.app.ui.i18n.I18n.photoDetailsHint(currentLanguage),
+                            color = TelegramTextSecondary,
+                            fontSize = 13.sp
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -184,62 +407,59 @@ fun PhotoReportDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Location & Move Marker on Map Card
+                // Compact Location Pill Row (Minimal text, clear pictograms)
                 val hasCustomLocation = initialLat != 0.0 && initialLng != 0.0 && (initialLat != userLat || initialLng != userLng)
                 val distanceMeters = if (hasCustomLocation && userLat != 0.0 && userLng != 0.0) {
                     (com.safecomm.app.util.GeoUtils.distanceKm(userLat, userLng, initialLat, initialLng) * 1000).toInt()
                 } else 0
 
-                Card(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { onMoveMarkerOnMap() },
-                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
-                    border = BorderStroke(1.dp, if (hasCustomLocation) Color(0xFFFFD600) else TelegramDivider)
+                        .background(TelegramDarkCard)
+                        .border(1.dp, if (hasCustomLocation) Color(0xFFFFD600).copy(alpha = 0.6f) else TelegramDivider, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "📍", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (hasCustomLocation) {
+                                if (distanceMeters > 0) "+${distanceMeters}м (${com.safecomm.app.ui.i18n.I18n.fromYouLabel(currentLanguage)})" else com.safecomm.app.ui.i18n.I18n.customLocationSet(currentLanguage)
+                            } else {
+                                "GPS"
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasCustomLocation) Color(0xFFFFD600) else TelegramTextPrimary
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = TelegramBlue.copy(alpha = 0.16f),
+                        border = BorderStroke(1.dp, TelegramBlue.copy(alpha = 0.5f)),
+                        modifier = Modifier.clickable {
+                            onStateChange?.invoke(selectedType, description)
+                            onMoveMarkerOnMap()
+                        }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(text = "📍", fontSize = 18.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = com.safecomm.app.ui.i18n.I18n.markerLocationLabel(currentLanguage),
-                                    fontSize = 10.sp,
-                                    color = TelegramTextSecondary
-                                )
-                                Text(
-                                    text = if (hasCustomLocation) {
-                                        if (distanceMeters > 0) "${distanceMeters}м " + com.safecomm.app.ui.i18n.I18n.fromYouLabel(currentLanguage) else com.safecomm.app.ui.i18n.I18n.customLocationSet(currentLanguage)
-                                    } else {
-                                        com.safecomm.app.ui.i18n.I18n.nearYouLabel(currentLanguage)
-                                    },
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (hasCustomLocation) Color(0xFFFFD600) else Color.White
-                                )
-                            }
-                        }
-                        TextButton(
-                            onClick = onMoveMarkerOnMap,
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
+                            Text(text = "🎯", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = com.safecomm.app.ui.i18n.I18n.moveMarkerBtn(currentLanguage),
+                                text = com.safecomm.app.ui.i18n.I18n.moveMarkerShort(currentLanguage),
                                 fontSize = 11.sp,
-                                color = TelegramBlue,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                color = TelegramBlue
                             )
                         }
                     }
@@ -255,7 +475,7 @@ fun PhotoReportDialog(
                         .clip(RoundedCornerShape(16.dp))
                         .background(TelegramDarkCard)
                         .border(1.dp, PhotoActionBlue.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .pointerInput(selectedType, description, photoUri, initialLat, initialLng) {
+                        .pointerInput(selectedType, description, photoUri, photoFile, initialLat, initialLng, arrows.size) {
                             detectTapGestures(
                                 onPress = {
                                     isHolding = true
@@ -271,6 +491,12 @@ fun PhotoReportDialog(
                                         }
                                         if (holdProgress >= 1.0f) {
                                             AlertUsageTracker.recordUsage(context, selectedType)
+                                            // Bake arrows into photo file if drawn
+                                            if (photoFile != null && arrows.isNotEmpty()) {
+                                                try {
+                                                    PhotoMarkupHelper.bakeArrows(photoFile, arrows.toList())
+                                                } catch (_: Exception) {}
+                                            }
                                             val finalLat = if (initialLat != 0.0) initialLat else userLat
                                             val finalLng = if (initialLng != 0.0) initialLng else userLng
                                             onConfirmReport(selectedType, description, finalLat, finalLng)

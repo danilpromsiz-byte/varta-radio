@@ -200,19 +200,18 @@ class AlertNotificationManager(private val context: Context) {
 
         val typeName = I18n.alertTypeName(lang, alert.alertType)
         val title = if (isFromOtherRoom) {
-            "🚨 $typeName • Комната «$roomName»"
+            "🚨 $typeName • $roomName"
         } else {
             "🚨 $typeName"
         }
 
-        val desc = if (alert.description.isNotBlank()) alert.description else "Метка опасности"
-        val body = "$desc • Сообщил: ${alert.senderNick} (${alert.createdAt})"
+        val body = "👤 ${alert.senderNick}" + if (alert.description.isNotBlank()) " • ${alert.description}" else ""
 
         val notif = NotificationCompat.Builder(context, CHANNEL_HAZARD_ID)
             .setSmallIcon(android.R.drawable.stat_notify_error)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$body\nКомната: $roomName"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -249,17 +248,17 @@ class AlertNotificationManager(private val context: Context) {
         )
 
         val title = if (isFromOtherRoom) {
-            "🎙 Рация: $senderNick (Комната «$roomName»)"
+            "🎙️ $senderNick • $roomName"
         } else {
-            "🎙 Рация: $senderNick"
+            "🎙️ $senderNick"
         }
-        val body = "Длительность: ${durationSec}с • Нажмите для прослушивания"
+        val body = "${I18n.unplayedVoiceNotificationTitle(lang)} • ${durationSec}с"
 
         val notif = NotificationCompat.Builder(context, CHANNEL_VOICE_ID)
             .setSmallIcon(android.R.drawable.stat_sys_speakerphone)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$body\nКомната: $roomName"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

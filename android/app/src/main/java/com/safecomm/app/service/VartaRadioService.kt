@@ -140,8 +140,8 @@ class VartaRadioService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("🛡️ Varta GO: $sector")
-            .setContentText("Позывной: $callSign • Рация на связи (Экран выкл. активен)")
+            .setContentTitle("🛡️ $sector")
+            .setContentText("👤 $callSign • В эфире 🟢")
             .setSmallIcon(android.R.drawable.stat_sys_speakerphone)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
