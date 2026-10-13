@@ -282,6 +282,34 @@ object I18n {
     fun alertClusterTitle(lang: AppLanguage, count: Int) = t(lang, "Группа меток ($count)", "Група міток ($count)", "Alert Cluster ($count)")
     fun alertClusterTitle(c: Context, count: Int) = alertClusterTitle(LanguageManager.getLanguage(c), count)
 
+    // Move Marker & Custom Location
+    fun markerLocationLabel(lang: AppLanguage) = t(lang, "Местоположение метки:", "Місцезнаходження мітки:", "Marker Location:")
+    fun markerLocationLabel(c: Context) = markerLocationLabel(LanguageManager.getLanguage(c))
+
+    fun moveMarkerBtn(lang: AppLanguage) = t(lang, "📍 Подвинуть на карте", "📍 Посунути на карті", "📍 Move on map")
+    fun moveMarkerBtn(c: Context) = moveMarkerBtn(LanguageManager.getLanguage(c))
+
+    fun nearYouLabel(lang: AppLanguage) = t(lang, "Рядом с вами (GPS)", "Поряд з вами (GPS)", "Near you (GPS)")
+    fun nearYouLabel(c: Context) = nearYouLabel(LanguageManager.getLanguage(c))
+
+    fun fromYouLabel(lang: AppLanguage) = t(lang, "от вас", "від вас", "from you")
+    fun fromYouLabel(c: Context) = fromYouLabel(LanguageManager.getLanguage(c))
+
+    fun customLocationSet(lang: AppLanguage) = t(lang, "Выбрано на карте", "Обрано на карті", "Selected on map")
+    fun customLocationSet(c: Context) = customLocationSet(LanguageManager.getLanguage(c))
+
+    fun panMapHint(lang: AppLanguage) = t(lang, "📍 Переместите карту под метку", "📍 Перемістіть карту під мітку", "📍 Pan map under marker pin")
+    fun panMapHint(c: Context) = panMapHint(LanguageManager.getLanguage(c))
+
+    fun confirmLocationBtn(lang: AppLanguage) = t(lang, "✓ Подтвердить место", "✓ Підтвердити місце", "✓ Confirm location")
+    fun confirmLocationBtn(c: Context) = confirmLocationBtn(LanguageManager.getLanguage(c))
+
+    fun cancelLocationBtn(lang: AppLanguage) = t(lang, "Отмена", "Скасувати", "Cancel")
+    fun cancelLocationBtn(c: Context) = cancelLocationBtn(LanguageManager.getLanguage(c))
+
+    fun frequentBadge(lang: AppLanguage) = t(lang, "⭐ Частая", "⭐ Часта", "⭐ Frequent")
+    fun frequentBadge(c: Context) = frequentBadge(LanguageManager.getLanguage(c))
+
     // --- App Updates ---
     fun updatesSection(lang: AppLanguage) = t(lang, "📦 Обновления приложения", "📦 Оновлення застосунку", "📦 App Updates")
     fun updatesSection(c: Context) = updatesSection(LanguageManager.getLanguage(c))

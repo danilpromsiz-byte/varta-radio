@@ -58,8 +58,8 @@ fun MainHubScreen(
     onStartPtt: () -> Unit,
     onStopPtt: () -> Unit,
     onLaunchCamera: () -> Unit,
-    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int) -> Unit,
-    onConfirmPhotoReport: (type: AlertType, description: String) -> Unit,
+    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double) -> Unit,
+    onConfirmPhotoReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double) -> Unit,
     onResolveAlert: (Alert) -> Unit,
     onPlayHistoryVoice: (VoiceMessage) -> Unit,
     onStopHistoryVoice: () -> Unit,
@@ -102,6 +102,12 @@ fun MainHubScreen(
     var showLeaveRoomConfirm by remember { mutableStateOf(false) }
     var selectedAlertForDetail by remember { mutableStateOf<Alert?>(null) }
 
+    // Map Location Picking for Danger/Photo Alerts
+    var isPickingLocationOnMap by remember { mutableStateOf(false) }
+    var customAlertLat by remember { mutableDoubleStateOf(0.0) }
+    var customAlertLng by remember { mutableDoubleStateOf(0.0) }
+    var pendingDialogType by remember { mutableStateOf<String?>(null) }
+
     val isChiefAdmin = isRoomOwner || isSuperAdmin
     val isCurrentAdmin = isChiefAdmin || members.any {
         (it.userId == currentUserId || it.nickname.contains("(Вы)") || it.nickname.contains("(Ви)") || it.nickname.contains("(You)")) &&
@@ -123,16 +129,37 @@ fun MainHubScreen(
             userLng = userLng,
             alerts = alerts,
             onAlertClick = { selectedAlertForDetail = it },
+            onMapLongClick = { lat, lng ->
+                onHapticTick()
+                customAlertLat = lat
+                customAlertLng = lng
+                showDangerDialog = true
+            },
+            isPickingLocation = isPickingLocationOnMap,
+            initialPickLat = if (customAlertLat != 0.0) customAlertLat else userLat,
+            initialPickLng = if (customAlertLng != 0.0) customAlertLng else userLng,
+            onLocationConfirmed = { lat, lng ->
+                customAlertLat = lat
+                customAlertLng = lng
+                isPickingLocationOnMap = false
+                if (pendingDialogType == "PHOTO") showPhotoDialog = true else showDangerDialog = true
+                pendingDialogType = null
+            },
+            onCancelPickLocation = {
+                isPickingLocationOnMap = false
+                if (pendingDialogType == "PHOTO") showPhotoDialog = true else showDangerDialog = true
+                pendingDialogType = null
+            },
             currentLanguage = currentLanguage,
             modifier = Modifier.fillMaxSize()
         )
 
         // --- 2. ACTIVE ALERTS FLOATING BANNER (Under Top Bar) ---
-        if (alerts.isNotEmpty()) {
+        if (alerts.isNotEmpty() && !isPickingLocationOnMap) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 96.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = 84.dp, start = 14.dp, end = 14.dp)
             ) {
                 ActiveAlertsBanner(
                     alerts = alerts,
@@ -144,81 +171,107 @@ fun MainHubScreen(
         }
 
         // --- 3. TOP FLOATING WAZE TACTICAL CAPSULE ---
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(start = 14.dp, end = 14.dp, top = 32.dp)
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = TelegramDarkSurface.copy(alpha = 0.68f),
-                shadowElevation = 10.dp,
-                border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.6f))
+        if (!isPickingLocationOnMap) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 14.dp, top = 32.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = TelegramDarkSurface.copy(alpha = 0.72f),
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.5f))
                 ) {
-                    // Left: Avatar + Room Info & Quick Switch
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { showLeaveRoomConfirm = true }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        com.safecomm.app.ui.components.UserAvatarView(
-                            avatarString = userAvatar,
-                            size = 38.dp,
-                            borderWidth = 1.5.dp,
-                            borderColor = if (isConnected) AlertMedicalGreen else AlertShellingRed,
-                            modifier = Modifier.clickable { showAvatarDialog = true }
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = group?.name ?: I18n.appTitle(currentLanguage),
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TelegramTextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.Default.SwapHoriz,
-                                    contentDescription = I18n.switchRoomTooltip(currentLanguage),
-                                    tint = Color(0xFFFFD600),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            val audioStatusText = when (audioMode) {
-                                AudioMode.SOUND -> I18n.audioModeSound(currentLanguage)
-                                AudioMode.VIBRATE -> I18n.audioModeVibrate(currentLanguage)
-                                AudioMode.SILENT -> I18n.audioModeSilent(currentLanguage)
-                            }
-                            Text(
-                                text = if (isConnected) {
-                                    "${members.size} " + I18n.online(currentLanguage) + " • " + audioStatusText
-                                } else I18n.connecting(currentLanguage),
-                                fontSize = 11.sp,
-                                color = if (isConnected) {
-                                    when (audioMode) {
-                                        AudioMode.SOUND -> Color(0xFFFFD600)
-                                        AudioMode.VIBRATE -> Color(0xFF64B5F6)
-                                        AudioMode.SILENT -> Color(0xFFFF5252)
-                                    }
-                                } else AlertShellingRed
+                        // Left: Avatar + Room Name + Swap Icon + [🟢 2] Counter (No redundant "Рация" / "у мережі")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showLeaveRoomConfirm = true }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            com.safecomm.app.ui.components.UserAvatarView(
+                                avatarString = userAvatar,
+                                size = 36.dp,
+                                borderWidth = 1.5.dp,
+                                borderColor = if (isConnected) AlertMedicalGreen else AlertShellingRed,
+                                modifier = Modifier.clickable { showAvatarDialog = true }
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = group?.name ?: I18n.appTitle(currentLanguage),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TelegramTextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = I18n.switchRoomTooltip(currentLanguage),
+                                tint = Color(0xFFFFD600),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            // Green Circle + Member Count (e.g. 🟢 2) instead of text "2 в сети"
+                            if (isConnected) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF00E676).copy(alpha = 0.16f))
+                                        .clickable { showMembersDialog = true }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .background(Color(0xFF00E676), CircleShape)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${members.size}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00E676)
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(AlertShellingRed.copy(alpha = 0.16f))
+                                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(AlertShellingRed, CircleShape)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "...",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AlertShellingRed
+                                    )
+                                }
+                            }
                         }
-                    }
 
                     // Right: Quick Tactical Actions (Audio Mode, Radio History, Members, Settings)
                     Row(
@@ -293,98 +346,107 @@ fun MainHubScreen(
                 }
             }
         }
+    }
 
-        // --- 4. BOTTOM FLOATING WAZE OPERATIONAL DOCK ---
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Speaker HUD Floating Capsule
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = when {
-                    isPlayingVoice -> Color(0xFF263238).copy(alpha = 0.95f)
-                    isRecordingVoice -> Color(0xFF3E1C1C).copy(alpha = 0.95f)
-                    else -> TelegramDarkSurface.copy(alpha = 0.92f)
-                },
-                border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.5f)),
-                shadowElevation = 8.dp
+    // --- 4. BOTTOM FLOATING WAZE OPERATIONAL DOCK ---
+        if (!isPickingLocationOnMap) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Speaker HUD Floating Capsule
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = when {
+                        isPlayingVoice -> Color(0xFF263238).copy(alpha = 0.95f)
+                        isRecordingVoice -> Color(0xFF3E1C1C).copy(alpha = 0.95f)
+                        else -> TelegramDarkSurface.copy(alpha = 0.92f)
+                    },
+                    border = BorderStroke(1.dp, TelegramDivider.copy(alpha = 0.5f)),
+                    shadowElevation = 8.dp
                 ) {
-                    val activeSpeakerAvatar = when {
-                        isRecordingVoice -> userAvatar
-                        isPlayingVoice -> members.firstOrNull { it.nickname == currentSpeaker || it.nickname.startsWith(currentSpeaker ?: "") }?.avatarUrl ?: "radio"
-                        else -> null
-                    }
-                    if (activeSpeakerAvatar != null) {
-                        com.safecomm.app.ui.components.UserAvatarView(
-                            avatarString = activeSpeakerAvatar,
-                            size = 20.dp,
-                            borderWidth = 1.dp,
-                            borderColor = if (isPlayingVoice) AlertFireOrange else AlertShellingRed
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4CAF50))
-                        )
-                    }
-
-                    Text(
-                        text = when {
-                            isPlayingVoice -> I18n.activeSpeakerVoice(currentLanguage, currentSpeaker ?: "User")
-                            isRecordingVoice -> I18n.youAreTransmitting(currentLanguage)
-                            else -> I18n.channelClear(currentLanguage)
-                        },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = when {
-                            isPlayingVoice -> AlertFireOrange
-                            isRecordingVoice -> AlertShellingRed
-                            else -> TelegramTextSecondary
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val activeSpeakerAvatar = when {
+                            isRecordingVoice -> userAvatar
+                            isPlayingVoice -> members.firstOrNull { it.nickname == currentSpeaker || it.nickname.startsWith(currentSpeaker ?: "") }?.avatarUrl ?: "radio"
+                            else -> null
                         }
-                    )
+                        if (activeSpeakerAvatar != null) {
+                            com.safecomm.app.ui.components.UserAvatarView(
+                                avatarString = activeSpeakerAvatar,
+                                size = 20.dp,
+                                borderWidth = 1.dp,
+                                borderColor = if (isPlayingVoice) AlertFireOrange else AlertShellingRed
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF4CAF50))
+                            )
+                        }
 
-                    if (isPlayingVoice || isRecordingVoice) {
                         Text(
-                            text = I18n.activeSpeakerBadge(currentLanguage),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            text = when {
+                                isPlayingVoice -> I18n.activeSpeakerVoice(currentLanguage, currentSpeaker ?: "User")
+                                isRecordingVoice -> I18n.youAreTransmitting(currentLanguage)
+                                else -> I18n.channelClear(currentLanguage)
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = when {
+                                isPlayingVoice -> AlertFireOrange
+                                isRecordingVoice -> AlertShellingRed
+                                else -> TelegramTextSecondary
+                            }
                         )
+
+                        if (isPlayingVoice || isRecordingVoice) {
+                            Text(
+                                text = I18n.activeSpeakerBadge(currentLanguage),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
+
+                // 3D Convex PTT Walkie-Talkie Button
+                PttButton(
+                    isRecording = isRecordingVoice,
+                    amplitude = amplitude,
+                    isReceivingVoice = isPlayingVoice,
+                    onStartTalk = onStartPtt,
+                    onStopTalk = onStopPtt
+                )
+
+                // Waze-Style Tactical Action Buttons (Never truncating)
+                AlertActionButtons(
+                    onTriggerAlarm = {
+                        customAlertLat = userLat
+                        customAlertLng = userLng
+                        showDangerDialog = true
+                    },
+                    onTriggerPhoto = {
+                        customAlertLat = userLat
+                        customAlertLng = userLng
+                        onLaunchCamera()
+                        showPhotoDialog = true
+                    },
+                    currentLanguage = currentLanguage
+                )
             }
-
-            // 3D Convex PTT Walkie-Talkie Button
-            PttButton(
-                isRecording = isRecordingVoice,
-                amplitude = amplitude,
-                isReceivingVoice = isPlayingVoice,
-                onStartTalk = onStartPtt,
-                onStopTalk = onStopPtt
-            )
-
-            // Waze-Style Tactical Action Buttons (Never truncating)
-            AlertActionButtons(
-                onTriggerAlarm = { showDangerDialog = true },
-                onTriggerPhoto = {
-                    onLaunchCamera()
-                    showPhotoDialog = true
-                },
-                currentLanguage = currentLanguage
-            )
         }
     }
 
@@ -393,10 +455,25 @@ fun MainHubScreen(
     // =========================================================================
     if (showDangerDialog) {
         DangerReportDialog(
-            onDismiss = { showDangerDialog = false },
-            onConfirmAlert = { type, desc, dur ->
+            initialLat = customAlertLat,
+            initialLng = customAlertLng,
+            userLat = userLat,
+            userLng = userLng,
+            onMoveMarkerOnMap = {
                 showDangerDialog = false
-                onConfirmAlert(type, desc, dur)
+                pendingDialogType = "DANGER"
+                isPickingLocationOnMap = true
+            },
+            onDismiss = {
+                showDangerDialog = false
+                customAlertLat = 0.0
+                customAlertLng = 0.0
+            },
+            onConfirmAlert = { type, desc, dur, lat, lng ->
+                showDangerDialog = false
+                customAlertLat = 0.0
+                customAlertLng = 0.0
+                onConfirmAlert(type, desc, dur, lat, lng)
             },
             onHapticTick = onHapticTick,
             currentLanguage = currentLanguage
@@ -406,11 +483,26 @@ fun MainHubScreen(
     if (showPhotoDialog) {
         PhotoReportDialog(
             photoUri = capturedPhotoUri,
-            onLaunchCamera = onLaunchCamera,
-            onDismiss = { showPhotoDialog = false },
-            onConfirmReport = { type, desc ->
+            initialLat = customAlertLat,
+            initialLng = customAlertLng,
+            userLat = userLat,
+            userLng = userLng,
+            onMoveMarkerOnMap = {
                 showPhotoDialog = false
-                onConfirmPhotoReport(type, desc)
+                pendingDialogType = "PHOTO"
+                isPickingLocationOnMap = true
+            },
+            onLaunchCamera = onLaunchCamera,
+            onDismiss = {
+                showPhotoDialog = false
+                customAlertLat = 0.0
+                customAlertLng = 0.0
+            },
+            onConfirmReport = { type, desc, lat, lng ->
+                showPhotoDialog = false
+                customAlertLat = 0.0
+                customAlertLng = 0.0
+                onConfirmPhotoReport(type, desc, lat, lng)
             },
             onHapticTick = onHapticTick,
             currentLanguage = currentLanguage

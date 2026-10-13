@@ -22,8 +22,25 @@ import androidx.core.graphics.createBitmap
 import com.safecomm.app.data.model.Alert
 import com.safecomm.app.ui.i18n.AppLanguage
 import com.safecomm.app.ui.i18n.I18n
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import com.safecomm.app.ui.theme.TelegramDivider
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.views.overlay.MapEventsOverlay
 import com.safecomm.app.ui.theme.TelegramBlue
 import com.safecomm.app.ui.theme.TelegramDarkSurface
+import com.safecomm.app.ui.theme.TelegramTextSecondary
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
@@ -45,6 +62,12 @@ fun OsmMapView(
     userLng: Double,
     alerts: List<Alert>,
     onAlertClick: (Alert) -> Unit,
+    onMapLongClick: ((Double, Double) -> Unit)? = null,
+    isPickingLocation: Boolean = false,
+    initialPickLat: Double = 0.0,
+    initialPickLng: Double = 0.0,
+    onLocationConfirmed: ((Double, Double) -> Unit)? = null,
+    onCancelPickLocation: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     currentLanguage: AppLanguage = AppLanguage.EN
 ) {
@@ -52,6 +75,29 @@ fun OsmMapView(
     var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
     var userMarkerInstance by remember { mutableStateOf<Marker?>(null) }
     var hasCenteredInitial by remember { mutableStateOf(false) }
+
+    val eventsOverlay = remember(onMapLongClick) {
+        MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean = false
+            override fun longPressHelper(p: GeoPoint): Boolean {
+                onMapLongClick?.invoke(p.latitude, p.longitude)
+                return true
+            }
+        })
+    }
+
+    // Camera animation when entering location picking mode
+    LaunchedEffect(isPickingLocation) {
+        val map = mapViewInstance ?: return@LaunchedEffect
+        if (isPickingLocation) {
+            val targetLat = if (initialPickLat != 0.0) initialPickLat else userLat
+            val targetLng = if (initialPickLng != 0.0) initialPickLng else userLng
+            if (targetLat != 0.0 && targetLng != 0.0) {
+                map.controller.animateTo(GeoPoint(targetLat, targetLng))
+                map.controller.setZoom(16.0)
+            }
+        }
+    }
 
     // 1. Initial centering ONLY ONCE when valid location is acquired
     LaunchedEffect(userLat, userLng) {
@@ -88,9 +134,10 @@ fun OsmMapView(
     LaunchedEffect(alerts, currentLanguage) {
         val map = mapViewInstance ?: return@LaunchedEffect
 
-        // Remove all overlays except user marker
+        // Remove all overlays except user marker and events listener
         val userMarker = userMarkerInstance
         map.overlays.clear()
+        map.overlays.add(eventsOverlay)
         if (userMarker != null) {
             map.overlays.add(userMarker)
         }
@@ -153,13 +200,112 @@ fun OsmMapView(
                         GeoPoint(50.4501, 30.5234) // Default fallback
                     }
                     controller.setCenter(startPoint)
+                    overlays.add(eventsOverlay)
                     mapViewInstance = this
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Floating Action Button: "Моё местоположение" (elevated above bottom dock)
+        // Center Pin & Controls when in Picking / Moving Marker Mode
+        if (isPickingLocation) {
+            // Tactical Center Target Pin
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                // Ground target ring
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .background(Color(0xFFE53935).copy(alpha = 0.35f), CircleShape)
+                        .border(1.5.dp, Color.White, CircleShape)
+                )
+
+                // Pin hovering so its bottom point aligns with the center
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.offset(y = (-26).dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFE53935),
+                        shadowElevation = 8.dp,
+                        border = BorderStroke(2.dp, Color.White),
+                        modifier = Modifier.size(46.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "📍", fontSize = 24.sp)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color.White, CircleShape)
+                    )
+                }
+            }
+
+            // Top Guidance & Confirmation Capsule
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 40.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = TelegramDarkSurface.copy(alpha = 0.95f),
+                shadowElevation = 12.dp,
+                border = BorderStroke(1.5.dp, Color(0xFFFFD600))
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = I18n.panMapHint(currentLanguage),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onCancelPickLocation?.invoke() },
+                            modifier = Modifier.weight(1f).height(40.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, TelegramDivider),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TelegramTextSecondary)
+                        ) {
+                            Text(text = I18n.cancelLocationBtn(currentLanguage), fontSize = 13.sp)
+                        }
+                        Button(
+                            onClick = {
+                                val center = mapViewInstance?.mapCenter
+                                val lat = center?.latitude ?: userLat
+                                val lng = center?.longitude ?: userLng
+                                onLocationConfirmed?.invoke(lat, lng)
+                            },
+                            modifier = Modifier.weight(1.5f).height(40.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
+                        ) {
+                            Text(
+                                text = I18n.confirmLocationBtn(currentLanguage),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Floating Action Button: "Моё местоположение"
         FloatingActionButton(
             onClick = {
                 val map = mapViewInstance ?: return@FloatingActionButton
@@ -170,7 +316,7 @@ fun OsmMapView(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .padding(bottom = 140.dp, end = 16.dp)
+                .padding(bottom = if (isPickingLocation) 32.dp else 140.dp, end = 16.dp)
                 .size(46.dp),
             shape = CircleShape,
             containerColor = TelegramDarkSurface,

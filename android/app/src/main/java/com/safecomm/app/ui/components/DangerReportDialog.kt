@@ -2,6 +2,7 @@ package com.safecomm.app.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,34 +19,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.safecomm.app.data.model.AlertType
+import com.safecomm.app.data.model.AlertUsageTracker
 import com.safecomm.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Danger Report Dialog with Two-Stage False-Trigger Protection:
- * 1. Explicit Category Selection (Intent confirmation)
+ * 1. Explicit Category Selection (Most frequent shown first and larger)
  * 2. 2-Second Hold-to-Confirm with dynamic progress fill
- *
- * UX Justification:
- * In emergency and high-stress situations, users often accidentally press panic buttons.
- * Requiring a sustained 2-second press with continuous visual/haptic feedback
- * ensures the action is deliberate while remaining under the threshold of panic latency.
+ * 3. Movable marker location support
  */
 @Composable
 fun DangerReportDialog(
+    initialLat: Double = 0.0,
+    initialLng: Double = 0.0,
+    userLat: Double = 0.0,
+    userLng: Double = 0.0,
+    onMoveMarkerOnMap: () -> Unit = {},
     onDismiss: () -> Unit,
-    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int) -> Unit,
+    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double) -> Unit,
     onHapticTick: () -> Unit = {},
     currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
-    var selectedType by remember { mutableStateOf(AlertType.SHELLING) }
+    val context = LocalContext.current
+    val sortedCategories = remember { AlertUsageTracker.getSortedCategories(context) }
+    val topCategory = sortedCategories.first()
+    val otherCategories = sortedCategories.drop(1)
+
+    var selectedType by remember { mutableStateOf(topCategory) }
     var selectedDurationMinutes by remember { mutableIntStateOf(30) } // Default: 30 minutes
     var description by remember { mutableStateOf("") }
     var holdProgress by remember { mutableFloatStateOf(0f) }
@@ -91,7 +101,7 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = com.safecomm.app.ui.i18n.I18n.chooseDangerDesc(currentLanguage),
                     style = MaterialTheme.typography.bodyMedium,
@@ -100,12 +110,77 @@ fun DangerReportDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Danger Categories 3x2 Grid
-                val categories = AlertType.entries
+                // TOP (MOST USED) CATEGORY: First & Larger
+                val isTopSelected = selectedType == topCategory
+                val topCatColor = when (topCategory) {
+                    AlertType.SHELLING -> AlertShellingRed
+                    AlertType.FIRE -> AlertFireOrange
+                    AlertType.MEDICAL -> AlertMedicalGreen
+                    AlertType.POLICE -> AlertPoliceBlue
+                    AlertType.MILITARY -> AlertMilitaryYellow
+                    AlertType.OTHER -> AlertOtherGray
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(78.dp)
+                        .border(
+                            width = if (isTopSelected) 2.dp else 1.dp,
+                            color = if (isTopSelected) topCatColor else TelegramDivider,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable { selectedType = topCategory },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isTopSelected) topCatColor.copy(alpha = 0.22f) else TelegramDarkCard
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = topCategory.icon, fontSize = 34.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, topCategory.rawValue),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isTopSelected) Color.White else TelegramTextPrimary
+                                )
+                                Text(
+                                    text = com.safecomm.app.ui.i18n.I18n.frequentBadge(currentLanguage),
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFFFD600),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        if (isTopSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .background(topCatColor, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "✓", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Other 5 Categories (in clean 3-col rows)
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (row in categories.chunked(3)) {
+                    for (row in otherCategories.chunked(3)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -124,7 +199,7 @@ fun DangerReportDialog(
                                 Card(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(76.dp)
+                                        .height(66.dp)
                                         .border(
                                             width = if (isSelected) 2.dp else 1.dp,
                                             color = if (isSelected) catColor else TelegramDivider,
@@ -141,15 +216,22 @@ fun DangerReportDialog(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        Text(text = cat.icon, fontSize = 26.sp)
-                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(text = cat.icon, fontSize = 22.sp)
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, cat.rawValue),
-                                            fontSize = 11.sp,
+                                            fontSize = 10.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color.White else TelegramTextSecondary
+                                            color = if (isSelected) Color.White else TelegramTextSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
+                                }
+                            }
+                            if (row.size < 3) {
+                                for (i in 0 until (3 - row.size)) {
+                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
@@ -236,7 +318,66 @@ fun DangerReportDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                // Location & Move Marker on Map Card
+                val hasCustomLocation = initialLat != 0.0 && initialLng != 0.0 && (initialLat != userLat || initialLng != userLng)
+                val distanceMeters = if (hasCustomLocation && userLat != 0.0 && userLng != 0.0) {
+                    (com.safecomm.app.util.GeoUtils.distanceKm(userLat, userLng, initialLat, initialLng) * 1000).toInt()
+                } else 0
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onMoveMarkerOnMap() },
+                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
+                    border = BorderStroke(1.dp, if (hasCustomLocation) Color(0xFFFFD600) else TelegramDivider)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(text = "📍", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = com.safecomm.app.ui.i18n.I18n.markerLocationLabel(currentLanguage),
+                                    fontSize = 10.sp,
+                                    color = TelegramTextSecondary
+                                )
+                                Text(
+                                    text = if (hasCustomLocation) {
+                                        if (distanceMeters > 0) "${distanceMeters}м " + com.safecomm.app.ui.i18n.I18n.fromYouLabel(currentLanguage) else com.safecomm.app.ui.i18n.I18n.customLocationSet(currentLanguage)
+                                    } else {
+                                        com.safecomm.app.ui.i18n.I18n.nearYouLabel(currentLanguage)
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (hasCustomLocation) Color(0xFFFFD600) else Color.White
+                                )
+                            }
+                        }
+                        TextButton(
+                            onClick = onMoveMarkerOnMap,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = com.safecomm.app.ui.i18n.I18n.moveMarkerBtn(currentLanguage),
+                                fontSize = 11.sp,
+                                color = TelegramBlue,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // HOLD TO CONFIRM BUTTON (False-trigger protection)
                 Box(
@@ -246,7 +387,7 @@ fun DangerReportDialog(
                         .clip(RoundedCornerShape(16.dp))
                         .background(TelegramDarkCard)
                         .border(1.dp, AlertShellingRed.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .pointerInput(selectedType, description, selectedDurationMinutes) {
+                        .pointerInput(selectedType, description, selectedDurationMinutes, initialLat, initialLng) {
                             detectTapGestures(
                                 onPress = {
                                     isHolding = true
@@ -263,7 +404,10 @@ fun DangerReportDialog(
                                             }
                                         }
                                         if (holdProgress >= 1.0f) {
-                                            onConfirmAlert(selectedType, description, selectedDurationMinutes)
+                                            AlertUsageTracker.recordUsage(context, selectedType)
+                                            val finalLat = if (initialLat != 0.0) initialLat else userLat
+                                            val finalLng = if (initialLng != 0.0) initialLng else userLng
+                                            onConfirmAlert(selectedType, description, selectedDurationMinutes, finalLat, finalLng)
                                         }
                                     }
                                     tryAwaitRelease()

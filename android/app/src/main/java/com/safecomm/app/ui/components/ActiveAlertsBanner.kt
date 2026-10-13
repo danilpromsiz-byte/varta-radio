@@ -80,7 +80,7 @@ fun ActiveAlertsBanner(
                             .fillMaxWidth()
                             .padding(horizontal = 10.dp, vertical = 8.dp)
                     ) {
-                        // Top Row: Icon + Label + Author Callsign
+                        // Top Row: Pictogram Icon + Author Callsign (No redundant text description)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -90,26 +90,17 @@ fun ActiveAlertsBanner(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Text(text = alert.typedCategory.icon, fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(text = alert.typedCategory.icon, fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = alert.typedCategory.label,
+                                    text = alert.senderNick.ifBlank { "Аноним" },
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = catColor,
+                                    color = TelegramTextPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Text(
-                                text = alert.senderNick.ifBlank { "Аноним" },
-                                fontSize = 10.sp,
-                                color = TelegramTextSecondary,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
                         }
 
                         // Description preview (wrapped, readable)

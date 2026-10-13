@@ -23,8 +23,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import com.safecomm.app.data.model.AlertType
+import com.safecomm.app.data.model.AlertUsageTracker
 import com.safecomm.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -36,13 +39,20 @@ import kotlinx.coroutines.launch
 @Composable
 fun PhotoReportDialog(
     photoUri: Uri?,
+    initialLat: Double = 0.0,
+    initialLng: Double = 0.0,
+    userLat: Double = 0.0,
+    userLng: Double = 0.0,
+    onMoveMarkerOnMap: () -> Unit = {},
     onLaunchCamera: () -> Unit,
     onDismiss: () -> Unit,
-    onConfirmReport: (type: AlertType, description: String) -> Unit,
+    onConfirmReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double) -> Unit,
     onHapticTick: () -> Unit = {},
     currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
-    var selectedType by remember { mutableStateOf(AlertType.OTHER) }
+    val context = LocalContext.current
+    val sortedCategories = remember { AlertUsageTracker.getSortedCategories(context) }
+    var selectedType by remember { mutableStateOf(sortedCategories.first()) }
     var description by remember { mutableStateOf("") }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
@@ -138,7 +148,7 @@ fun PhotoReportDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    for (cat in AlertType.entries) {
+                    for (cat in sortedCategories) {
                         val isSelected = cat == selectedType
                         Box(
                             modifier = Modifier
@@ -174,7 +184,68 @@ fun PhotoReportDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Location & Move Marker on Map Card
+                val hasCustomLocation = initialLat != 0.0 && initialLng != 0.0 && (initialLat != userLat || initialLng != userLng)
+                val distanceMeters = if (hasCustomLocation && userLat != 0.0 && userLng != 0.0) {
+                    (com.safecomm.app.util.GeoUtils.distanceKm(userLat, userLng, initialLat, initialLng) * 1000).toInt()
+                } else 0
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onMoveMarkerOnMap() },
+                    colors = CardDefaults.cardColors(containerColor = TelegramDarkCard),
+                    border = BorderStroke(1.dp, if (hasCustomLocation) Color(0xFFFFD600) else TelegramDivider)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(text = "📍", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = com.safecomm.app.ui.i18n.I18n.markerLocationLabel(currentLanguage),
+                                    fontSize = 10.sp,
+                                    color = TelegramTextSecondary
+                                )
+                                Text(
+                                    text = if (hasCustomLocation) {
+                                        if (distanceMeters > 0) "${distanceMeters}м " + com.safecomm.app.ui.i18n.I18n.fromYouLabel(currentLanguage) else com.safecomm.app.ui.i18n.I18n.customLocationSet(currentLanguage)
+                                    } else {
+                                        com.safecomm.app.ui.i18n.I18n.nearYouLabel(currentLanguage)
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (hasCustomLocation) Color(0xFFFFD600) else Color.White
+                                )
+                            }
+                        }
+                        TextButton(
+                            onClick = onMoveMarkerOnMap,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = com.safecomm.app.ui.i18n.I18n.moveMarkerBtn(currentLanguage),
+                                fontSize = 11.sp,
+                                color = TelegramBlue,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Hold to Confirm Button
                 Box(
@@ -184,7 +255,7 @@ fun PhotoReportDialog(
                         .clip(RoundedCornerShape(16.dp))
                         .background(TelegramDarkCard)
                         .border(1.dp, PhotoActionBlue.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .pointerInput(selectedType, description, photoUri) {
+                        .pointerInput(selectedType, description, photoUri, initialLat, initialLng) {
                             detectTapGestures(
                                 onPress = {
                                     isHolding = true
@@ -199,7 +270,10 @@ fun PhotoReportDialog(
                                             if (elapsed % 300 == 0L) onHapticTick()
                                         }
                                         if (holdProgress >= 1.0f) {
-                                            onConfirmReport(selectedType, description)
+                                            AlertUsageTracker.recordUsage(context, selectedType)
+                                            val finalLat = if (initialLat != 0.0) initialLat else userLat
+                                            val finalLng = if (initialLng != 0.0) initialLng else userLng
+                                            onConfirmReport(selectedType, description, finalLat, finalLng)
                                         }
                                     }
                                     tryAwaitRelease()

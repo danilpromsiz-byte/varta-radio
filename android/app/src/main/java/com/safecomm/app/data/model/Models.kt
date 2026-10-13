@@ -18,7 +18,7 @@ enum class AlertType(val rawValue: String, val label: String, val icon: String, 
     POLICE("police", "Полиция", "🚔", "#2196F3"),
 
     @SerialName("military")
-    MILITARY("military", "Военная", "⚠️", "#FFC107"),
+    MILITARY("military", "Военная", "🪖", "#FFC107"),
 
     @SerialName("other")
     OTHER("other", "Другое", "❓", "#9E9E9E");
@@ -27,6 +27,29 @@ enum class AlertType(val rawValue: String, val label: String, val icon: String, 
         fun fromRaw(raw: String): AlertType {
             return entries.firstOrNull { it.rawValue == raw } ?: OTHER
         }
+    }
+}
+
+object AlertUsageTracker {
+    private const val PREFS_NAME = "varta_alert_usage_prefs"
+
+    fun recordUsage(context: android.content.Context, type: AlertType) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val current = prefs.getInt(type.rawValue, 0)
+        prefs.edit().putInt(type.rawValue, current + 1).apply()
+    }
+
+    fun getUsageCount(context: android.content.Context, type: AlertType): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        return prefs.getInt(type.rawValue, 0)
+    }
+
+    fun getSortedCategories(context: android.content.Context): List<AlertType> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        return AlertType.entries.sortedWith(
+            compareByDescending<AlertType> { prefs.getInt(it.rawValue, 0) }
+                .thenBy { it.ordinal }
+        )
     }
 }
 
