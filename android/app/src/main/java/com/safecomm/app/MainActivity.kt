@@ -1,6 +1,7 @@
 package com.safecomm.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
 
         checkPermissions()
         locationHelper.startLocationUpdates()
+        handleNotificationIntent(intent)
 
         setContent {
             SafeCommTheme {
@@ -94,6 +96,33 @@ class MainActivity : ComponentActivity() {
                     VartaAppContent()
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent == null) return
+        val targetRoom = intent.getStringExtra(AlertNotificationManager.EXTRA_TARGET_ROOM)
+        val playVoiceId = intent.getLongExtra(AlertNotificationManager.EXTRA_PLAY_VOICE_ID, 0L)
+        val targetAlertId = intent.getLongExtra(AlertNotificationManager.EXTRA_TARGET_ALERT_ID, 0L)
+
+        if (playVoiceId != 0L) {
+            alertNotificationManager.dismissVoiceNotification(playVoiceId)
+        }
+        if (targetAlertId != 0L) {
+            alertNotificationManager.dismissHazardNotification(targetAlertId)
+        }
+
+        if (!targetRoom.isNullOrBlank() && !targetRoom.equals(telegramClient.communityLinkOrTag, ignoreCase = true)) {
+            val history = com.safecomm.app.data.model.RoomHistoryManager.getHistory(this)
+            val item = history.find { it.roomName.equals(targetRoom, ignoreCase = true) }
+            val password = item?.savedPassword ?: ""
+            telegramClient.connectToSector(targetRoom, password)
         }
     }
 
@@ -206,44 +235,106 @@ class MainActivity : ComponentActivity() {
                         // Handled directly via isSectorConnected StateFlow
                     }
                     is TelegramLiveEvent.LiveVoice -> {
-                        when (audioMode) {
-                            AudioMode.SOUND -> {
-                                walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick)
+                        val targetRoom = event.roomName.ifBlank { telegramClient.communityLinkOrTag }
+
+                        if (event.isFromOtherRoom) {
+                            // Unplayed voice message from ANOTHER group:
+                            // 1. Post notification in шторка & Heads-Up over all windows
+                            alertNotificationManager.showUnplayedVoiceNotification(
+                                senderNick = event.senderNick,
+                                roomName = targetRoom,
+                                durationSec = event.durationSec,
+                                filePath = event.fileUrl,
+                                messageId = event.messageId,
+                                isFromOtherRoom = true
+                            )
+                            // 2. Play subtle incoming chirp / vibrate so user knows a message came in
+                            when (audioMode) {
+                                AudioMode.SOUND -> walkieTalkieManager.playIncomingRadioChirp()
+                                AudioMode.VIBRATE -> alertNotificationManager.triggerHapticAlert()
+                                AudioMode.SILENT -> {}
                             }
-                            AudioMode.VIBRATE -> {
-                                alertNotificationManager.triggerHapticAlert()
-                                Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeVibrate(appLanguage) + ")", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // Voice message from CURRENT group:
+                            // 1. Post notification in шторка & Heads-Up over all windows
+                            alertNotificationManager.showUnplayedVoiceNotification(
+                                senderNick = event.senderNick,
+                                roomName = targetRoom,
+                                durationSec = event.durationSec,
+                                filePath = event.fileUrl,
+                                messageId = event.messageId,
+                                isFromOtherRoom = false
+                            )
+
+                            when (audioMode) {
+                                AudioMode.SOUND -> {
+                                    walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick) {
+                                        alertNotificationManager.dismissVoiceNotification(event.messageId)
+                                    }
+                                }
+                                AudioMode.VIBRATE -> {
+                                    alertNotificationManager.triggerHapticAlert()
+                                    Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeVibrate(appLanguage) + ")", Toast.LENGTH_SHORT).show()
+                                }
+                                AudioMode.SILENT -> {
+                                    Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeSilent(appLanguage) + ")", Toast.LENGTH_SHORT).show()
+                                }
                             }
-                            AudioMode.SILENT -> {
-                                Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeSilent(appLanguage) + ")", Toast.LENGTH_SHORT).show()
-                            }
+                            val newVoice = VoiceMessage(
+                                id = event.messageId,
+                                senderNick = event.senderNick,
+                                filePath = event.fileUrl,
+                                durationSec = event.durationSec,
+                                createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                            )
+                            voiceMessages = listOf(newVoice) + voiceMessages.filter { it.id != event.messageId }
                         }
-                        val newVoice = VoiceMessage(
-                            id = event.messageId,
-                            senderNick = event.senderNick,
-                            filePath = event.fileUrl,
-                            durationSec = event.durationSec,
-                            createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-                        )
-                        voiceMessages = listOf(newVoice) + voiceMessages.filter { it.id != event.messageId }
                     }
                     is TelegramLiveEvent.LiveAlert -> {
-                        when (audioMode) {
-                            AudioMode.SOUND -> {
-                                alertNotificationManager.triggerRoomSiren()
-                                alertNotificationManager.triggerHapticAlert()
+                        val targetRoom = event.roomName.ifBlank { telegramClient.communityLinkOrTag }
+
+                        if (event.isFromOtherRoom) {
+                            // Hazard alert from ANOTHER group:
+                            alertNotificationManager.showHazardNotification(
+                                alert = event.alert,
+                                roomName = targetRoom,
+                                isFromOtherRoom = true
+                            )
+                            when (audioMode) {
+                                AudioMode.SOUND -> {
+                                    alertNotificationManager.triggerRoomSiren(event.alert.typedCategory)
+                                    alertNotificationManager.triggerHapticAlert(event.alert.typedCategory)
+                                }
+                                AudioMode.VIBRATE -> {
+                                    alertNotificationManager.triggerHapticAlert(event.alert.typedCategory)
+                                }
+                                AudioMode.SILENT -> {}
                             }
-                            AudioMode.VIBRATE -> {
-                                alertNotificationManager.triggerHapticAlert()
+                        } else {
+                            // Hazard alert from CURRENT group:
+                            alertNotificationManager.showHazardNotification(
+                                alert = event.alert,
+                                roomName = targetRoom,
+                                isFromOtherRoom = false
+                            )
+                            when (audioMode) {
+                                AudioMode.SOUND -> {
+                                    alertNotificationManager.triggerRoomSiren(event.alert.typedCategory)
+                                    alertNotificationManager.triggerHapticAlert(event.alert.typedCategory)
+                                }
+                                AudioMode.VIBRATE -> {
+                                    alertNotificationManager.triggerHapticAlert(event.alert.typedCategory)
+                                }
+                                AudioMode.SILENT -> {
+                                    // Visual alert only
+                                }
                             }
-                            AudioMode.SILENT -> {
-                                // Visual alert only
-                            }
+                            alerts = listOf(event.alert) + alerts.filter { it.id != event.alert.id }
                         }
-                        alerts = listOf(event.alert) + alerts.filter { it.id != event.alert.id }
                     }
                     is TelegramLiveEvent.LiveAlertResolved -> {
                         alerts = alerts.filter { it.id != event.alertId }
+                        alertNotificationManager.dismissHazardNotification(event.alertId)
                     }
                 }
             }

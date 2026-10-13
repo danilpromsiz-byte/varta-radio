@@ -183,6 +183,7 @@ class TelegramClientManager(private val context: Context) {
 
     private var mqttClient: MqttAsyncClient? = null
     private var currentTopicBase: String = ""
+    private val topicBaseToRoom = ConcurrentHashMap<String, String>()
 
     init {
         // One-time forced migration v114: evict from cached rooms to enforce unified smart rooms
@@ -1054,6 +1055,7 @@ class TelegramClientManager(private val context: Context) {
                 disconnectMqtt()
 
                 currentTopicBase = deriveTopicBase(sector, password)
+                topicBaseToRoom[currentTopicBase] = sector
                 Log.d("VartaNetwork", "Connecting to sector topic: $currentTopicBase")
 
                 // Multi-broker failover cluster: EMQX, HiveMQ, and Mosquitto across standard TCP
@@ -1104,7 +1106,7 @@ class TelegramClientManager(private val context: Context) {
                     override fun messageArrived(topic: String?, message: MqttMessage?) {
                         if (topic == null || message == null) return
                         val payload = String(message.payload, Charsets.UTF_8)
-                        handleIncomingPacket(payload)
+                        handleIncomingPacket(topic, payload)
                     }
 
                     override fun deliveryComplete(token: IMqttDeliveryToken?) {}
@@ -1151,17 +1153,33 @@ class TelegramClientManager(private val context: Context) {
     private fun subscribeToSectorTopics() {
         val client = mqttClient ?: return
         try {
-            val topics = arrayOf(
+            topicBaseToRoom[currentTopicBase] = communityLinkOrTag
+
+            val topicsList = mutableListOf(
                 "$currentTopicBase/presence",
                 "$currentTopicBase/voice",
                 "$currentTopicBase/alert",
                 "$currentTopicBase/control",
                 "$currentTopicBase/+"
             )
-            val qos = intArrayOf(1, 1, 1, 1, 1)
+
+            // Multi-group listener: also listen for voice and alert messages from other rooms in history!
+            val historyRooms = RoomHistoryManager.getHistory(context)
+            for (room in historyRooms) {
+                if (!room.roomName.equals(communityLinkOrTag, ignoreCase = true)) {
+                    val otherTopicBase = deriveTopicBase(room.roomName, room.savedPassword)
+                    topicBaseToRoom[otherTopicBase] = room.roomName
+                    topicsList.add("$otherTopicBase/voice")
+                    topicsList.add("$otherTopicBase/alert")
+                }
+            }
+
+            val topics = topicsList.toTypedArray()
+            val qos = IntArray(topics.size) { 1 }
+
             client.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("VartaNetwork", "Subscribed successfully to sector topics")
+                    Log.d("VartaNetwork", "Subscribed successfully to active and multi-room topics (${topics.size})")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -1308,21 +1326,27 @@ class TelegramClientManager(private val context: Context) {
 
     // --- Incoming Packet Processing ---
 
-    private fun handleIncomingPacket(payloadStr: String) {
+    private fun handleIncomingPacket(topic: String, payloadStr: String) {
         try {
             val packet = json.decodeFromString<VartaPacket>(payloadStr)
 
             // Ignore our own echo
             if (packet.senderId == mySenderId) return
 
-            // Always immediately register or refresh member presence & avatar on ANY received packet!
-            membersSeen[packet.senderId] = PeerPresence(
-                packet.senderId,
-                packet.senderNick,
-                packet.avatar.ifBlank { "shield" },
-                System.currentTimeMillis()
-            )
-            pruneInactiveMembers()
+            val topicBase = if (topic.contains('/')) topic.substringBeforeLast('/') else currentTopicBase
+            val roomName = topicBaseToRoom[topicBase] ?: communityLinkOrTag
+            val isFromOtherRoom = !roomName.equals(communityLinkOrTag, ignoreCase = true)
+
+            // Always immediately register or refresh member presence only if it belongs to current active room!
+            if (!isFromOtherRoom) {
+                membersSeen[packet.senderId] = PeerPresence(
+                    packet.senderId,
+                    packet.senderNick,
+                    packet.avatar.ifBlank { "shield" },
+                    System.currentTimeMillis()
+                )
+                pruneInactiveMembers()
+            }
 
             // Deduplication filter for alerts and voice: Drop duplicates within recent window
             val packetKey = "${packet.type}_${packet.senderId}_${packet.timestamp}_${packet.alertId}"
@@ -1417,7 +1441,7 @@ class TelegramClientManager(private val context: Context) {
                     val rxFile = File(context.cacheDir, "rx_voice_${packet.timestamp}.aac")
                     rxFile.writeBytes(audioBytes)
 
-                    Log.d("VartaNetwork", "Received live voice message from ${packet.senderNick}: ${audioBytes.size} bytes")
+                    Log.d("VartaNetwork", "Received live voice message from ${packet.senderNick}: ${audioBytes.size} bytes (room=$roomName)")
 
                     scope.launch {
                         _events.emit(
@@ -1425,7 +1449,9 @@ class TelegramClientManager(private val context: Context) {
                                 senderNick = packet.senderNick,
                                 fileUrl = rxFile.absolutePath,
                                 durationSec = packet.durationSec,
-                                messageId = packet.timestamp
+                                messageId = packet.timestamp,
+                                roomName = roomName,
+                                isFromOtherRoom = isFromOtherRoom
                             )
                         )
                     }
@@ -1465,16 +1491,22 @@ class TelegramClientManager(private val context: Context) {
                         expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
                     )
 
-                    Log.d("VartaNetwork", "Received live alert from ${packet.senderNick}: ${packet.alertType}")
+                    Log.d("VartaNetwork", "Received live alert from ${packet.senderNick}: ${packet.alertType} (room=$roomName)")
 
                     scope.launch {
-                        _events.emit(TelegramLiveEvent.LiveAlert(alert))
+                        _events.emit(
+                            TelegramLiveEvent.LiveAlert(
+                                alert = alert,
+                                roomName = roomName,
+                                isFromOtherRoom = isFromOtherRoom
+                            )
+                        )
                     }
                 }
 
                 "RESOLVE" -> {
                     scope.launch {
-                        _events.emit(TelegramLiveEvent.LiveAlertResolved(packet.alertId))
+                        _events.emit(TelegramLiveEvent.LiveAlertResolved(packet.alertId, roomName = roomName))
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.safecomm.app.ui.screens
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -71,6 +72,9 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val audioPrefs = remember { context.getSharedPreferences("varta_audio_prefs", Context.MODE_PRIVATE) }
+    var isVolumeBoostOn by remember { mutableStateOf(audioPrefs.getBoolean("volume_boost", true)) }
+
     var selectedLang by remember(currentLanguage) { mutableStateOf(currentLanguage) }
     var selectedRadius by remember { mutableDoubleStateOf(currentRadius) }
     var isSoundOn by remember { mutableStateOf(soundEnabled) }
@@ -333,6 +337,45 @@ fun SettingsDialog(
                                     checkedThumbColor = Color(0xFFFF5252),
                                     checkedTrackColor = Color(0xFFFF5252).copy(alpha = 0.4f),
                                     uncheckedThumbColor = TelegramBlue,
+                                    uncheckedTrackColor = TelegramDarkSurface
+                                )
+                            )
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            color = TelegramDivider.copy(alpha = 0.5f)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = I18n.volumeBoostTitle(selectedLang),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TelegramTextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = I18n.volumeBoostDesc(selectedLang),
+                                    fontSize = 11.sp,
+                                    color = TelegramTextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = isVolumeBoostOn,
+                                onCheckedChange = {
+                                    isVolumeBoostOn = it
+                                    audioPrefs.edit().putBoolean("volume_boost", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = AlertFireOrange,
+                                    checkedTrackColor = AlertFireOrange.copy(alpha = 0.4f),
+                                    uncheckedThumbColor = TelegramTextSecondary,
                                     uncheckedTrackColor = TelegramDarkSurface
                                 )
                             )

@@ -293,7 +293,11 @@ fun DangerReportDialog(
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
-                            letterSpacing = 0.5.sp
+                            letterSpacing = 0.5.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp)
                         )
                     }
                 }

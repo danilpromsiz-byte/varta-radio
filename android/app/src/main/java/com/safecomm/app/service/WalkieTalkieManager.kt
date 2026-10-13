@@ -6,6 +6,8 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.ToneGenerator
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -40,14 +42,31 @@ class WalkieTalkieManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var amplitudeJob: Job? = null
 
-    // --- Audio Cues (Start Chirp & Roger Beep) ---
+    // --- Volume Boost / Hardware Gain Amplifier (LoudnessEnhancer) ---
+    private val audioPrefs = context.getSharedPreferences("varta_audio_prefs", Context.MODE_PRIVATE)
+
+    var isVolumeBoostEnabled: Boolean
+        get() = audioPrefs.getBoolean("volume_boost", true)
+        set(value) = audioPrefs.edit().putBoolean("volume_boost", value).apply()
+
+    var volumeBoostGainMb: Int
+        get() = audioPrefs.getInt("volume_boost_gain", 1200) // +12 dB
+        set(value) = audioPrefs.edit().putInt("volume_boost_gain", value).apply()
+
+    private var loudnessEnhancer: LoudnessEnhancer? = null
+
+    // --- Audio Cues (Start Chirp, Incoming Call Signal & Roger Beep) ---
 
     fun playPttStartChirp() {
         scope.launch {
             try {
-                val toneGen = android.media.ToneGenerator(AudioManager.STREAM_MUSIC, 70)
-                toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 70)
-                delay(90)
+                if (isVolumeBoostEnabled) {
+                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, 0)
+                }
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 100)
+                delay(130)
                 toneGen.release()
             } catch (e: Exception) {
                 Log.e("WalkieTalkie", "Start chirp failed", e)
@@ -55,12 +74,34 @@ class WalkieTalkieManager(private val context: Context) {
         }
     }
 
+    fun playIncomingRadioChirp() {
+        scope.launch {
+            try {
+                if (isVolumeBoostEnabled) {
+                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, 0)
+                }
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                // Crisp dual tactical tone (call cue)
+                toneGen.startTone(ToneGenerator.TONE_PROP_PROMPT, 170)
+                delay(200)
+                toneGen.release()
+            } catch (e: Exception) {
+                Log.e("WalkieTalkie", "Incoming chirp failed", e)
+            }
+        }
+    }
+
     fun playRogerBeep() {
         scope.launch {
             try {
-                val toneGen = android.media.ToneGenerator(AudioManager.STREAM_MUSIC, 75)
-                toneGen.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 120)
-                delay(150)
+                if (isVolumeBoostEnabled) {
+                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, 0)
+                }
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                toneGen.startTone(ToneGenerator.TONE_PROP_ACK, 180)
+                delay(210)
                 toneGen.release()
             } catch (e: Exception) {
                 Log.e("WalkieTalkie", "Roger beep failed", e)
@@ -156,10 +197,11 @@ class WalkieTalkieManager(private val context: Context) {
 
     // --- Instant Walkie-Talkie Playback ---
 
-    fun playLiveVoiceMessage(audioUrl: String, senderNick: String) {
+    fun playLiveVoiceMessage(audioUrl: String, senderNick: String, onFinished: () -> Unit = {}) {
         scope.launch {
-            playPttStartChirp()
-            delay(100)
+            // 1. Play loud tactical incoming radio cue
+            playIncomingRadioChirp()
+            delay(240) // Wait for incoming cue to play cleanly before speech
 
             withContext(Dispatchers.Main) {
                 stopPlayback()
@@ -167,7 +209,18 @@ class WalkieTalkieManager(private val context: Context) {
                 try {
                     // Set audio routing to speakerphone for loud walkie-talkie output
                     audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                    @Suppress("DEPRECATION")
                     audioManager.isSpeakerphoneOn = true
+
+                    // Force maximum volume on device if Volume Boost is enabled
+                    if (isVolumeBoostEnabled) {
+                        try {
+                            val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                            val maxVoice = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                            audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoice, 0)
+                        } catch (_: Exception) {}
+                    }
 
                     _currentSpeaker.value = senderNick
                     _isPlaying.value = true
@@ -176,26 +229,45 @@ class WalkieTalkieManager(private val context: Context) {
                         setAudioAttributes(
                             AudioAttributes.Builder()
                                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
                                 .build()
                         )
                         setDataSource(context, Uri.parse(audioUrl))
                         setOnCompletionListener {
-                            playRogerBeep()
-                            stopPlayback()
+                            scope.launch {
+                                playRogerBeep()
+                                delay(250) // Wait for roger beep to finish before resetting audio session
+                                withContext(Dispatchers.Main) {
+                                    stopPlayback()
+                                    onFinished()
+                                }
+                            }
                         }
                         setOnErrorListener { _, _, _ ->
                             stopPlayback()
+                            onFinished()
                             true
                         }
                         prepareAsync()
                         setOnPreparedListener {
+                            if (isVolumeBoostEnabled) {
+                                try {
+                                    loudnessEnhancer?.release()
+                                    loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply {
+                                        setTargetGain(volumeBoostGainMb)
+                                        enabled = true
+                                    }
+                                } catch (e: Exception) {
+                                    Log.w("WalkieTalkie", "LoudnessEnhancer error", e)
+                                }
+                            }
                             start()
                         }
                     }
                 } catch (e: Exception) {
                     Log.e("WalkieTalkie", "Failed to play live voice", e)
                     stopPlayback()
+                    onFinished()
                 }
             }
         }
@@ -205,6 +277,13 @@ class WalkieTalkieManager(private val context: Context) {
         stopPlayback()
         try {
             _isPlaying.value = true
+            if (isVolumeBoostEnabled) {
+                try {
+                    val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                } catch (_: Exception) {}
+            }
+
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -214,9 +293,14 @@ class WalkieTalkieManager(private val context: Context) {
                 )
                 setDataSource(context, Uri.parse(urlOrPath))
                 setOnCompletionListener {
-                    playRogerBeep()
-                    stopPlayback()
-                    onComplete()
+                    scope.launch {
+                        playRogerBeep()
+                        delay(250)
+                        withContext(Dispatchers.Main) {
+                            stopPlayback()
+                            onComplete()
+                        }
+                    }
                 }
                 setOnErrorListener { _, _, _ ->
                     stopPlayback()
@@ -224,7 +308,20 @@ class WalkieTalkieManager(private val context: Context) {
                     true
                 }
                 prepareAsync()
-                setOnPreparedListener { start() }
+                setOnPreparedListener {
+                    if (isVolumeBoostEnabled) {
+                        try {
+                            loudnessEnhancer?.release()
+                            loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply {
+                                setTargetGain(volumeBoostGainMb)
+                                enabled = true
+                            }
+                        } catch (e: Exception) {
+                            Log.w("WalkieTalkie", "LoudnessEnhancer error", e)
+                        }
+                    }
+                    start()
+                }
             }
         } catch (e: Exception) {
             Log.e("WalkieTalkie", "Error playing audio file", e)
@@ -235,6 +332,14 @@ class WalkieTalkieManager(private val context: Context) {
 
     fun stopPlayback() {
         try {
+            loudnessEnhancer?.apply {
+                enabled = false
+                release()
+            }
+        } catch (_: Exception) {}
+        loudnessEnhancer = null
+
+        try {
             mediaPlayer?.apply {
                 if (isPlaying) stop()
                 release()
@@ -243,6 +348,7 @@ class WalkieTalkieManager(private val context: Context) {
         mediaPlayer = null
         _isPlaying.value = false
         _currentSpeaker.value = null
+        @Suppress("DEPRECATION")
         audioManager.isSpeakerphoneOn = false
         audioManager.mode = AudioManager.MODE_NORMAL
     }

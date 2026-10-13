@@ -243,6 +243,23 @@ object I18n {
     fun audioModeSilent(lang: AppLanguage) = t(lang, "Без звука", "Без звуку", "Silent")
     fun audioModeSilent(c: Context) = audioModeSilent(LanguageManager.getLanguage(c))
 
+    fun volumeBoostTitle(lang: AppLanguage) = t(lang, "🔊 Принудительное усиление звука (+12 dB)", "🔊 Примусове підсилення звуку (+12 dB)", "🔊 Forced Volume Boost (+12 dB)")
+    fun volumeBoostTitle(c: Context) = volumeBoostTitle(LanguageManager.getLanguage(c))
+    fun volumeBoostDesc(lang: AppLanguage) = t(
+        lang,
+        "Аппаратный турбо-буст динамика рации сверх лимита громкости телефона (Loudness Enhancer)",
+        "Апаратний турбо-буст динаміка рації понад ліміт гучності телефону (Loudness Enhancer)",
+        "Hardware turbo-boost for walkie-talkie speakerphone beyond system limit (Loudness Enhancer)"
+    )
+    fun volumeBoostDesc(c: Context) = volumeBoostDesc(LanguageManager.getLanguage(c))
+
+    fun hazardNotificationChannel(lang: AppLanguage) = t(lang, "Varta GO: Экстренные метки", "Varta GO: Екстрені мітки", "Varta GO: Hazard Alerts")
+    fun hazardNotificationChannel(c: Context) = hazardNotificationChannel(LanguageManager.getLanguage(c))
+    fun voiceNotificationChannel(lang: AppLanguage) = t(lang, "Varta GO: Рация и сообщения", "Varta GO: Рація та повідомлення", "Varta GO: Radio & Voice")
+    fun voiceNotificationChannel(c: Context) = voiceNotificationChannel(LanguageManager.getLanguage(c))
+    fun playVoiceAction(lang: AppLanguage) = t(lang, "▶ Прослушать", "▶ Прослухати", "▶ Listen")
+    fun playVoiceAction(c: Context) = playVoiceAction(LanguageManager.getLanguage(c))
+
     // Alert Expiry & Threat Clear
     fun alertDurationTitle(lang: AppLanguage) = t(lang, "Срок действия метки:", "Термін дії мітки:", "Alert Duration:")
     fun alertDurationTitle(c: Context) = alertDurationTitle(LanguageManager.getLanguage(c))

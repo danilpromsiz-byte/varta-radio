@@ -46,15 +46,20 @@ sealed class TelegramLiveEvent {
         val senderNick: String,
         val fileUrl: String,
         val durationSec: Int,
-        val messageId: Long
+        val messageId: Long,
+        val roomName: String = "",
+        val isFromOtherRoom: Boolean = false
     ) : TelegramLiveEvent()
 
     data class LiveAlert(
-        val alert: Alert
+        val alert: Alert,
+        val roomName: String = "",
+        val isFromOtherRoom: Boolean = false
     ) : TelegramLiveEvent()
 
     data class LiveAlertResolved(
-        val alertId: Long
+        val alertId: Long,
+        val roomName: String = ""
     ) : TelegramLiveEvent()
 
     data class ConnectionState(

@@ -1,6 +1,11 @@
 package com.safecomm.app.service
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
@@ -9,12 +14,64 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.safecomm.app.MainActivity
 import com.safecomm.app.data.model.Alert
 import com.safecomm.app.data.model.AlertType
+import com.safecomm.app.ui.i18n.I18n
+import com.safecomm.app.ui.i18n.LanguageManager
 import com.safecomm.app.util.GeoUtils
 import kotlinx.coroutines.*
 
 class AlertNotificationManager(private val context: Context) {
+
+    private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+
+    companion object {
+        const val CHANNEL_HAZARD_ID = "varta_hazard_alerts_v2"
+        const val CHANNEL_VOICE_ID = "varta_unplayed_voice_v2"
+
+        const val EXTRA_TARGET_ROOM = "EXTRA_TARGET_ROOM"
+        const val EXTRA_PLAY_VOICE_ID = "EXTRA_PLAY_VOICE_ID"
+        const val EXTRA_TARGET_ALERT_ID = "EXTRA_TARGET_ALERT_ID"
+    }
+
+    init {
+        createNotificationChannels()
+    }
+
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
+            val lang = LanguageManager.getLanguage(context)
+
+            val hazardChannel = NotificationChannel(
+                CHANNEL_HAZARD_ID,
+                I18n.hazardNotificationChannel(lang),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Экстренные метки об опасностях поверх всех окон"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 800)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+            }
+
+            val voiceChannel = NotificationChannel(
+                CHANNEL_VOICE_ID,
+                I18n.voiceNotificationChannel(lang),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Непрослушанные голосовые сообщения рации поверх всех окон"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 150, 100, 150)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+            }
+
+            notificationManager.createNotificationChannel(hazardChannel)
+            notificationManager.createNotificationChannel(voiceChannel)
+        }
+    }
 
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -121,5 +178,112 @@ class AlertNotificationManager(private val context: Context) {
                 Log.e("AlertNotify", "Tone alert failed", e)
             }
         }
+    }
+
+    // --- System Notifications (Heads-Up & Notification Drawer) ---
+
+    fun showHazardNotification(alert: Alert, roomName: String, isFromOtherRoom: Boolean = false) {
+        if (notificationManager == null) return
+        val lang = LanguageManager.getLanguage(context)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TARGET_ROOM, roomName)
+            putExtra(EXTRA_TARGET_ALERT_ID, alert.id)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            (alert.id % 100000).toInt(),
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val typeName = I18n.alertTypeName(lang, alert.alertType)
+        val title = if (isFromOtherRoom) {
+            "🚨 $typeName • Комната «$roomName»"
+        } else {
+            "🚨 $typeName"
+        }
+
+        val desc = if (alert.description.isNotBlank()) alert.description else "Метка опасности"
+        val body = "$desc • Сообщил: ${alert.senderNick} (${alert.createdAt})"
+
+        val notif = NotificationCompat.Builder(context, CHANNEL_HAZARD_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$body\nКомната: $roomName"))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .build()
+
+        val notifId = (alert.id % 100000).toInt() + 10000
+        notificationManager.notify(notifId, notif)
+    }
+
+    fun showUnplayedVoiceNotification(
+        senderNick: String,
+        roomName: String,
+        durationSec: Int,
+        filePath: String,
+        messageId: Long,
+        isFromOtherRoom: Boolean = false
+    ) {
+        if (notificationManager == null) return
+        val lang = LanguageManager.getLanguage(context)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_TARGET_ROOM, roomName)
+            putExtra(EXTRA_PLAY_VOICE_ID, messageId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            (messageId % 100000).toInt(),
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val title = if (isFromOtherRoom) {
+            "🎙 Рация: $senderNick (Комната «$roomName»)"
+        } else {
+            "🎙 Рация: $senderNick"
+        }
+        val body = "Длительность: ${durationSec}с • Нажмите для прослушивания"
+
+        val notif = NotificationCompat.Builder(context, CHANNEL_VOICE_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_speakerphone)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$body\nКомната: $roomName"))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .addAction(
+                android.R.drawable.ic_media_play,
+                I18n.playVoiceAction(lang),
+                pendingIntent
+            )
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .build()
+
+        val notifId = (messageId % 100000).toInt() + 20000
+        notificationManager.notify(notifId, notif)
+    }
+
+    fun dismissVoiceNotification(messageId: Long) {
+        val notifId = (messageId % 100000).toInt() + 20000
+        notificationManager?.cancel(notifId)
+    }
+
+    fun dismissHazardNotification(alertId: Long) {
+        val notifId = (alertId % 100000).toInt() + 10000
+        notificationManager?.cancel(notifId)
     }
 }
