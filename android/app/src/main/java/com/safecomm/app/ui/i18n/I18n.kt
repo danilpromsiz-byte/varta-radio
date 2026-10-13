@@ -592,10 +592,58 @@ object I18n {
         "fire" -> t(lang, "Пожар", "Пожежа", "Fire")
         "medical" -> t(lang, "Медпомощь", "Меддопомога", "Medical")
         "police" -> t(lang, "Полиция", "Поліція", "Police")
-        "military" -> t(lang, "Военные", "Військові", "Military")
+        "military" -> t(lang, "Опасная зона", "Небезпечна зона", "Hazard Zone")
         else -> t(lang, "Другое", "Інше", "Other")
     }
     fun alertTypeName(c: Context, rawValue: String): String = alertTypeName(LanguageManager.getLanguage(c), rawValue)
+
+    // --- Privacy Policy & UGC Guidelines ---
+    fun privacyPolicyBtn(lang: AppLanguage) = t(lang, "🔒 Политика конфиденциальности и правила", "🔒 Політика конфіденційності та правила", "🔒 Privacy Policy & Community Rules")
+    fun privacyPolicyBtn(c: Context) = privacyPolicyBtn(LanguageManager.getLanguage(c))
+    fun privacyPolicyTitle(lang: AppLanguage) = t(lang, "🛡️ Политика конфиденциальности и правила сообщества", "🛡️ Політика конфіденційності та правила спільноти", "🛡️ Privacy Policy & Community Guidelines")
+    fun privacyPolicyTitle(c: Context) = privacyPolicyTitle(LanguageManager.getLanguage(c))
+    fun privacyPolicyContent(lang: AppLanguage) = t(
+        lang,
+        """1. Назначение приложения
+Varta GO — это гражданский инструмент рации (Push-to-Talk) и взаимного оповещения общины о чрезвычайных ситуациях, стихийных бедствиях, пожарах, ДТП и необходимости медицинской помощи.
+
+2. Используемые разрешения
+• Микрофон (RECORD_AUDIO): используется исключительно во время удерживания кнопки рации (PTT) для передачи голосового сообщения в активную комнату.
+• Геолокация (LOCATION): используется для отображения карты вокруг вас и расчёта расстояния до меток опасности в вашей комнате. Координаты не передаются третьим лицам и рекламным сетям.
+• Камера (CAMERA): используется только по вашему запросу для фотофиксации чрезвычайного происшествия.
+• Фоновая служба (FOREGROUND_SERVICE): обеспечивает непрерывный приём экстренных голосовых сообщений рации при выключенном экране.
+
+3. Правила сообщества (UGC Policy)
+• Строго запрещено публиковать спам, оскорбления, заведомо ложные вызовы, незаконный контент или материалы, нарушающие действующее законодательство.
+• Создатели и администраторы комнат имеют полномочия мгновенно исключать (Kick) и блокировать (Ban) нарушителей.
+• Все сообщения и метки автоматически очищаются по истечении срока актуальности.""",
+        """1. Призначення застосунку
+Varta GO — це цивільний інструмент рації (Push-to-Talk) та взаємного оповіщення громади про надзвичайні ситуації, стихійні лиха, пожежі, ДТП та потребу в медичній допомозі.
+
+2. Дозволи, що використовуються
+• Мікрофон (RECORD_AUDIO): використовується виключно під час утримування кнопки рації (PTT) для передачі голосового повідомлення в активну кімнату.
+• Геолокація (LOCATION): використовується для відображення карти навколо вас та розрахунку відстані до міток небезпеки. Координати не передаються третім особам чи рекламним мережам.
+• Камера (CAMERA): використовується лише за вашим запитом для фотофіксації надзвичайної події.
+• Фонова служба (FOREGROUND_SERVICE): забезпечує безперервний прийом екстрених голосових повідомлень рації при вимкненому екрані.
+
+3. Правила спільноти (UGC Policy)
+• Суворо заборонено публікувати спам, образи, завідомо неправдиві виклики, незаконний контент або матеріали, що порушують чинне законодавство.
+• Творці та адміністратори кімнат мають повноваження миттєво виключати (Kick) та блокувати (Ban) порушників.
+• Усі повідомлення та мітки автоматично очищуються після закінчення терміну актуальності.""",
+        """1. Purpose of the Application
+Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety alert tool designed for mutual assistance during emergencies, fires, road accidents, and medical incidents.
+
+2. Permissions Used
+• Microphone (RECORD_AUDIO): Used strictly while pressing and holding the PTT button to transmit voice audio to your active room.
+• Location (LOCATION): Used to display the map and calculate distance to community hazard markers. Location data is never sold or shared with third-party advertisers.
+• Camera (CAMERA): Used only when explicitly triggered by you to attach a photo to a hazard report.
+• Foreground Service (FOREGROUND_SERVICE): Maintains real-time walkie-talkie audio reception when the screen is turned off.
+
+3. Community Guidelines (UGC Policy)
+• Spam, harassment, false emergency reports, illegal content, or any material violating local laws is strictly prohibited.
+• Room owners and administrators have built-in moderation tools to immediately Kick or Ban abusive users.
+• Ephemeral alerts and voice transmissions are automatically purged upon expiration."""
+    )
 
     // --- Settings Dialog ---
     fun settingsTitle(lang: AppLanguage) = t(lang, "Настройки комнаты", "Налаштування кімнати", "Room Settings")

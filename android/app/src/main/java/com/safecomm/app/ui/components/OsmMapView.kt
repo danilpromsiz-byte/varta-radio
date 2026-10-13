@@ -402,14 +402,18 @@ private fun createCleanMarkerDrawable(context: Context, emoji: String, clusterCo
     val bitmap = createBitmap(size, size)
     val canvas = Canvas(bitmap)
 
-    // Emoji icon directly with subtle shadow
-    val textPaint = Paint().apply {
-        isAntiAlias = true
-        textSize = 52f
-        textAlign = Paint.Align.CENTER
-        setShadowLayer(8f, 0f, 4f, AndroidColor.argb(200, 0, 0, 0))
+    // Render custom spotted camouflage turtle for Hazard Zone ("🐢"), or emoji for other types
+    if (emoji == "🐢") {
+        drawCamoTurtleOnAndroidCanvas(canvas, size / 2f, size / 2f, 76f)
+    } else {
+        val textPaint = Paint().apply {
+            isAntiAlias = true
+            textSize = 52f
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(8f, 0f, 4f, AndroidColor.argb(200, 0, 0, 0))
+        }
+        canvas.drawText(emoji, size / 2f, size / 2f + 18, textPaint)
     }
-    canvas.drawText(emoji, size / 2f, size / 2f + 18, textPaint)
 
     // If cluster count > 1, draw crisp count badge in top-right corner
     if (clusterCount > 1) {

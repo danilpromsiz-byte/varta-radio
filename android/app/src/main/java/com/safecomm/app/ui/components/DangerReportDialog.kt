@@ -154,7 +154,7 @@ fun DangerReportDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = topCategory.icon, fontSize = 34.sp)
+                            AlertCategoryIcon(type = topCategory, fontSize = 34.sp)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
@@ -224,7 +224,7 @@ fun DangerReportDialog(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        Text(text = cat.icon, fontSize = 22.sp)
+                                        AlertCategoryIcon(type = cat, fontSize = 22.sp)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, cat.rawValue),

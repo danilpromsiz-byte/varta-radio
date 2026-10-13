@@ -18,7 +18,7 @@ enum class AlertType(val rawValue: String, val label: String, val icon: String, 
     POLICE("police", "Полиция", "🚔", "#2196F3"),
 
     @SerialName("military")
-    MILITARY("military", "Военная", "🪖", "#FFC107"),
+    MILITARY("military", "Опасная зона", "🐢", "#FFC107"),
 
     @SerialName("other")
     OTHER("other", "Другое", "❓", "#9E9E9E");

@@ -90,7 +90,7 @@ fun ActiveAlertsBanner(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Text(text = alert.typedCategory.icon, fontSize = 20.sp)
+                                AlertCategoryIcon(type = alert.typedCategory, fontSize = 20.sp)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = alert.senderNick.ifBlank { "Аноним" },

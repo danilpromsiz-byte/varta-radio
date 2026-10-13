@@ -223,16 +223,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Auto-check GitHub updates on launch and periodically every 10 minutes when NOT in a room
-        LaunchedEffect(authState) {
-            if (authState !is TelegramAuthState.Ready) {
-                while (true) {
-                    appUpdateManager.checkForUpdates(force = false)
-                    kotlinx.coroutines.delay(10 * 60 * 1000L)
-                }
-            }
-        }
-
         // Handle incoming live events from Telegram cloud
         LaunchedEffect(Unit) {
             telegramClient.events.collect { event ->
@@ -362,30 +352,12 @@ class MainActivity : ComponentActivity() {
                         appLanguage = lang
                     },
                     appVersion = BuildConfig.VERSION_NAME,
-                    isUpdateAvailable = updateStatus is UpdateStatus.UpdateAvailable,
+                    isUpdateAvailable = false,
                     onCheckUpdate = {
-                        coroutineScope.launch {
-                            Toast.makeText(this@MainActivity, I18n.checkingUpdatesStatus(this@MainActivity), Toast.LENGTH_SHORT).show()
-                            appUpdateManager.checkForUpdates(force = true)
-                                .onSuccess { available ->
-                                    if (!available) {
-                                        Toast.makeText(this@MainActivity, I18n.upToDateStatus(this@MainActivity, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(this@MainActivity, I18n.updateAvailableToast(this@MainActivity), Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                                .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, err.message ?: "Update check error", Toast.LENGTH_LONG).show()
-                                }
-                        }
+                        appUpdateManager.openGooglePlay(this@MainActivity)
                     },
                     onInstallUpdate = {
-                        (updateStatus as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
-                            coroutineScope.launch {
-                                Toast.makeText(this@MainActivity, I18n.downloadingApk(this@MainActivity), Toast.LENGTH_SHORT).show()
-                                appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
-                            }
-                        }
+                        appUpdateManager.openGooglePlay(this@MainActivity)
                     },
                     isSuperAdmin = telegramClient.isSuperAdmin(),
                     onUnlockSuperAdmin = { key ->
@@ -492,55 +464,20 @@ class MainActivity : ComponentActivity() {
                         is UpdateStatus.Checking -> I18n.checkingUpdatesStatus(this@MainActivity)
                         is UpdateStatus.UpdateAvailable -> I18n.updateAvailableStatus(this@MainActivity, s.newVersion)
                         is UpdateStatus.UpToDate -> I18n.upToDateStatus(this@MainActivity, BuildConfig.VERSION_NAME)
-                        is UpdateStatus.Downloading -> I18n.downloadingUpdateStatus(this@MainActivity, s.progressPercent)
-                        is UpdateStatus.ReadyToInstall -> I18n.readyToInstallStatus(this@MainActivity)
                         is UpdateStatus.Error -> "⚠️ ${s.message}"
                         is UpdateStatus.Idle -> ""
                     },
                     isUpdateAvailable = updateStatus is UpdateStatus.UpdateAvailable,
-                    isDownloadingUpdate = updateStatus is UpdateStatus.Downloading,
-                    downloadProgress = (updateStatus as? UpdateStatus.Downloading)?.progressPercent ?: 0,
-                    onCheckUpdate = { repo ->
-                        appUpdateManager.githubRepo = repo
-                        coroutineScope.launch {
-                            appUpdateManager.checkForUpdates()
-                                .onSuccess { available ->
-                                    if (!available) {
-                                        Toast.makeText(this@MainActivity, I18n.upToDateStatus(this@MainActivity, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(this@MainActivity, I18n.updateAvailableToast(this@MainActivity), Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                                .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, err.message ?: "Update check error", Toast.LENGTH_LONG).show()
-                                }
-                        }
+                    isDownloadingUpdate = false,
+                    downloadProgress = 0,
+                    onCheckUpdate = { _ ->
+                        appUpdateManager.openGooglePlay(this@MainActivity)
                     },
-                    onForceUpdate = { repo ->
-                        appUpdateManager.githubRepo = repo
-                        coroutineScope.launch {
-                            Toast.makeText(this@MainActivity, I18n.checkingUpdatesStatus(this@MainActivity), Toast.LENGTH_SHORT).show()
-                            appUpdateManager.checkForUpdates(force = true)
-                                .onSuccess { available ->
-                                    if (available) {
-                                        (appUpdateManager.updateStatus.value as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
-                                            Toast.makeText(this@MainActivity, I18n.downloadingApk(this@MainActivity), Toast.LENGTH_SHORT).show()
-                                            appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
-                                        }
-                                    }
-                                }
-                                .onFailure { err ->
-                                    Toast.makeText(this@MainActivity, err.message ?: "Update error", Toast.LENGTH_LONG).show()
-                                }
-                        }
+                    onForceUpdate = { _ ->
+                        appUpdateManager.openGooglePlay(this@MainActivity)
                     },
                     onInstallUpdate = {
-                        (updateStatus as? UpdateStatus.UpdateAvailable)?.let { updateInfo ->
-                            coroutineScope.launch {
-                                Toast.makeText(this@MainActivity, I18n.downloadingApk(this@MainActivity), Toast.LENGTH_SHORT).show()
-                                appUpdateManager.downloadAndInstallApk(updateInfo.downloadUrl)
-                            }
-                        }
+                        appUpdateManager.openGooglePlay(this@MainActivity)
                     },
                     onStartPtt = {
                         val ok = walkieTalkieManager.startRecording()
@@ -768,8 +705,7 @@ class MainActivity : ComponentActivity() {
         when (val s = updateStatus) {
             is UpdateStatus.UpdateAvailable -> {
                 AlertDialog(
-                    onDismissRequest = { /* Mandatory update cannot be dismissed */ },
-                    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+                    onDismissRequest = { appUpdateManager.resetStatus() },
                     title = {
                         Text(
                             text = I18n.updateModalTitle(this@MainActivity, s.newVersion),
@@ -804,91 +740,18 @@ class MainActivity : ComponentActivity() {
                     confirmButton = {
                         Button(
                             onClick = {
-                                coroutineScope.launch {
-                                    appUpdateManager.downloadAndInstallApk(s.downloadUrl)
-                                }
+                                appUpdateManager.resetStatus()
+                                appUpdateManager.openGooglePlay(this@MainActivity)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange)
                         ) {
-                            Text(I18n.installUpdateBtn(this@MainActivity), fontWeight = FontWeight.Bold)
+                            Text("Google Play", fontWeight = FontWeight.Bold)
                         }
                     },
-                    containerColor = TelegramDarkSurface
-                )
-            }
-            is UpdateStatus.Downloading -> {
-                AlertDialog(
-                    onDismissRequest = { /* Don't dismiss while downloading */ },
-                    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
-                    title = {
-                        Text(
-                            text = I18n.downloadingUpdateTitle(this@MainActivity),
-                            color = TelegramTextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    text = {
-                        Column {
-                            Text(
-                                text = I18n.downloadProgressText(this@MainActivity, s.progressPercent),
-                                color = TelegramTextPrimary,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            LinearProgressIndicator(
-                                progress = { (s.progressPercent / 100f).coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth().height(8.dp),
-                                color = AlertFireOrange,
-                                trackColor = TelegramDarkBg
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = I18n.downloadWaitText(this@MainActivity),
-                                color = TelegramTextSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-                    },
-                    confirmButton = {},
-                    containerColor = TelegramDarkSurface
-                )
-            }
-            is UpdateStatus.ReadyToInstall -> {
-                AlertDialog(
-                    onDismissRequest = { /* Mandatory update */ },
-                    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
-                    title = {
-                        Text(
-                            text = I18n.updateDownloadedTitle(this@MainActivity),
-                            color = TelegramTextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    text = {
-                        Column {
-                            Text(
-                                text = I18n.updateDownloadedDesc(this@MainActivity),
-                                color = TelegramTextPrimary,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = I18n.installNowPrompt(this@MainActivity),
-                                color = TelegramTextSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                appUpdateManager.triggerApkInstall(s.apkFile)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = AlertMedicalGreen)
-                        ) {
-                            Text(I18n.installNowBtn(this@MainActivity), fontWeight = FontWeight.Bold)
+                    dismissButton = {
+                        TextButton(onClick = { appUpdateManager.resetStatus() }) {
+                            Text(I18n.cancel(this@MainActivity), color = TelegramTextSecondary)
                         }
                     },
                     containerColor = TelegramDarkSurface

@@ -373,7 +373,7 @@ fun PhotoReportDialog(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = cat.icon, fontSize = 20.sp)
+                            AlertCategoryIcon(type = cat, fontSize = 20.sp)
                         }
                     }
                 }

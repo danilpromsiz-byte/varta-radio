@@ -92,6 +92,7 @@ fun SettingsDialog(
 
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
+    var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
 
     var easterEggTaps by remember { mutableIntStateOf(0) }
     var lastEasterEggTime by remember { mutableLongStateOf(0L) }
@@ -223,13 +224,13 @@ fun SettingsDialog(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(TelegramBlue.copy(alpha = 0.15f))
+                                    .background(Color(0xFF00C853).copy(alpha = 0.15f))
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "GitHub Releases",
+                                    text = "Google Play",
                                     fontSize = 10.sp,
-                                    color = TelegramBlue,
+                                    color = Color(0xFF00E676),
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -244,53 +245,31 @@ fun SettingsDialog(
                             )
                         }
 
-                        if (isDownloadingUpdate) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { (downloadProgress / 100f).coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth().height(6.dp),
-                                color = AlertFireOrange,
-                                trackColor = TelegramDarkBg
-                            )
-                            Text(
-                                text = I18n.downloadingUpdateStatus(selectedLang, downloadProgress),
-                                fontSize = 11.sp,
-                                color = TelegramTextSecondary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Button(
+                            onClick = { onCheckUpdate(githubRepo) },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Button(
-                                onClick = { onCheckUpdate(githubRepo) },
-                                modifier = Modifier.weight(1f).height(42.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(I18n.checkForUpdatesBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            if (isUpdateAvailable) {
-                                Button(
-                                    onClick = onInstallUpdate,
-                                    modifier = Modifier.weight(1f).height(42.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(I18n.installUpdateBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Google Play Store", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Privacy Policy & Community Rules
+                OutlinedButton(
+                    onClick = { showPrivacyPolicyDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TelegramTextPrimary)
+                ) {
+                    Text(I18n.privacyPolicyBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -755,6 +734,46 @@ fun SettingsDialog(
             dismissButton = {
                 TextButton(onClick = closeWipeModal) {
                     Text(I18n.cancel(selectedLang), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
+    }
+
+    // Modal: Privacy Policy & Community Rules
+    if (showPrivacyPolicyDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrivacyPolicyDialog = false },
+            title = {
+                Text(
+                    text = I18n.privacyPolicyTitle(selectedLang),
+                    fontWeight = FontWeight.Bold,
+                    color = TelegramTextPrimary,
+                    fontSize = 15.sp
+                )
+            },
+            text = {
+                val scroll = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(scroll)
+                ) {
+                    Text(
+                        text = I18n.privacyPolicyContent(selectedLang),
+                        color = TelegramTextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showPrivacyPolicyDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
+                ) {
+                    Text(I18n.close(selectedLang), fontWeight = FontWeight.Bold)
                 }
             },
             containerColor = TelegramDarkSurface

@@ -112,6 +112,7 @@ fun AuthCommunityScreen(
     var superAdminKeyInput by remember { mutableStateOf("") }
     var isSuperAdminActive by remember { mutableStateOf(isSuperAdmin) }
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
+    var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
 
     var easterEggClicks by remember { mutableIntStateOf(0) }
     var lastEasterEggClickTime by remember { mutableLongStateOf(0L) }
@@ -1138,7 +1139,60 @@ fun AuthCommunityScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TextButton(
+            onClick = { showPrivacyPolicyDialog = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = I18n.privacyPolicyBtn(currentLanguage),
+                fontSize = 11.sp,
+                color = TelegramTextSecondary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showPrivacyPolicyDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrivacyPolicyDialog = false },
+            title = {
+                Text(
+                    text = I18n.privacyPolicyTitle(currentLanguage),
+                    fontWeight = FontWeight.Bold,
+                    color = TelegramTextPrimary,
+                    fontSize = 15.sp
+                )
+            },
+            text = {
+                val scroll = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(scroll)
+                ) {
+                    Text(
+                        text = I18n.privacyPolicyContent(currentLanguage),
+                        color = TelegramTextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showPrivacyPolicyDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue)
+                ) {
+                    Text(I18n.close(currentLanguage), fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
     }
 
     if (showAvatarPicker) {

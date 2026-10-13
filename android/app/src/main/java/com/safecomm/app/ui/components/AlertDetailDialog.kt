@@ -56,7 +56,7 @@ fun AlertDetailDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = alert.typedCategory.icon, fontSize = 28.sp)
+                        AlertCategoryIcon(type = alert.typedCategory, fontSize = 28.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, alert.typedCategory.rawValue),
