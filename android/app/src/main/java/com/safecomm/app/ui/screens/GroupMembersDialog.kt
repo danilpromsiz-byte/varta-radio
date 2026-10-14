@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.safecomm.app.data.model.Group
 import com.safecomm.app.data.model.GroupMember
+import com.safecomm.app.data.model.UserStatus
 import com.safecomm.app.ui.i18n.AppLanguage
 import com.safecomm.app.ui.i18n.I18n
 import com.safecomm.app.ui.theme.*
@@ -39,6 +41,8 @@ fun GroupMembersDialog(
     isChiefAdmin: Boolean,
     isAdmin: Boolean,
     currentLanguage: AppLanguage = AppLanguage.EN,
+    currentCallSign: String = "",
+    onUpdateCallSign: (String) -> Unit = {},
     onDelegateAdmin: (GroupMember, Boolean) -> Unit,
     onKickMember: (GroupMember) -> Unit,
     onBanMember: (GroupMember, Long) -> Unit,
@@ -46,6 +50,8 @@ fun GroupMembersDialog(
 ) {
     val context = LocalContext.current
     var selectedMemberForModeration by remember { mutableStateOf<GroupMember?>(null) }
+    var showEditCallSignDialog by remember { mutableStateOf(false) }
+    var callSignInput by remember { mutableStateOf(currentCallSign) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -151,12 +157,20 @@ fun GroupMembersDialog(
                                 Spacer(modifier = Modifier.width(10.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = member.nickname.ifBlank { "User #${member.userId}" },
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = TelegramTextPrimary
-                                    )
+                                    val userStatus = UserStatus.fromCode(member.status)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = member.nickname.ifBlank { "User #${member.userId}" },
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = TelegramTextPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = userStatus.icon,
+                                            fontSize = 13.sp
+                                        )
+                                    }
 
                                     val roleText = when (member.role) {
                                         "owner" -> I18n.ownerBadge(currentLanguage)
@@ -168,13 +182,44 @@ fun GroupMembersDialog(
                                         "admin" -> TelegramBlue
                                         else -> TelegramTextSecondary
                                     }
+                                    val statusLabel = when (userStatus) {
+                                        UserStatus.TALK -> I18n.userStatusTalk(currentLanguage)
+                                        UserStatus.LISTEN -> I18n.userStatusListen(currentLanguage)
+                                        UserStatus.AFK -> I18n.userStatusAfk(currentLanguage)
+                                    }
 
-                                    Text(
-                                        text = roleText,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = roleColor
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = roleText,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = roleColor
+                                        )
+                                        Text(
+                                            text = " • $statusLabel",
+                                            fontSize = 11.sp,
+                                            color = TelegramTextSecondary
+                                        )
+                                    }
+                                }
+
+                                if (isSelf) {
+                                    IconButton(
+                                        onClick = {
+                                            callSignInput = currentCallSign.ifBlank {
+                                                member.nickname.replace("(Вы)", "").replace("(Ви)", "").replace("(You)", "").trim()
+                                            }
+                                            showEditCallSignDialog = true
+                                        },
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = I18n.editCallsignTitle(currentLanguage),
+                                            tint = TelegramBlue,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
 
                                 if (canModerateThis) {
@@ -315,6 +360,78 @@ fun GroupMembersDialog(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { selectedMemberForModeration = null }) {
+                    Text(I18n.cancel(currentLanguage), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkSurface
+        )
+    }
+
+    // Modal dialog to change callsign
+    if (showEditCallSignDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditCallSignDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✏️", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = I18n.editCallsignTitle(currentLanguage),
+                        fontWeight = FontWeight.Bold,
+                        color = TelegramTextPrimary,
+                        fontSize = 16.sp
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = I18n.editCallsignPrompt(currentLanguage),
+                        fontSize = 13.sp,
+                        color = TelegramTextSecondary
+                    )
+                    OutlinedTextField(
+                        value = callSignInput,
+                        onValueChange = { callSignInput = it },
+                        singleLine = true,
+                        placeholder = {
+                            Text(
+                                text = I18n.callSignFieldPlaceholder(currentLanguage),
+                                color = TelegramTextSecondary,
+                                fontSize = 13.sp
+                            )
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = TelegramBlue,
+                            unfocusedBorderColor = TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmed = callSignInput.trim()
+                        if (trimmed.isNotBlank()) {
+                            onUpdateCallSign(trimmed)
+                            Toast.makeText(context, I18n.callsignSavedToast(currentLanguage), Toast.LENGTH_SHORT).show()
+                            showEditCallSignDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(I18n.save(currentLanguage), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditCallSignDialog = false }) {
                     Text(I18n.cancel(currentLanguage), color = TelegramTextSecondary)
                 }
             },

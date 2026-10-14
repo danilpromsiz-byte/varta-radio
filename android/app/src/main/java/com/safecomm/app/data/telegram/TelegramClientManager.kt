@@ -10,6 +10,7 @@ import com.safecomm.app.data.model.Alert
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.GroupMember
 import com.safecomm.app.data.model.VoiceMessage
+import com.safecomm.app.data.model.UserStatus
 import com.safecomm.app.data.model.RoomHistoryManager
 import com.safecomm.app.util.VartaChannelToken
 import kotlinx.coroutines.*
@@ -58,7 +59,8 @@ data class VartaPacket(
     val targetSenderId: String = "",
     val targetNick: String = "",
     val banUntil: Long = 0L, // 0 = none, -1 = permanent ban, > 0 = timestamp
-    val sig: String = ""
+    val sig: String = "",
+    val userStatus: String = "talk"
 )
 
 /**
@@ -107,6 +109,30 @@ class TelegramClientManager(private val context: Context) {
                 prefs.edit().putString("call_sign", trimmed).apply()
             }
         }
+
+    var userStatus: UserStatus
+        get() {
+            val code = prefs.getString("user_radio_status", UserStatus.TALK.code) ?: UserStatus.TALK.code
+            return UserStatus.fromCode(code)
+        }
+        set(value) {
+            prefs.edit().putString("user_radio_status", value.code).apply()
+            sendHeartbeat()
+            pruneInactiveMembers()
+        }
+
+    fun updateUserStatus(status: UserStatus) {
+        userStatus = status
+    }
+
+    fun updateCallSign(newCallSign: String) {
+        val trimmed = newCallSign.trim()
+        if (trimmed.isNotBlank() && trimmed != callSign) {
+            callSign = trimmed
+            sendHeartbeat()
+            pruneInactiveMembers()
+        }
+    }
 
     var communityLinkOrTag: String
         get() = prefs.getString("community_link", "") ?: ""
@@ -173,9 +199,12 @@ class TelegramClientManager(private val context: Context) {
         val senderId: String,
         val callSign: String,
         val avatar: String,
-        val lastSeenMs: Long
+        val lastSeenMs: Long,
+        val lastSpokenMs: Long = 0L,
+        val status: String = "talk"
     )
 
+    private var myLastSpokenMs: Long = 0L
     private val membersSeen = ConcurrentHashMap<String, PeerPresence>() // senderId -> PeerPresence
     private val processedPacketMap = ConcurrentHashMap<String, Long>()
 
@@ -252,7 +281,15 @@ class TelegramClientManager(private val context: Context) {
             tdlibEngine.events.collect { tdEvent ->
                 when (tdEvent) {
                     is TdRadioEvent.IncomingVoice -> {
-                        membersSeen[tdEvent.senderNick] = PeerPresence(tdEvent.senderNick, tdEvent.senderNick, "shield", System.currentTimeMillis())
+                        val existing = membersSeen[tdEvent.senderNick]
+                        membersSeen[tdEvent.senderNick] = PeerPresence(
+                            senderId = existing?.senderId ?: tdEvent.senderNick,
+                            callSign = tdEvent.senderNick,
+                            avatar = existing?.avatar ?: "shield",
+                            lastSeenMs = System.currentTimeMillis(),
+                            lastSpokenMs = System.currentTimeMillis(),
+                            status = existing?.status ?: "talk"
+                        )
                         pruneInactiveMembers()
                         _events.emit(
                             TelegramLiveEvent.LiveVoice(
@@ -276,7 +313,15 @@ class TelegramClientManager(private val context: Context) {
                             createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
                             expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
                         )
-                        membersSeen[tdEvent.senderNick] = PeerPresence(tdEvent.senderNick, tdEvent.senderNick, "shield", System.currentTimeMillis())
+                        val existing = membersSeen[tdEvent.senderNick]
+                        membersSeen[tdEvent.senderNick] = PeerPresence(
+                            senderId = existing?.senderId ?: tdEvent.senderNick,
+                            callSign = tdEvent.senderNick,
+                            avatar = existing?.avatar ?: "shield",
+                            lastSeenMs = System.currentTimeMillis(),
+                            lastSpokenMs = existing?.lastSpokenMs ?: 0L,
+                            status = existing?.status ?: "talk"
+                        )
                         pruneInactiveMembers()
                         _events.emit(TelegramLiveEvent.LiveAlert(alert))
                     }
@@ -287,7 +332,15 @@ class TelegramClientManager(private val context: Context) {
                         _events.emit(TelegramLiveEvent.ConnectionState(tdEvent.isConnected, tdEvent.message))
                     }
                     is TdRadioEvent.MemberJoined -> {
-                        membersSeen[tdEvent.memberName] = PeerPresence(tdEvent.memberName, tdEvent.memberName, "shield", System.currentTimeMillis())
+                        val existing = membersSeen[tdEvent.memberName]
+                        membersSeen[tdEvent.memberName] = PeerPresence(
+                            senderId = existing?.senderId ?: tdEvent.memberName,
+                            callSign = tdEvent.memberName,
+                            avatar = existing?.avatar ?: "shield",
+                            lastSeenMs = System.currentTimeMillis(),
+                            lastSpokenMs = existing?.lastSpokenMs ?: 0L,
+                            status = existing?.status ?: "talk"
+                        )
                         pruneInactiveMembers()
                     }
                 }
@@ -299,12 +352,28 @@ class TelegramClientManager(private val context: Context) {
             telegramDirectClient.events.collect { tgEvent ->
                 when (tgEvent) {
                     is TelegramLiveEvent.LiveVoice -> {
-                        membersSeen[tgEvent.senderNick] = PeerPresence(tgEvent.senderNick, tgEvent.senderNick, "shield", System.currentTimeMillis())
+                        val existing = membersSeen[tgEvent.senderNick]
+                        membersSeen[tgEvent.senderNick] = PeerPresence(
+                            senderId = existing?.senderId ?: tgEvent.senderNick,
+                            callSign = tgEvent.senderNick,
+                            avatar = existing?.avatar ?: "shield",
+                            lastSeenMs = System.currentTimeMillis(),
+                            lastSpokenMs = System.currentTimeMillis(),
+                            status = existing?.status ?: "talk"
+                        )
                         pruneInactiveMembers()
                         _events.emit(tgEvent)
                     }
                     is TelegramLiveEvent.LiveAlert -> {
-                        membersSeen[tgEvent.alert.senderNick] = PeerPresence(tgEvent.alert.senderNick, tgEvent.alert.senderNick, "shield", System.currentTimeMillis())
+                        val existing = membersSeen[tgEvent.alert.senderNick]
+                        membersSeen[tgEvent.alert.senderNick] = PeerPresence(
+                            senderId = existing?.senderId ?: tgEvent.alert.senderNick,
+                            callSign = tgEvent.alert.senderNick,
+                            avatar = existing?.avatar ?: "shield",
+                            lastSeenMs = System.currentTimeMillis(),
+                            lastSpokenMs = existing?.lastSpokenMs ?: 0L,
+                            status = existing?.status ?: "talk"
+                        )
                         pruneInactiveMembers()
                         _events.emit(tgEvent)
                     }
@@ -1257,7 +1326,8 @@ class TelegramClientManager(private val context: Context) {
             senderNick = callSign,
             avatar = userAvatar,
             timestamp = System.currentTimeMillis(),
-            sig = generateSignature("JOIN:$mySenderId:$callSign", communityPassword)
+            sig = generateSignature("JOIN:$mySenderId:$callSign", communityPassword),
+            userStatus = userStatus.code
         )
         publishPacket("$currentTopicBase/presence", packet, qos = 1)
     }
@@ -1269,7 +1339,8 @@ class TelegramClientManager(private val context: Context) {
             senderNick = callSign,
             avatar = userAvatar,
             timestamp = System.currentTimeMillis(),
-            sig = generateSignature("HEARTBEAT:$mySenderId:$callSign", communityPassword)
+            sig = generateSignature("HEARTBEAT:$mySenderId:$callSign", communityPassword),
+            userStatus = userStatus.code
         )
         publishPacket("$currentTopicBase/presence", packet, qos = 0)
     }
@@ -1285,14 +1356,16 @@ class TelegramClientManager(private val context: Context) {
             else -> "member"
         }
 
-        // Always include self
+        // Always include self at index 0 (top)
         val activeList = mutableListOf(
             GroupMember(
                 userId = 1L,
                 nickname = "$callSign (Вы)",
                 avatarUrl = userAvatar,
                 role = myRole,
-                senderId = mySenderId
+                senderId = mySenderId,
+                status = userStatus.code,
+                lastSpokenMs = myLastSpokenMs
             )
         )
 
@@ -1308,8 +1381,14 @@ class TelegramClientManager(private val context: Context) {
         val seenNicks = mutableSetOf(callSign.trim().lowercase())
         var counterId = 2L
 
+        // Unified deterministic sorting logic:
+        // 1. Primary: who spoke last (lastSpokenMs descending). Whoever spoke most recently is at the top!
+        // 2. Secondary: stable alphabetical order by callsign (order never randomly jumps on heartbeat arrival)
         membersSeen.values
-            .sortedByDescending { it.lastSeenMs }
+            .sortedWith(
+                compareByDescending<PeerPresence> { it.lastSpokenMs }
+                    .thenBy { it.callSign.lowercase() }
+            )
             .forEach { peer ->
                 val normNick = peer.callSign.trim().lowercase()
                 if (normNick.isNotBlank() && seenNicks.add(normNick)) {
@@ -1326,7 +1405,9 @@ class TelegramClientManager(private val context: Context) {
                             nickname = peer.callSign.trim(),
                             avatarUrl = peer.avatar,
                             role = peerRole,
-                            senderId = peer.senderId
+                            senderId = peer.senderId,
+                            status = peer.status,
+                            lastSpokenMs = peer.lastSpokenMs
                         )
                     )
                 }
@@ -1350,11 +1431,17 @@ class TelegramClientManager(private val context: Context) {
 
             // Always immediately register or refresh member presence only if it belongs to current active room!
             if (!isFromOtherRoom) {
+                val existing = membersSeen[packet.senderId]
+                val isVoice = packet.type == "VOICE"
+                val lastSpoken = if (isVoice) System.currentTimeMillis() else (existing?.lastSpokenMs ?: 0L)
+                val peerStatus = if (packet.userStatus.isNotBlank()) packet.userStatus else (existing?.status ?: "talk")
                 membersSeen[packet.senderId] = PeerPresence(
-                    packet.senderId,
-                    packet.senderNick,
-                    packet.avatar.ifBlank { "shield" },
-                    System.currentTimeMillis()
+                    senderId = packet.senderId,
+                    callSign = packet.senderNick,
+                    avatar = packet.avatar.ifBlank { existing?.avatar ?: "shield" },
+                    lastSeenMs = System.currentTimeMillis(),
+                    lastSpokenMs = lastSpoken,
+                    status = peerStatus
                 )
                 pruneInactiveMembers()
             }
@@ -1571,10 +1658,13 @@ class TelegramClientManager(private val context: Context) {
                 timestamp = msgId,
                 durationSec = durationSec,
                 audioBase64 = base64Audio,
-                sig = sig
+                sig = sig,
+                userStatus = userStatus.code
             )
 
             publishPacket("$currentTopicBase/voice", packet, qos = 1)
+            myLastSpokenMs = System.currentTimeMillis()
+            pruneInactiveMembers()
             Log.d("VartaNetwork", "Transmitted voice message to sector mesh")
         } catch (e: Exception) {
             Log.e("VartaNetwork", "MQTT transmit voice failed", e)

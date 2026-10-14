@@ -213,6 +213,9 @@ class MainActivity : ComponentActivity() {
         val isPlayingVoice by walkieTalkieManager.isPlaying.collectAsState()
         val currentSpeaker by walkieTalkieManager.currentSpeaker.collectAsState()
         val amplitude by walkieTalkieManager.amplitude.collectAsState()
+        val voiceQueueCount by walkieTalkieManager.queueCount.collectAsState()
+        var userStatus by remember { mutableStateOf<UserStatus>(telegramClient.userStatus) }
+        var currentCallSign by remember { mutableStateOf<String>(telegramClient.callSign) }
 
         // Auto-prune expired alerts periodically
         LaunchedEffect(Unit) {
@@ -264,7 +267,12 @@ class MainActivity : ComponentActivity() {
 
                             when (audioMode) {
                                 AudioMode.SOUND -> {
-                                    walkieTalkieManager.playLiveVoiceMessage(event.fileUrl, event.senderNick) {
+                                    walkieTalkieManager.playLiveVoiceMessage(
+                                        audioUrl = event.fileUrl,
+                                        senderNick = event.senderNick,
+                                        durationSec = event.durationSec,
+                                        messageId = event.messageId
+                                    ) {
                                         alertNotificationManager.dismissVoiceNotification(event.messageId)
                                     }
                                 }
@@ -426,6 +434,17 @@ class MainActivity : ComponentActivity() {
                     members = currentMembers,
                     userAvatar = telegramClient.userAvatar,
                     onChangeAvatar = { telegramClient.userAvatar = it },
+                    userStatus = userStatus,
+                    onUpdateUserStatus = { newStatus ->
+                        telegramClient.updateUserStatus(newStatus)
+                        userStatus = newStatus
+                    },
+                    currentCallSign = currentCallSign,
+                    onUpdateCallSign = { newSign ->
+                        telegramClient.updateCallSign(newSign)
+                        currentCallSign = telegramClient.callSign
+                    },
+                    voiceQueueCount = voiceQueueCount,
                     audioMode = audioMode,
                     onToggleAudioMode = {
                         audioMode = when (audioMode) {

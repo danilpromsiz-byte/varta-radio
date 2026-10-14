@@ -56,6 +56,8 @@ fun SettingsDialog(
     onWipeAllRooms: (() -> Unit)? = null,
     currentLanguage: AppLanguage = AppLanguage.EN,
     onLanguageChange: (AppLanguage) -> Unit = {},
+    currentCallSign: String = "",
+    onUpdateCallSign: ((String) -> Unit)? = null,
     bannedUsers: Map<String, Long> = emptyMap(),
     initialAutoDeleteEnabled: Boolean = true,
     initialTelegramBridgeEnabled: Boolean = false,
@@ -72,6 +74,7 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    var userCallSignInput by remember { mutableStateOf(currentCallSign) }
     val audioPrefs = remember { context.getSharedPreferences("varta_audio_prefs", Context.MODE_PRIVATE) }
     var isVolumeBoostOn by remember { mutableStateOf(audioPrefs.getBoolean("volume_boost", true)) }
 
@@ -138,6 +141,54 @@ fun SettingsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
+
+                // =====================================================================
+                // 0. CALLSIGN SECTION
+                // =====================================================================
+                Text(
+                    text = "🎙️ ${I18n.callSignFieldLabel(selectedLang)}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TelegramTextPrimary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = userCallSignInput,
+                        onValueChange = { userCallSignInput = it },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TelegramTextPrimary,
+                            unfocusedTextColor = TelegramTextPrimary,
+                            focusedBorderColor = TelegramBlue,
+                            unfocusedBorderColor = TelegramDivider,
+                            focusedContainerColor = TelegramDarkCard,
+                            unfocusedContainerColor = TelegramDarkCard
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(
+                        onClick = {
+                            val trimmed = userCallSignInput.trim()
+                            if (trimmed.isNotBlank()) {
+                                onUpdateCallSign?.invoke(trimmed)
+                                Toast.makeText(context, I18n.callsignSavedToast(selectedLang), Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = TelegramBlue),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(50.dp)
+                    ) {
+                        Text(I18n.save(selectedLang), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // =====================================================================
                 // 1. LANGUAGE SELECTOR (Order: EN, UK, RU)

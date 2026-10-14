@@ -76,6 +76,11 @@ fun MainHubScreen(
     onWipeAllRooms: (() -> Unit)? = null,
     currentLanguage: AppLanguage = AppLanguage.EN,
     onLanguageChange: (AppLanguage) -> Unit = {},
+    userStatus: UserStatus = UserStatus.TALK,
+    onUpdateUserStatus: (UserStatus) -> Unit = {},
+    currentCallSign: String = "",
+    onUpdateCallSign: (String) -> Unit = {},
+    voiceQueueCount: Int = 0,
     bannedUsers: Map<String, Long> = emptyMap(),
     onUnbanUser: ((String) -> Unit)? = null,
     onSaveSettings: (radius: Double, sound: Boolean, token: String, chat: String, pass: String) -> Unit,
@@ -99,6 +104,7 @@ fun MainHubScreen(
     var showHistoryDialog by remember { mutableStateOf(false) }
     var showMembersDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showStatusDialog by remember { mutableStateOf(false) }
     var showAvatarDialog by remember { mutableStateOf(false) }
     var showLeaveRoomConfirm by remember { mutableStateOf(false) }
     var selectedAlertForDetail by remember { mutableStateOf<Alert?>(null) }
@@ -273,6 +279,40 @@ fun MainHubScreen(
                                         color = Color(0xFF00E676)
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.width(5.dp))
+
+                                // Status Pill: 🎙️ / 🎧 / 💤
+                                val statusLabel = when (userStatus) {
+                                    UserStatus.TALK -> I18n.userStatusTalk(currentLanguage)
+                                    UserStatus.LISTEN -> I18n.userStatusListen(currentLanguage)
+                                    UserStatus.AFK -> I18n.userStatusAfk(currentLanguage)
+                                }
+                                val statusColor = when (userStatus) {
+                                    UserStatus.TALK -> Color(0xFF00E676)
+                                    UserStatus.LISTEN -> Color(0xFF64B5F6)
+                                    UserStatus.AFK -> Color(0xFFFFB300)
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(statusColor.copy(alpha = 0.16f))
+                                        .clickable { showStatusDialog = true }
+                                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = userStatus.icon,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = statusLabel,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = statusColor
+                                    )
+                                }
                             } else {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -443,6 +483,23 @@ fun MainHubScreen(
                                 color = Color.White
                             )
                         }
+
+                        if (voiceQueueCount > 0) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFF9800).copy(alpha = 0.2f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = I18n.audioQueueBadge(currentLanguage, voiceQueueCount),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFB74D)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -572,6 +629,8 @@ fun MainHubScreen(
             group = group,
             members = members,
             currentUserId = currentUserId,
+            currentCallSign = currentCallSign,
+            onUpdateCallSign = onUpdateCallSign,
             isChiefAdmin = isChiefAdmin,
             isAdmin = isCurrentAdmin,
             currentLanguage = currentLanguage,
@@ -582,6 +641,81 @@ fun MainHubScreen(
         )
     }
 
+    if (showStatusDialog) {
+        AlertDialog(
+            onDismissRequest = { showStatusDialog = false },
+            title = {
+                Text(
+                    text = I18n.userStatusTitle(currentLanguage),
+                    fontWeight = FontWeight.Bold,
+                    color = TelegramTextPrimary
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val statusOptions = listOf(
+                        Triple(UserStatus.TALK, I18n.userStatusTalk(currentLanguage), Color(0xFF00E676)),
+                        Triple(UserStatus.LISTEN, I18n.userStatusListen(currentLanguage), Color(0xFF64B5F6)),
+                        Triple(UserStatus.AFK, I18n.userStatusAfk(currentLanguage), Color(0xFFFFB300))
+                    )
+
+                    statusOptions.forEach { (st, label, col) ->
+                        val isSelected = userStatus == st
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) col.copy(alpha = 0.2f) else TelegramDarkSurface,
+                            border = BorderStroke(1.dp, if (isSelected) col else TelegramDivider),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onUpdateUserStatus(st)
+                                    showStatusDialog = false
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = st.icon,
+                                    fontSize = 20.sp
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = label,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) col else TelegramTextPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = col,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showStatusDialog = false }) {
+                    Text(I18n.cancel(currentLanguage), color = TelegramTextSecondary)
+                }
+            },
+            containerColor = TelegramDarkBg
+        )
+    }
+
     if (showSettingsDialog) {
         SettingsDialog(
             currentRadius = currentRadiusKm,
@@ -589,6 +723,8 @@ fun MainHubScreen(
             botToken = botToken,
             chatId = chatId,
             groupPassword = groupPassword,
+            currentCallSign = currentCallSign,
+            onUpdateCallSign = onUpdateCallSign,
             githubRepo = githubRepo,
             appVersion = appVersion,
             updateStatusText = updateStatusText,

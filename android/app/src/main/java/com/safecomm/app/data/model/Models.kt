@@ -71,6 +71,20 @@ data class Group(
     @SerialName("created_at") val createdAt: String = ""
 )
 
+enum class UserStatus(val code: String, val icon: String) {
+    TALK("talk", "🎙️"),
+    LISTEN("listen", "🎧"),
+    AFK("afk", "💤");
+
+    companion object {
+        fun fromCode(code: String): UserStatus = when (code.lowercase()) {
+            "listen" -> LISTEN
+            "afk" -> AFK
+            else -> TALK
+        }
+    }
+}
+
 @Serializable
 data class GroupMember(
     val id: Long = 0,
@@ -78,9 +92,11 @@ data class GroupMember(
     @SerialName("user_id") val userId: Long = 0,
     val nickname: String = "",
     @SerialName("avatar_url") val avatarUrl: String = "",
-    val role: String = "member", // "admin" or "member"
+    val role: String = "member", // "owner", "admin" or "member"
     val senderId: String = "",
-    @SerialName("joined_at") val joinedAt: String = ""
+    @SerialName("joined_at") val joinedAt: String = "",
+    val status: String = "talk",
+    val lastSpokenMs: Long = 0L
 )
 
 @Serializable

@@ -489,7 +489,7 @@ object I18n {
     fun chooseDangerDesc(c: Context) = chooseDangerDesc(LanguageManager.getLanguage(c))
     fun dangerDetailsHint(lang: AppLanguage) = t(
         lang,
-        "Уточнение (напр. ул. Ленина, 5)",
+        "Уточнение (напр. ул. Центральная, 5)",
         "Уточнення (напр. вул. Лесі Українки, 5)",
         "Details (e.g. cross street or building)"
     )
@@ -845,4 +845,34 @@ Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety ale
             else -> t(c, "Ошибка Telegram: $raw", "Помилка Telegram: $raw", "Telegram error: $raw")
         }
     }
+
+    // --- User Statuses ---
+    fun userStatusTitle(lang: AppLanguage) = t(lang, "Статус в эфире", "Статус в ефірі", "Radio Status")
+    fun userStatusTitle(c: Context) = userStatusTitle(LanguageManager.getLanguage(c))
+
+    fun userStatusTalk(lang: AppLanguage) = t(lang, "Готов говорить", "Готовий говорити", "Ready to talk")
+    fun userStatusTalk(c: Context) = userStatusTalk(LanguageManager.getLanguage(c))
+
+    fun userStatusListen(lang: AppLanguage) = t(lang, "Готов слушать", "Готовий слухати", "Listening only")
+    fun userStatusListen(c: Context) = userStatusListen(LanguageManager.getLanguage(c))
+
+    fun userStatusAfk(lang: AppLanguage) = t(lang, "Отошёл (АФК)", "Відійшов (АФК)", "AFK")
+    fun userStatusAfk(c: Context) = userStatusAfk(LanguageManager.getLanguage(c))
+
+    // --- Callsign Editing ---
+    fun editCallsignTitle(lang: AppLanguage) = t(lang, "Сменить позывной", "Змінити позивний", "Change Callsign")
+    fun editCallsignTitle(c: Context) = editCallsignTitle(LanguageManager.getLanguage(c))
+
+    fun editCallsignPrompt(lang: AppLanguage) = t(lang, "Введите ваш новый позывной в эфире:", "Введіть ваш новий позивний в ефірі:", "Enter your new callsign:")
+    fun editCallsignPrompt(c: Context) = editCallsignPrompt(LanguageManager.getLanguage(c))
+
+    fun callsignSavedToast(lang: AppLanguage) = t(lang, "Позывной успешно обновлён", "Позивний успішно оновлено", "Callsign updated successfully")
+    fun callsignSavedToast(c: Context) = callsignSavedToast(LanguageManager.getLanguage(c))
+
+    // --- Audio Queue & Speaking ---
+    fun audioQueueBadge(lang: AppLanguage, count: Int) = t(lang, "В очереди: $count", "У черзі: $count", "Queue: $count")
+    fun audioQueueBadge(c: Context, count: Int) = audioQueueBadge(LanguageManager.getLanguage(c), count)
+
+    fun whoSpokeRecently(lang: AppLanguage) = t(lang, "Говорил недавно", "Говорив нещодавно", "Spoke recently")
+    fun whoSpokeRecently(c: Context) = whoSpokeRecently(LanguageManager.getLanguage(c))
 }

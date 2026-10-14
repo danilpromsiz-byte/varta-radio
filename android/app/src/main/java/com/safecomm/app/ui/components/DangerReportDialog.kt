@@ -73,8 +73,8 @@ fun DangerReportDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.88f)
-                .padding(vertical = 12.dp),
+                .fillMaxHeight(0.94f)
+                .padding(vertical = 8.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = TelegramDarkSurface)
         ) {
@@ -109,18 +109,9 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = com.safecomm.app.ui.i18n.I18n.chooseDangerDesc(currentLanguage),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TelegramTextSecondary,
-                    textAlign = TextAlign.Start,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // TOP (MOST USED) CATEGORY: First & Larger
+                // TOP (MOST USED) CATEGORY: First & Sleek
                 val isTopSelected = selectedType == topCategory
                 val topCatColor = when (topCategory) {
                     AlertType.SHELLING -> AlertShellingRed
@@ -134,7 +125,7 @@ fun DangerReportDialog(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(78.dp)
+                        .height(58.dp)
                         .border(
                             width = if (isTopSelected) 2.dp else 1.dp,
                             color = if (isTopSelected) topCatColor else TelegramDivider,
@@ -154,18 +145,18 @@ fun DangerReportDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AlertCategoryIcon(type = topCategory, fontSize = 34.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
+                            AlertCategoryIcon(type = topCategory, fontSize = 28.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
                                     text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, topCategory.rawValue),
-                                    fontSize = 14.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isTopSelected) Color.White else TelegramTextPrimary
                                 )
                                 Text(
                                     text = com.safecomm.app.ui.i18n.I18n.frequentBadge(currentLanguage),
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     color = Color(0xFFFFD600),
                                     fontWeight = FontWeight.Medium
                                 )
@@ -187,11 +178,11 @@ fun DangerReportDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Other 5 Categories (in clean 3-col rows)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (row in otherCategories.chunked(3)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             for (cat in row) {
                                 val isSelected = cat == selectedType
@@ -207,28 +198,28 @@ fun DangerReportDialog(
                                 Card(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(66.dp)
+                                        .height(52.dp)
                                         .border(
                                             width = if (isSelected) 2.dp else 1.dp,
                                             color = if (isSelected) catColor else TelegramDivider,
-                                            shape = RoundedCornerShape(12.dp)
+                                            shape = RoundedCornerShape(10.dp)
                                         )
                                         .clickable { selectedType = cat },
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (isSelected) catColor.copy(alpha = 0.2f) else TelegramDarkCard
                                     ),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
                                     Column(
                                         modifier = Modifier.fillMaxSize(),
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        AlertCategoryIcon(type = cat, fontSize = 22.sp)
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        AlertCategoryIcon(type = cat, fontSize = 20.sp)
+                                        Spacer(modifier = Modifier.height(1.dp))
                                         Text(
                                             text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, cat.rawValue),
-                                            fontSize = 10.sp,
+                                            fontSize = 9.5.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             color = if (isSelected) Color.White else TelegramTextSecondary,
                                             maxLines = 1,
@@ -246,7 +237,7 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Alert Expiry / Duration Selector
                 Text(
@@ -272,7 +263,7 @@ fun DangerReportDialog(
                         Card(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(38.dp)
+                                .height(32.dp)
                                 .border(
                                     width = if (isSelected) 1.5.dp else 1.dp,
                                     color = if (isSelected) TelegramBlue else TelegramDivider.copy(alpha = 0.5f),
@@ -300,7 +291,7 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Optional description input
                 OutlinedTextField(
@@ -310,7 +301,7 @@ fun DangerReportDialog(
                         Text(
                             com.safecomm.app.ui.i18n.I18n.dangerDetailsHint(currentLanguage),
                             color = TelegramTextSecondary,
-                            fontSize = 13.sp
+                            fontSize = 12.sp
                         )
                     },
                     singleLine = true,
@@ -332,7 +323,7 @@ fun DangerReportDialog(
                     (com.safecomm.app.util.GeoUtils.distanceKm(userLat, userLng, initialLat, initialLng) * 1000).toInt()
                 } else 0
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Row(
                     modifier = Modifier
@@ -340,12 +331,12 @@ fun DangerReportDialog(
                         .clip(RoundedCornerShape(12.dp))
                         .background(TelegramDarkCard)
                         .border(1.dp, if (hasCustomLocation) Color(0xFFFFD600).copy(alpha = 0.6f) else TelegramDivider, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "📍", fontSize = 14.sp)
+                        Text(text = "📍", fontSize = 13.sp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (hasCustomLocation) {
@@ -353,7 +344,7 @@ fun DangerReportDialog(
                             } else {
                                 "GPS"
                             },
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (hasCustomLocation) Color(0xFFFFD600) else TelegramTextPrimary
                         )
@@ -370,13 +361,13 @@ fun DangerReportDialog(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
-                            Text(text = "🎯", fontSize = 12.sp)
+                            Text(text = "🎯", fontSize = 11.sp)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = com.safecomm.app.ui.i18n.I18n.moveMarkerShort(currentLanguage),
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TelegramBlue
                             )
@@ -384,13 +375,13 @@ fun DangerReportDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // HOLD TO CONFIRM BUTTON (False-trigger protection)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(50.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(TelegramDarkCard)
                         .border(1.dp, AlertShellingRed.copy(alpha = 0.5f), RoundedCornerShape(16.dp))

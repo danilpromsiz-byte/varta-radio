@@ -39,6 +39,20 @@ class WalkieTalkieManager(private val context: Context) {
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude.asStateFlow()
 
+    data class QueuedVoice(
+        val audioUrl: String,
+        val senderNick: String,
+        val durationSec: Int = 0,
+        val messageId: Long = 0L,
+        val onFinished: () -> Unit = {}
+    )
+
+    private val voiceQueue = java.util.concurrent.ConcurrentLinkedQueue<QueuedVoice>()
+    private val _queueCount = MutableStateFlow(0)
+    val queueCount: StateFlow<Int> = _queueCount.asStateFlow()
+    @Volatile private var isProcessingQueue = false
+    private val queueLock = Any()
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var amplitudeJob: Job? = null
 
@@ -195,94 +209,177 @@ class WalkieTalkieManager(private val context: Context) {
         currentRecordFile = null
     }
 
-    // --- Instant Walkie-Talkie Playback ---
+    // --- Instant Walkie-Talkie Playback with Smart Queue & Xiaomi DAC Protection ---
 
-    fun playLiveVoiceMessage(audioUrl: String, senderNick: String, onFinished: () -> Unit = {}) {
-        scope.launch {
-            // 1. Play loud tactical incoming radio cue
-            playIncomingRadioChirp()
-            delay(240) // Wait for incoming cue to play cleanly before speech
+    private fun setupWalkieTalkieAudioRouting() {
+        try {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = true
 
-            withContext(Dispatchers.Main) {
-                stopPlayback()
-
+            if (isVolumeBoostEnabled) {
                 try {
-                    // Set audio routing to speakerphone for loud walkie-talkie output
-                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-                    @Suppress("DEPRECATION")
-                    audioManager.isSpeakerphoneOn = true
+                    val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
+                    val maxVoice = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                    audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoice, 0)
+                } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            Log.w("WalkieTalkie", "Error setting audio routing", e)
+        }
+    }
 
-                    // Force maximum volume on device if Volume Boost is enabled
-                    if (isVolumeBoostEnabled) {
-                        try {
-                            val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
-                            val maxVoice = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
-                            audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVoice, 0)
-                        } catch (_: Exception) {}
-                    }
+    private suspend fun playIncomingRadioChirpDirect() {
+        try {
+            setupWalkieTalkieAudioRouting()
+            val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+            toneGen.startTone(ToneGenerator.TONE_PROP_PROMPT, 170)
+            delay(200)
+            toneGen.release()
+            // Xiaomi/MIUI DAC & PA wake-up settling delay:
+            // Prevents clipping the first 250ms of incoming speech
+            delay(120)
+        } catch (e: Exception) {
+            Log.e("WalkieTalkie", "Incoming chirp failed", e)
+        }
+    }
 
-                    _currentSpeaker.value = senderNick
-                    _isPlaying.value = true
-
-                    mediaPlayer = MediaPlayer().apply {
-                        setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .setUsage(AudioAttributes.USAGE_MEDIA)
-                                .build()
-                        )
-                        setDataSource(context, Uri.parse(audioUrl))
-                        setOnCompletionListener {
-                            scope.launch {
-                                playRogerBeep()
-                                delay(250) // Wait for roger beep to finish before resetting audio session
-                                withContext(Dispatchers.Main) {
-                                    stopPlayback()
-                                    onFinished()
-                                }
-                            }
-                        }
-                        setOnErrorListener { _, _, _ ->
-                            stopPlayback()
-                            onFinished()
-                            true
-                        }
-                        prepareAsync()
-                        setOnPreparedListener {
-                            if (isVolumeBoostEnabled) {
-                                try {
-                                    loudnessEnhancer?.release()
-                                    loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply {
-                                        setTargetGain(volumeBoostGainMb)
-                                        enabled = true
-                                    }
-                                } catch (e: Exception) {
-                                    Log.w("WalkieTalkie", "LoudnessEnhancer error", e)
-                                }
-                            }
-                            start()
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("WalkieTalkie", "Failed to play live voice", e)
-                    stopPlayback()
-                    onFinished()
+    fun playLiveVoiceMessage(
+        audioUrl: String,
+        senderNick: String,
+        durationSec: Int = 0,
+        messageId: Long = 0L,
+        onFinished: () -> Unit = {}
+    ) {
+        val item = QueuedVoice(audioUrl, senderNick, durationSec, messageId, onFinished)
+        synchronized(queueLock) {
+            voiceQueue.offer(item)
+            _queueCount.value = voiceQueue.size
+            Log.d("WalkieTalkie", "Enqueued voice from $senderNick, total in queue: ${voiceQueue.size}")
+            if (!isProcessingQueue) {
+                isProcessingQueue = true
+                scope.launch {
+                    processQueueLoop()
                 }
             }
         }
     }
 
-    fun playAudioFile(urlOrPath: String, onComplete: () -> Unit = {}) {
-        stopPlayback()
-        try {
-            _isPlaying.value = true
-            if (isVolumeBoostEnabled) {
-                try {
-                    val maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0)
-                } catch (_: Exception) {}
+    private suspend fun processQueueLoop() {
+        while (true) {
+            val item = synchronized(queueLock) {
+                val next = voiceQueue.poll()
+                _queueCount.value = voiceQueue.size
+                if (next == null) {
+                    isProcessingQueue = false
+                    return@synchronized null
+                }
+                next
+            } ?: break
+
+            try {
+                playSingleVoiceItem(item)
+            } catch (e: Exception) {
+                Log.e("WalkieTalkie", "Error playing queued voice item", e)
+                item.onFinished()
             }
+
+            // Radio separator gap between sequential messages
+            delay(150)
+        }
+
+        withContext(Dispatchers.Main) {
+            if (voiceQueue.isEmpty() && !isProcessingQueue) {
+                stopPlayback(resetHardwareMode = true)
+            }
+        }
+    }
+
+    private suspend fun playSingleVoiceItem(item: QueuedVoice) {
+        setupWalkieTalkieAudioRouting()
+        _currentSpeaker.value = item.senderNick
+        _isPlaying.value = true
+
+        // Play tactical cue and warm up Xiaomi DAC hardware pipeline
+        playIncomingRadioChirpDirect()
+
+        val completionDeferred = CompletableDeferred<Unit>()
+
+        withContext(Dispatchers.Main) {
+            try {
+                cleanupMediaPlayer()
+
+                mediaPlayer = MediaPlayer().apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    setDataSource(context, Uri.parse(item.audioUrl))
+                    setOnCompletionListener {
+                        scope.launch {
+                            playRogerBeep()
+                            delay(220)
+                            try { item.onFinished() } catch (_: Exception) {}
+                            completionDeferred.complete(Unit)
+                        }
+                    }
+                    setOnErrorListener { _, what, extra ->
+                        Log.e("WalkieTalkie", "MediaPlayer playback error: what=$what, extra=$extra")
+                        try { item.onFinished() } catch (_: Exception) {}
+                        completionDeferred.complete(Unit)
+                        true
+                    }
+                    prepareAsync()
+                    setOnPreparedListener {
+                        if (isVolumeBoostEnabled) {
+                            try {
+                                loudnessEnhancer?.release()
+                                loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply {
+                                    setTargetGain(volumeBoostGainMb)
+                                    enabled = true
+                                }
+                            } catch (e: Exception) {
+                                Log.w("WalkieTalkie", "LoudnessEnhancer error", e)
+                            }
+                        }
+                        start()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("WalkieTalkie", "Failed to start media player", e)
+                try { item.onFinished() } catch (_: Exception) {}
+                completionDeferred.complete(Unit)
+            }
+        }
+
+        completionDeferred.await()
+    }
+
+    fun skipCurrentVoice() {
+        scope.launch(Dispatchers.Main) {
+            try {
+                mediaPlayer?.apply {
+                    if (isPlaying) stop()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun clearQueue() {
+        synchronized(queueLock) {
+            voiceQueue.clear()
+            _queueCount.value = 0
+        }
+    }
+
+    fun playAudioFile(urlOrPath: String, onComplete: () -> Unit = {}) {
+        stopPlayback(resetHardwareMode = false)
+        try {
+            setupWalkieTalkieAudioRouting()
+            _isPlaying.value = true
 
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
@@ -295,15 +392,15 @@ class WalkieTalkieManager(private val context: Context) {
                 setOnCompletionListener {
                     scope.launch {
                         playRogerBeep()
-                        delay(250)
+                        delay(220)
                         withContext(Dispatchers.Main) {
-                            stopPlayback()
+                            stopPlayback(resetHardwareMode = true)
                             onComplete()
                         }
                     }
                 }
                 setOnErrorListener { _, _, _ ->
-                    stopPlayback()
+                    stopPlayback(resetHardwareMode = true)
                     onComplete()
                     true
                 }
@@ -325,12 +422,12 @@ class WalkieTalkieManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("WalkieTalkie", "Error playing audio file", e)
-            stopPlayback()
+            stopPlayback(resetHardwareMode = true)
             onComplete()
         }
     }
 
-    fun stopPlayback() {
+    private fun cleanupMediaPlayer() {
         try {
             loudnessEnhancer?.apply {
                 enabled = false
@@ -346,10 +443,24 @@ class WalkieTalkieManager(private val context: Context) {
             }
         } catch (_: Exception) {}
         mediaPlayer = null
+    }
+
+    fun stopPlayback(resetHardwareMode: Boolean = true) {
+        cleanupMediaPlayer()
         _isPlaying.value = false
         _currentSpeaker.value = null
-        @Suppress("DEPRECATION")
-        audioManager.isSpeakerphoneOn = false
-        audioManager.mode = AudioManager.MODE_NORMAL
+
+        if (resetHardwareMode) {
+            synchronized(queueLock) {
+                voiceQueue.clear()
+                _queueCount.value = 0
+                isProcessingQueue = false
+            }
+            try {
+                @Suppress("DEPRECATION")
+                audioManager.isSpeakerphoneOn = false
+                audioManager.mode = AudioManager.MODE_NORMAL
+            } catch (_: Exception) {}
+        }
     }
 }
