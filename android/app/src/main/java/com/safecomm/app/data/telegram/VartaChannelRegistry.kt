@@ -428,10 +428,10 @@ class VartaChannelRegistry {
             if (response != null) {
                 Result.success(response!!)
             } else {
-                Result.failure(Exception("Создатель комнаты не ответил на запрос"))
+                Result.failure(Exception("Создатель канала не ответил на запрос"))
             }
         } catch (e: TimeoutCancellationException) {
-            Result.failure(Exception("Создатель комнаты не ответил на запрос (оффлайн или занят)"))
+            Result.failure(Exception("Создатель канала не ответил на запрос (оффлайн или занят)"))
         } catch (e: Exception) {
             Result.failure(e)
         } finally {

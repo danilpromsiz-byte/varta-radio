@@ -483,13 +483,13 @@ class TelegramClientManager(private val context: Context) {
     ): Result<Pair<Long, String>> = withContext(Dispatchers.IO) {
         val cleanName = ChannelSecurity.normalizeChannelName(channelName)
         val pass = password.trim()
-        if (cleanName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Укажите номер или название комнаты"))
+        if (cleanName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Укажите номер или название канала"))
         if (pass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль обязателен для защиты эфира"))
 
         // Check local ban
         val localBan = getLocalBan(cleanName)
         if (localBan != null && (localBan == -1L || localBan > System.currentTimeMillis())) {
-            val msg = if (localBan == -1L) "🚫 Вы навсегда заблокированы в этой комнате администратором." else "⏳ Вы временно заблокированы в этой комнате."
+            val msg = if (localBan == -1L) "🚫 Вы навсегда заблокированы в этом канале администратором." else "⏳ Вы временно заблокированы в этом канале."
             return@withContext Result.failure(IllegalArgumentException(msg))
         }
 
@@ -503,10 +503,10 @@ class TelegramClientManager(private val context: Context) {
                 ?: existing.bannedUsers[callSign.trim().lowercase()]
             if (remoteBan != null && (remoteBan == -1L || remoteBan == Long.MAX_VALUE || remoteBan > System.currentTimeMillis())) {
                 val msg = if (remoteBan == -1L || remoteBan == Long.MAX_VALUE) {
-                    "🚫 Вы навсегда заблокированы в комнате «${existing.channelName}» администратором."
+                    "🚫 Вы навсегда заблокированы в канале «${existing.channelName}» администратором."
                 } else {
                     val mins = kotlin.math.max(1, ((remoteBan - System.currentTimeMillis()) / 60000L).toInt())
-                    "⏳ Вы временно заблокированы в комнате «${existing.channelName}» ещё на $mins мин."
+                    "⏳ Вы временно заблокированы в канале «${existing.channelName}» ещё на $mins мин."
                 }
                 return@withContext Result.failure(IllegalArgumentException(msg))
             }
@@ -536,15 +536,15 @@ class TelegramClientManager(private val context: Context) {
                     communityPassword = pass
                     sessionToken = "varta_$cleanName"
                     _isSectorConnected.value = true
-                    _connectionStatusText.value = "Комната «$cleanName» обновлена (Вы владелец)"
-                    _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
+                    _connectionStatusText.value = "Канал «$cleanName» обновлен (Вы владелец)"
+                    _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «$cleanName» в эфире"))
                     _authState.value = TelegramAuthState.Ready(callSign, cleanName)
                     connectToSector(cleanName, pass)
                     RoomHistoryManager.addOrUpdateRoom(context, cleanName, pass, isOwner = true, isAdmin = true)
                     return@withContext Result.success(Pair(activeChatId.takeIf { it != 0L } ?: 1L, activeInviteLink.ifBlank { "varta_$cleanName" }))
                 } else {
                     return@withContext Result.failure(
-                        IllegalArgumentException("Комната «${existing.channelName}» уже зарегистрирована с другим паролем! Введите правильный пароль для управления или создайте комнату с другим названием.")
+                        IllegalArgumentException("Канал «${existing.channelName}» уже зарегистрирован с другим паролем! Введите правильный пароль для управления или создайте канал с другим названием.")
                     )
                 }
             } else {
@@ -595,8 +595,8 @@ class TelegramClientManager(private val context: Context) {
                 _currentChannelDescriptor.value = descriptor
 
                 _isSectorConnected.value = true
-                _connectionStatusText.value = "Комната «$cleanName» создана (Вы создатель)"
-                _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
+                _connectionStatusText.value = "Канал «$cleanName» создан (Вы создатель)"
+                _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «$cleanName» в эфире"))
 
                 _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
@@ -614,7 +614,7 @@ class TelegramClientManager(private val context: Context) {
             // Validate password
             val passHash = ChannelSecurity.hashString(pass)
             if (passHash != existing.passwordHash) {
-                return@withContext Result.failure(IllegalArgumentException("Неверный пароль комнаты «${existing.channelName}»!"))
+                return@withContext Result.failure(IllegalArgumentException("Неверный пароль канала «${existing.channelName}»!"))
             }
 
             var decryptedLink: String? = null
@@ -656,8 +656,8 @@ class TelegramClientManager(private val context: Context) {
             }
 
             _isSectorConnected.value = true
-            _connectionStatusText.value = "Комната «$cleanName» в эфире"
-            _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
+            _connectionStatusText.value = "Канал «$cleanName» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «$cleanName» в эфире"))
 
             _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
@@ -711,8 +711,8 @@ class TelegramClientManager(private val context: Context) {
             _currentChannelDescriptor.value = descriptor
 
             _isSectorConnected.value = true
-            _connectionStatusText.value = "Комната «$cleanName» в эфире"
-            _events.emit(TelegramLiveEvent.ConnectionState(true, "Комната «$cleanName» в эфире"))
+            _connectionStatusText.value = "Канал «$cleanName» в эфире"
+            _events.emit(TelegramLiveEvent.ConnectionState(true, "Канал «$cleanName» в эфире"))
 
             _authState.value = TelegramAuthState.Ready(callSign, cleanName)
 
@@ -814,10 +814,10 @@ class TelegramClientManager(private val context: Context) {
         try {
             val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
             val desc = _currentChannelDescriptor.value ?: channelRegistry.queryChannel(clean)
-                ?: return@withContext Result.failure(IllegalStateException("Комната не найдена"))
+                ?: return@withContext Result.failure(IllegalStateException("Канал не найден"))
 
             if (!canDeleteRoom(desc)) {
-                return@withContext Result.failure(IllegalStateException("Только создатель комнаты может назначать администраторов"))
+                return@withContext Result.failure(IllegalStateException("Только создатель канала может назначать администраторов"))
             }
 
             val targetId = member.senderId.ifBlank { member.nickname.trim().lowercase() }
@@ -859,7 +859,7 @@ class TelegramClientManager(private val context: Context) {
         if (cleanPass.isBlank()) return@withContext Result.failure(IllegalArgumentException("Пароль не может быть пустым"))
         val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
         val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
-            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+            ?: return@withContext Result.failure(IllegalStateException("Канал не найден в сети"))
 
         var newEncryptedLink = existing.encryptedInviteLink
         if (existing.encryptedInviteLink.isNotBlank()) {
@@ -883,7 +883,7 @@ class TelegramClientManager(private val context: Context) {
     suspend fun updateAutoDeleteTtl(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
         val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
-            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+            ?: return@withContext Result.failure(IllegalStateException("Канал не найден в сети"))
 
         val ttl = if (enabled) 86400 else 0
         val updated = existing.copy(autoDeleteTtl = ttl)
@@ -899,7 +899,7 @@ class TelegramClientManager(private val context: Context) {
     suspend fun updateTelegramBridge(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
         val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
-            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+            ?: return@withContext Result.failure(IllegalStateException("Канал не найден в сети"))
 
         var tgChatId = existing.telegramChatId
         var encLink = existing.encryptedInviteLink
@@ -930,7 +930,7 @@ class TelegramClientManager(private val context: Context) {
     suspend fun updateRedirectionMessage(message: String): Result<Unit> = withContext(Dispatchers.IO) {
         val clean = ChannelSecurity.normalizeChannelName(communityLinkOrTag)
         val existing = channelRegistry.queryChannel(clean) ?: _currentChannelDescriptor.value
-            ?: return@withContext Result.failure(IllegalStateException("Комната не найдена в сети"))
+            ?: return@withContext Result.failure(IllegalStateException("Канал не найден в сети"))
 
         val updated = existing.copy(redirectionMessage = message.trim())
         _currentChannelDescriptor.value = updated
@@ -1457,7 +1457,7 @@ class TelegramClientManager(private val context: Context) {
                 "ROOM_DELETED" -> {
                     Log.w("VartaNetwork", "Received ROOM_DELETED notification from creator")
                     scope.launch(Dispatchers.Main) {
-                        Toast.makeText(context, "🗑️ Комната была полностью удалена создателем сети.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "🗑️ Канал был полностью удалён создателем сети.", Toast.LENGTH_LONG).show()
                         RoomHistoryManager.removeRoom(context, communityLinkOrTag)
                         leaveRoom(isRoomDeleted = true)
                     }
@@ -1501,7 +1501,7 @@ class TelegramClientManager(private val context: Context) {
                     if (isTarget) {
                         Log.w("VartaNetwork", "Received KICK command from admin (${packet.senderNick})")
                         scope.launch(Dispatchers.Main) {
-                            Toast.makeText(context, "🚪 Вы были исключены из комнаты администратором.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "🚪 Вы были исключены из канала администратором.", Toast.LENGTH_LONG).show()
                             leaveRoom()
                         }
                     }
@@ -1516,10 +1516,10 @@ class TelegramClientManager(private val context: Context) {
                         Log.w("VartaNetwork", "Received BAN command from admin (${packet.senderNick}), until=$banUntil")
                         scope.launch(Dispatchers.Main) {
                             val msg = if (banUntil == -1L || banUntil == Long.MAX_VALUE) {
-                                "🚫 Вы навсегда заблокированы в этой комнате администратором."
+                                "🚫 Вы навсегда заблокированы в этом канале администратором."
                             } else {
                                 val mins = kotlin.math.max(1, ((banUntil - System.currentTimeMillis()) / 60000L).toInt())
-                                "⏳ Вы временно заблокированы в этой комнате на $mins мин."
+                                "⏳ Вы временно заблокированы в этом канале на $mins мин."
                             }
                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                             leaveRoom()

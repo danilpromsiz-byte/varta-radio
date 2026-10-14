@@ -87,7 +87,7 @@ fun AuthCommunityScreen(
     var userAvatar by remember { mutableStateOf(currentAvatar) }
     var showAvatarPicker by remember { mutableStateOf(false) }
 
-    // Mode: 0 = Войти в комнату, 1 = Создать комнату
+    // Mode: 0 = Войти в канал, 1 = Создать канал
     var selectedTab by remember { mutableIntStateOf(0) }
 
     // Inputs for Joining / Creating
@@ -393,23 +393,35 @@ fun AuthCommunityScreen(
                             border = BorderStroke(1.dp, Color(0xFF4CAF50))
                         ) {
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text("🟢", fontSize = 14.sp)
-                                    Text(
-                                        text = I18n.roomFoundBanner(currentLanguage, descriptor.channelName),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF4CAF50)
-                                    )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Text(
-                                        text = I18n.roomCreatorLabel(currentLanguage, descriptor.ownerCallSign),
-                                        fontSize = 10.sp,
-                                        color = TelegramTextSecondary
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text("🟢", fontSize = 14.sp)
+                                        Text(
+                                            text = I18n.roomFoundBanner(currentLanguage, descriptor.channelName),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF4CAF50)
+                                        )
+                                    }
+                                    if (descriptor.ownerCallSign.isNotBlank()) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            modifier = Modifier.padding(start = 22.dp)
+                                        ) {
+                                            Text(
+                                                text = I18n.roomCreatorLabel(currentLanguage, descriptor.ownerCallSign),
+                                                fontSize = 11.sp,
+                                                color = TelegramTextSecondary
+                                            )
+                                        }
+                                    }
                                 }
 
                                 if (descriptor.redirectionMessage.isNotBlank()) {
@@ -895,7 +907,7 @@ fun AuthCommunityScreen(
                                                         channelNameInput = item.roomName
                                                         groupPassword = ""
                                                         selectedTab = 0
-                                                        Toast.makeText(context, "Введите пароль для комнаты «${item.roomName}»", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, "Введите пароль для канала «${item.roomName}»", Toast.LENGTH_SHORT).show()
                                                     } else {
                                                         channelNameInput = item.roomName
                                                         groupPassword = item.savedPassword

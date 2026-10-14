@@ -75,51 +75,51 @@ object I18n {
     fun callSignFieldPlaceholder(lang: AppLanguage) = t(lang, "Комбат, Дозор-1...", "Комбат, Дозор-1...", "Falcon, Ranger-1...")
     fun callSignFieldPlaceholder(c: Context) = callSignFieldPlaceholder(LanguageManager.getLanguage(c))
 
-    fun tabJoinRoom(lang: AppLanguage) = t(lang, "Войти в комнату", "Увійти в кімнату", "Join Room")
+    fun tabJoinRoom(lang: AppLanguage) = t(lang, "Войти в канал", "Увійти в канал", "Join Channel")
     fun tabJoinRoom(c: Context) = tabJoinRoom(LanguageManager.getLanguage(c))
-    fun tabCreateRoom(lang: AppLanguage) = t(lang, "Создать комнату", "Створити кімнату", "Create Room")
+    fun tabCreateRoom(lang: AppLanguage) = t(lang, "Создать канал", "Створити канал", "Create Channel")
     fun tabCreateRoom(c: Context) = tabCreateRoom(LanguageManager.getLanguage(c))
 
-    fun joinRoomPrompt(lang: AppLanguage) = t(lang, "Введите название или номер комнаты, созданной командиром:", "Введіть назву або номер кімнати, створеної командиром:", "Enter room name or number created by commander:")
+    fun joinRoomPrompt(lang: AppLanguage) = t(lang, "Введите название или номер канала, созданного командиром:", "Введіть назву або номер каналу, створеного командиром:", "Enter channel name or number created by commander:")
     fun joinRoomPrompt(c: Context) = joinRoomPrompt(LanguageManager.getLanguage(c))
 
-    fun roomFieldLabel(lang: AppLanguage) = t(lang, "Номер или название комнаты *", "Номер або назва кімнати *", "Room number or name *")
+    fun roomFieldLabel(lang: AppLanguage) = t(lang, "Номер или название канала *", "Номер або назва каналу *", "Channel number or name *")
     fun roomFieldLabel(c: Context) = roomFieldLabel(LanguageManager.getLanguage(c))
     fun roomFieldPlaceholder(lang: AppLanguage) = t(lang, "102 или Сектор-3", "102 або Сектор-3", "102 or Sector-3")
     fun roomFieldPlaceholder(c: Context) = roomFieldPlaceholder(LanguageManager.getLanguage(c))
 
-    fun passwordFieldLabel(lang: AppLanguage) = t(lang, "Секретный пароль комнаты *", "Секретний пароль кімнати *", "Room Secret Password *")
+    fun passwordFieldLabel(lang: AppLanguage) = t(lang, "Секретный пароль канала *", "Секретний пароль каналу *", "Channel Secret Password *")
     fun passwordFieldLabel(c: Context) = passwordFieldLabel(LanguageManager.getLanguage(c))
-    fun passwordFieldPlaceholder(lang: AppLanguage) = t(lang, "Пароль для доступа в эфир", "Пароль для доступу в ефір", "Password for room access")
+    fun passwordFieldPlaceholder(lang: AppLanguage) = t(lang, "Пароль для доступа в эфир", "Пароль для доступу в ефір", "Password for channel access")
     fun passwordFieldPlaceholder(c: Context) = passwordFieldPlaceholder(LanguageManager.getLanguage(c))
 
-    fun searchingRoomStatus(lang: AppLanguage) = t(lang, "Поиск комнаты в эфире...", "Пошук кімнати в ефірі...", "Searching room in air...")
+    fun searchingRoomStatus(lang: AppLanguage) = t(lang, "Поиск канала в эфире...", "Пошук каналу в ефірі...", "Searching channel in air...")
     fun searchingRoomStatus(c: Context) = searchingRoomStatus(LanguageManager.getLanguage(c))
 
-    fun roomFoundBanner(lang: AppLanguage, name: String) = t(lang, "Комната «$name» найдена!", "Кімната «$name» знайдена!", "Room «$name» found!")
+    fun roomFoundBanner(lang: AppLanguage, name: String) = t(lang, "Канал «$name» найден!", "Канал «$name» знайдено!", "Channel «$name» found!")
     fun roomFoundBanner(c: Context, name: String) = roomFoundBanner(LanguageManager.getLanguage(c), name)
 
     fun roomCreatorLabel(lang: AppLanguage, owner: String) = t(lang, "Создатель: $owner", "Творець: $owner", "Creator: $owner")
     fun roomCreatorLabel(c: Context, owner: String) = roomCreatorLabel(LanguageManager.getLanguage(c), owner)
 
-    fun creatorNoteTitle(lang: AppLanguage) = t(lang, "Записка от создателя комнаты:", "Записка від творця кімнати:", "Note from room creator:")
+    fun creatorNoteTitle(lang: AppLanguage) = t(lang, "Записка от создателя канала:", "Записка від творця каналу:", "Note from channel creator:")
     fun creatorNoteTitle(c: Context) = creatorNoteTitle(LanguageManager.getLanguage(c))
 
     fun roomAbandonedWarning(lang: AppLanguage) = t(
         lang,
-        "⚠️ В комнате сейчас никого нет (создатель вышел). Доступ открыт по общему паролю.",
-        "⚠️ У кімнаті зараз нікого немає (творець вийшов). Доступ відкритий за загальним паролем.",
-        "⚠️ Room is empty (creator left). Access open with common password."
+        "⚠️ В канале сейчас никого нет (создатель вышел). Доступ открыт по общему паролю.",
+        "⚠️ У каналі зараз нікого немає (творець вийшов). Доступ відкритий за загальним паролем.",
+        "⚠️ Channel is empty (creator left). Access open with common password."
     )
     fun roomAbandonedWarning(c: Context) = roomAbandonedWarning(LanguageManager.getLanguage(c))
 
     fun enterAirBtn(lang: AppLanguage) = t(lang, "📻 ВОЙТИ В ЭФИР", "📻 УВІЙТИ В ЕФІР", "📻 ENTER AIR")
     fun enterAirBtn(c: Context) = enterAirBtn(LanguageManager.getLanguage(c))
 
-    fun createRoomPrompt(lang: AppLanguage) = t(lang, "Создайте новую закрытую комнату и станьте её владельцем:", "Створіть нову закриту кімнату та станьте її власником:", "Create a new closed room and become its owner:")
+    fun createRoomPrompt(lang: AppLanguage) = t(lang, "Создайте новый закрытый канал и станьте его владельцем:", "Створіть новий закритий канал та станьте його власником:", "Create a new closed channel and become its owner:")
     fun createRoomPrompt(c: Context) = createRoomPrompt(LanguageManager.getLanguage(c))
 
-    fun newRoomFieldLabel(lang: AppLanguage) = t(lang, "Название или номер комнаты *", "Назва або номер кімнати *", "Room name or number *")
+    fun newRoomFieldLabel(lang: AppLanguage) = t(lang, "Название или номер канала *", "Назва або номер каналу *", "Channel name or number *")
     fun newRoomFieldLabel(c: Context) = newRoomFieldLabel(LanguageManager.getLanguage(c))
     fun newRoomFieldPlaceholder(lang: AppLanguage) = t(lang, "102, Дозор-1...", "102, Дозор-1...", "102, Sector-1...")
     fun newRoomFieldPlaceholder(c: Context) = newRoomFieldPlaceholder(LanguageManager.getLanguage(c))
@@ -127,24 +127,24 @@ object I18n {
     fun randomNumberBtn(lang: AppLanguage) = t(lang, "🎲 Номер", "🎲 Номер", "🎲 Random")
     fun randomNumberBtn(c: Context) = randomNumberBtn(LanguageManager.getLanguage(c))
 
-    fun newPasswordFieldLabel(lang: AppLanguage) = t(lang, "Секретный пароль для комнаты *", "Секретний пароль для кімнати *", "Secret password for room *")
+    fun newPasswordFieldLabel(lang: AppLanguage) = t(lang, "Секретный пароль для канала *", "Секретний пароль для каналу *", "Secret password for channel *")
     fun newPasswordFieldLabel(c: Context) = newPasswordFieldLabel(LanguageManager.getLanguage(c))
     fun newPasswordFieldPlaceholder(lang: AppLanguage) = t(lang, "Придумайте пароль", "Придумайте пароль", "Create password")
     fun newPasswordFieldPlaceholder(c: Context) = newPasswordFieldPlaceholder(LanguageManager.getLanguage(c))
 
     fun yourExistingRoomNote(lang: AppLanguage) = t(
         lang,
-        "Это ваша созданная ранее комната. При вводе правильного пароля её настройки будут обновлены, и вы войдете как владелец.",
-        "Це ваша створена раніше кімната. При введенні правильного пароля її налаштування будуть оновлені, і ви увійдете як власник.",
-        "This is your previously created room. With correct password, settings will be updated and you will enter as owner."
+        "Это ваш созданный ранее канал. При вводе правильного пароля его настройки будут обновлены, и вы войдете как владелец.",
+        "Це ваш створений раніше канал. При введенні правильного пароля його налаштування будуть оновлені, і ви увійдете як власник.",
+        "This is your previously created channel. With correct password, settings will be updated and you will enter as owner."
     )
     fun yourExistingRoomNote(c: Context) = yourExistingRoomNote(LanguageManager.getLanguage(c))
 
     fun roomRegisteredNote(lang: AppLanguage, name: String) = t(
         lang,
-        "Комната «$name» уже зарегистрирована в сети. Если это ваша комната, введите её пароль для восстановления управления.",
-        "Кімната «$name» вже зареєстрована в мережі. Якщо це ваша кімната, введіть її пароль для відновлення керування.",
-        "Room «$name» is already registered. If this is your room, enter password to restore ownership."
+        "Канал «$name» уже зарегистрирован в сети. Если это ваш канал, введите его пароль для восстановления управления.",
+        "Канал «$name» вже зареєстрований в мережі. Якщо це ваш канал, введіть його пароль для відновлення керування.",
+        "Channel «$name» is already registered. If this is your channel, enter password to restore ownership."
     )
     fun roomRegisteredNote(c: Context, name: String) = roomRegisteredNote(LanguageManager.getLanguage(c), name)
 
@@ -220,7 +220,7 @@ object I18n {
     fun logOutTelegram(lang: AppLanguage) = t(lang, "Выйти из Telegram", "Вийти з Telegram", "Log out of Telegram")
     fun logOutTelegram(c: Context) = logOutTelegram(LanguageManager.getLanguage(c))
 
-    fun roomLabel(lang: AppLanguage) = t(lang, "Код комнаты", "Код кімнати", "Room ID")
+    fun roomLabel(lang: AppLanguage) = t(lang, "Код канала", "Код каналу", "Channel ID")
     fun roomLabel(c: Context) = roomLabel(LanguageManager.getLanguage(c))
 
     fun telegramConfirmBtn(lang: AppLanguage) = t(lang, "Войти", "Увійти", "Sign In")
@@ -229,10 +229,10 @@ object I18n {
     fun callSignRequiredToast(lang: AppLanguage) = t(lang, "Укажите ваш позывной", "Вкажіть ваш позивний", "Enter your callsign")
     fun callSignRequiredToast(c: Context) = callSignRequiredToast(LanguageManager.getLanguage(c))
 
-    fun roomNameRequiredToast(lang: AppLanguage) = t(lang, "Укажите номер или название комнаты", "Вкажіть номер або назву кімнати", "Enter room name or number")
+    fun roomNameRequiredToast(lang: AppLanguage) = t(lang, "Укажите номер или название канала", "Вкажіть номер або назву каналу", "Enter channel name or number")
     fun roomNameRequiredToast(c: Context) = roomNameRequiredToast(LanguageManager.getLanguage(c))
 
-    fun passwordRequiredToast(lang: AppLanguage) = t(lang, "Введите пароль комнаты", "Введіть пароль кімнати", "Enter room password")
+    fun passwordRequiredToast(lang: AppLanguage) = t(lang, "Введите пароль канала", "Введіть пароль каналу", "Enter channel password")
     fun passwordRequiredToast(c: Context) = passwordRequiredToast(LanguageManager.getLanguage(c))
 
     // Audio Modes
@@ -410,7 +410,7 @@ object I18n {
     fun downloadingApk(c: Context) = downloadingApk(LanguageManager.getLanguage(c))
 
     // --- Room Entry History ---
-    fun historyRoomsTitle(c: Context) = t(c, "📜 Недавние комнаты", "📜 Нещодавні кімнати", "📜 Recent Rooms")
+    fun historyRoomsTitle(c: Context) = t(c, "📜 Недавние каналы", "📜 Нещодавні канали", "📜 Recent Channels")
     fun historyRoomsSubtitle(c: Context) = t(
         c,
         "Быстрый вход в 1 клик и ваши права",
@@ -419,7 +419,7 @@ object I18n {
     )
     fun historyFilterAll(c: Context, count: Int) = t(c, "Все ($count)", "Всі ($count)", "All ($count)")
     fun historyFilterAdmin(c: Context, count: Int) = t(c, "👑 Мои / Админ ($count)", "👑 Мої / Адмін ($count)", "👑 Mine / Admin ($count)")
-    fun historyEmpty(c: Context) = t(c, "История входа пуста", "Історія входів порожня", "No room history yet")
+    fun historyEmpty(c: Context) = t(c, "История каналов пуста", "Історія каналів порожня", "No channel history yet")
     fun historyClearBtn(c: Context) = t(c, "Очистить историю", "Очистити історію", "Clear History")
     fun historyRoleOwner(c: Context) = t(c, "👑 Создатель", "👑 Творець", "👑 Creator")
     fun historyRoleAdmin(c: Context) = t(c, "🛡️ Админ", "🛡️ Адмін", "🛡️ Admin")
@@ -435,7 +435,7 @@ object I18n {
     fun vibrateModeBadge(c: Context) = vibrateModeBadge(LanguageManager.getLanguage(c))
     fun loudspeakerBadge(lang: AppLanguage) = t(lang, "🔊 Звук", "🔊 Звук", "🔊 Sound")
     fun loudspeakerBadge(c: Context) = loudspeakerBadge(LanguageManager.getLanguage(c))
-    fun switchRoomTooltip(lang: AppLanguage) = t(lang, "Сменить комнату", "Змінити кімнату", "Switch Room")
+    fun switchRoomTooltip(lang: AppLanguage) = t(lang, "Сменить канал", "Змінити канал", "Switch Channel")
     fun switchRoomTooltip(c: Context) = switchRoomTooltip(LanguageManager.getLanguage(c))
     fun voiceHistoryTooltip(lang: AppLanguage) = t(lang, "История рации", "Історія рації", "Radio History")
     fun voiceHistoryTooltip(c: Context) = voiceHistoryTooltip(LanguageManager.getLanguage(c))
@@ -465,16 +465,16 @@ object I18n {
     fun myLocationTooltip(lang: AppLanguage) = t(lang, "Моё местоположение", "Моє місцезнаходження", "My Location")
     fun myLocationTooltip(c: Context) = myLocationTooltip(LanguageManager.getLanguage(c))
 
-    fun switchRoomConfirmTitle(lang: AppLanguage) = t(lang, "🚪 Сменить комнату?", "🚪 Змінити кімнату?", "🚪 Switch Room?")
+    fun switchRoomConfirmTitle(lang: AppLanguage) = t(lang, "🚪 Сменить канал?", "🚪 Змінити канал?", "🚪 Switch Channel?")
     fun switchRoomConfirmTitle(c: Context) = switchRoomConfirmTitle(LanguageManager.getLanguage(c))
     fun switchRoomConfirmDesc(lang: AppLanguage, roomName: String) = t(
         lang,
-        "Вы выйдете из текущего закрытого радиоканала «$roomName» и сможете выбрать другую группу или создать новый канал.\n\nВаша авторизация сохранится.",
-        "Ви вийдете з поточного закритого радіоканалу «$roomName» і зможете обрати іншу групу або створити новий канал.\n\nВаша авторизація збережеться.",
-        "You will disconnect from current channel «$roomName» and can switch to another room or create a new one.\n\nYour session remains saved."
+        "Вы выйдете из текущего закрытого радиоканала «$roomName» и сможете выбрать другой канал или создать новый.\n\nВаша авторизация сохранится.",
+        "Ви вийдете з поточного закритого радіоканалу «$roomName» і зможете обрати інший канал або створити новий.\n\nВаша авторизація збережеться.",
+        "You will disconnect from current channel «$roomName» and can switch to another channel or create a new one.\n\nYour session remains saved."
     )
     fun switchRoomConfirmDesc(c: Context, roomName: String) = switchRoomConfirmDesc(LanguageManager.getLanguage(c), roomName)
-    fun switchRoomConfirmAction(lang: AppLanguage) = t(lang, "Сменить комнату", "Змінити кімнату", "Switch Room")
+    fun switchRoomConfirmAction(lang: AppLanguage) = t(lang, "Сменить канал", "Змінити канал", "Switch Channel")
     fun switchRoomConfirmAction(c: Context) = switchRoomConfirmAction(LanguageManager.getLanguage(c))
 
     // --- Hazard & Danger Report Dialogs ---
@@ -484,7 +484,7 @@ object I18n {
         lang,
         "Выберите тип метки для оповещения всех участников группы:",
         "Оберіть тип мітки для сповіщення всіх учасників групи:",
-        "Select hazard type to alert everyone in the room:"
+        "Select hazard type to alert everyone in the channel:"
     )
     fun chooseDangerDesc(c: Context) = chooseDangerDesc(LanguageManager.getLanguage(c))
     fun dangerDetailsHint(lang: AppLanguage) = t(
@@ -608,45 +608,45 @@ object I18n {
 Varta GO — это гражданский инструмент рации (Push-to-Talk) и взаимного оповещения общины о чрезвычайных ситуациях, стихийных бедствиях, пожарах, ДТП и необходимости медицинской помощи.
 
 2. Используемые разрешения
-• Микрофон (RECORD_AUDIO): используется исключительно во время удерживания кнопки рации (PTT) для передачи голосового сообщения в активную комнату.
-• Геолокация (LOCATION): используется для отображения карты вокруг вас и расчёта расстояния до меток опасности в вашей комнате. Координаты не передаются третьим лицам и рекламным сетям.
+• Микрофон (RECORD_AUDIO): используется исключительно во время удерживания кнопки рации (PTT) для передачи голосового сообщения в активный канал.
+• Геолокация (LOCATION): используется для отображения карты вокруг вас и расчёта расстояния до меток опасности в вашем канале. Координаты не передаются третьим лицам и рекламным сетям.
 • Камера (CAMERA): используется только по вашему запросу для фотофиксации чрезвычайного происшествия.
 • Фоновая служба (FOREGROUND_SERVICE): обеспечивает непрерывный приём экстренных голосовых сообщений рации при выключенном экране.
 
 3. Правила сообщества (UGC Policy)
 • Строго запрещено публиковать спам, оскорбления, заведомо ложные вызовы, незаконный контент или материалы, нарушающие действующее законодательство.
-• Создатели и администраторы комнат имеют полномочия мгновенно исключать (Kick) и блокировать (Ban) нарушителей.
+• Создатели и администраторы каналов имеют полномочия мгновенно исключать (Kick) и блокировать (Ban) нарушителей.
 • Все сообщения и метки автоматически очищаются по истечении срока актуальности.""",
         """1. Призначення застосунку
 Varta GO — це цивільний інструмент рації (Push-to-Talk) та взаємного оповіщення громади про надзвичайні ситуації, стихійні лиха, пожежі, ДТП та потребу в медичній допомозі.
 
 2. Дозволи, що використовуються
-• Мікрофон (RECORD_AUDIO): використовується виключно під час утримування кнопки рації (PTT) для передачі голосового повідомлення в активну кімнату.
+• Мікрофон (RECORD_AUDIO): використовується виключно під час утримування кнопки рації (PTT) для передачі голосового повідомлення в активний канал.
 • Геолокація (LOCATION): використовується для відображення карти навколо вас та розрахунку відстані до міток небезпеки. Координати не передаються третім особам чи рекламним мережам.
 • Камера (CAMERA): використовується лише за вашим запитом для фотофіксації надзвичайної події.
 • Фонова служба (FOREGROUND_SERVICE): забезпечує безперервний прийом екстрених голосових повідомлень рації при вимкненому екрані.
 
 3. Правила спільноти (UGC Policy)
 • Суворо заборонено публікувати спам, образи, завідомо неправдиві виклики, незаконний контент або матеріали, що порушують чинне законодавство.
-• Творці та адміністратори кімнат мають повноваження миттєво виключати (Kick) та блокувати (Ban) порушників.
+• Творці та адміністратори каналів мають повноваження миттєво виключати (Kick) та блокувати (Ban) порушників.
 • Усі повідомлення та мітки автоматично очищуються після закінчення терміну актуальності.""",
         """1. Purpose of the Application
 Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety alert tool designed for mutual assistance during emergencies, fires, road accidents, and medical incidents.
 
 2. Permissions Used
-• Microphone (RECORD_AUDIO): Used strictly while pressing and holding the PTT button to transmit voice audio to your active room.
+• Microphone (RECORD_AUDIO): Used strictly while pressing and holding the PTT button to transmit voice audio to your active channel.
 • Location (LOCATION): Used to display the map and calculate distance to community hazard markers. Location data is never sold or shared with third-party advertisers.
 • Camera (CAMERA): Used only when explicitly triggered by you to attach a photo to a hazard report.
 • Foreground Service (FOREGROUND_SERVICE): Maintains real-time walkie-talkie audio reception when the screen is turned off.
 
 3. Community Guidelines (UGC Policy)
 • Spam, harassment, false emergency reports, illegal content, or any material violating local laws is strictly prohibited.
-• Room owners and administrators have built-in moderation tools to immediately Kick or Ban abusive users.
+• Channel owners and administrators have built-in moderation tools to immediately Kick or Ban abusive users.
 • Ephemeral alerts and voice transmissions are automatically purged upon expiration."""
     )
 
     // --- Settings Dialog ---
-    fun settingsTitle(lang: AppLanguage) = t(lang, "Настройки комнаты", "Налаштування кімнати", "Room Settings")
+    fun settingsTitle(lang: AppLanguage) = t(lang, "Настройки канала", "Налаштування каналу", "Channel Settings")
     fun settingsTitle(c: Context) = settingsTitle(LanguageManager.getLanguage(c))
     fun languageSection(lang: AppLanguage) = t(lang, "Язык приложения", "Мова застосунку", "App Language")
     fun languageSection(c: Context) = languageSection(LanguageManager.getLanguage(c))
@@ -665,9 +665,9 @@ Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety ale
     fun storageSection(c: Context) = storageSection(LanguageManager.getLanguage(c))
     fun autoDeleteToggle(lang: AppLanguage) = t(lang, "Самоуничтожение сообщений (24ч)", "Самознищення повідомлень (24 год)", "Self-Destruct Messages (24h)")
     fun autoDeleteToggle(c: Context) = autoDeleteToggle(LanguageManager.getLanguage(c))
-    fun redirectionSection(lang: AppLanguage) = t(lang, "Сообщение для гостей пустой комнаты", "Повідомлення для гостей порожньої кімнати", "Announcement for room visitors")
+    fun redirectionSection(lang: AppLanguage) = t(lang, "Сообщение для гостей пустого канала", "Повідомлення для гостей порожнього каналу", "Announcement for channel visitors")
     fun redirectionSection(c: Context) = redirectionSection(LanguageManager.getLanguage(c))
-    fun redirectionHint(lang: AppLanguage) = t(lang, "Например: Мы перешли в комнату 26", "Наприклад: Ми перейшли в кімнату 26", "e.g. We moved to room 26")
+    fun redirectionHint(lang: AppLanguage) = t(lang, "Например: Мы перешли в канал 26", "Наприклад: Ми перейшли в канал 26", "e.g. We moved to channel 26")
     fun redirectionHint(c: Context) = redirectionHint(LanguageManager.getLanguage(c))
     fun saveRedirectionBtn(lang: AppLanguage) = t(lang, "Сохранить сообщение", "Зберегти повідомлення", "Save Announcement")
     fun saveRedirectionBtn(c: Context) = saveRedirectionBtn(LanguageManager.getLanguage(c))
@@ -677,20 +677,20 @@ Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety ale
     fun unbanBtn(c: Context) = unbanBtn(LanguageManager.getLanguage(c))
     fun noBannedUsers(lang: AppLanguage) = t(lang, "Нет заблокированных участников", "Немає заблокованих учасників", "No banned members")
     fun noBannedUsers(c: Context) = noBannedUsers(LanguageManager.getLanguage(c))
-    fun leaveRoomBtn(lang: AppLanguage) = t(lang, "Покинуть комнату", "Вийти з кімнати", "Leave Room")
+    fun leaveRoomBtn(lang: AppLanguage) = t(lang, "Покинуть канал", "Вийти з каналу", "Leave Channel")
     fun leaveRoomBtn(c: Context) = leaveRoomBtn(LanguageManager.getLanguage(c))
-    fun deleteRoomBtn(lang: AppLanguage) = t(lang, "🗑️ Удалить комнату совсем", "🗑️ Видалити кімнату назавжди", "🗑️ Delete Room Permanently")
+    fun deleteRoomBtn(lang: AppLanguage) = t(lang, "🗑️ Удалить канал совсем", "🗑️ Видалити канал назавжди", "🗑️ Delete Channel Permanently")
     fun deleteRoomBtn(c: Context) = deleteRoomBtn(LanguageManager.getLanguage(c))
-    fun deleteRoomConfirmTitle(lang: AppLanguage) = t(lang, "Удаление комнаты", "Видалення кімнати", "Delete Room")
+    fun deleteRoomConfirmTitle(lang: AppLanguage) = t(lang, "Удаление канала", "Видалення каналу", "Delete Channel")
     fun deleteRoomConfirmTitle(c: Context) = deleteRoomConfirmTitle(LanguageManager.getLanguage(c))
     fun deleteRoomConfirmText(lang: AppLanguage) = t(
         lang,
-        "Вы действительно хотите навсегда удалить эту комнату? Все участники будут отключены, а комната стёрта из сети.",
-        "Ви дійсно хочете назавжди видалити цю кімнату? Всі учасники будуть відключені, а кімната стерта з мережі.",
-        "Are you sure you want to permanently delete this room? All members will be disconnected and the room erased from the network."
+        "Вы действительно хотите навсегда удалить этот канал? Все участники будут отключены, а канал стёрт из сети.",
+        "Ви дійсно хочете назавжди видалити цей канал? Всі учасники будуть відключені, а канал стертий з мережі.",
+        "Are you sure you want to permanently delete this channel? All members will be disconnected and the channel erased from the network."
     )
     fun deleteRoomConfirmText(c: Context) = deleteRoomConfirmText(LanguageManager.getLanguage(c))
-    fun deleteRoomConfirmAction(lang: AppLanguage) = t(lang, "Да, удалить комнату", "Так, видалити кімнату", "Yes, delete room")
+    fun deleteRoomConfirmAction(lang: AppLanguage) = t(lang, "Да, удалить канал", "Так, видалити канал", "Yes, delete channel")
     fun deleteRoomConfirmAction(c: Context) = deleteRoomConfirmAction(LanguageManager.getLanguage(c))
 
     // --- Super Admin ---
@@ -700,9 +700,9 @@ Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety ale
     fun superAdminStatusActive(c: Context) = superAdminStatusActive(LanguageManager.getLanguage(c))
     fun superAdminDesc(lang: AppLanguage) = t(
         lang,
-        "У вас есть права на удаление любых комнат и управление всей сетью.",
-        "У вас є права на видалення будь-яких кімнат та керування всією мережею.",
-        "You have privileges to delete any room and manage the entire network."
+        "У вас есть права на удаление любых каналов и управление всей сетью.",
+        "У вас є права на видалення будь-яких каналів та керування всією мережею.",
+        "You have privileges to delete any channel and manage the entire network."
     )
     fun superAdminDesc(c: Context) = superAdminDesc(LanguageManager.getLanguage(c))
     fun superAdminPrompt(lang: AppLanguage) = t(lang, "Введите мастер-пароль суперадмина для активации:", "Введіть майстер-пароль суперадміна для активації:", "Enter super admin master passcode to activate:")
@@ -711,18 +711,18 @@ Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety ale
     fun superAdminKeyPlaceholder(c: Context) = superAdminKeyPlaceholder(LanguageManager.getLanguage(c))
     fun superAdminActivateBtn(lang: AppLanguage) = t(lang, "Активировать", "Активувати", "Activate")
     fun superAdminActivateBtn(c: Context) = superAdminActivateBtn(LanguageManager.getLanguage(c))
-    fun wipeAllRoomsBtn(lang: AppLanguage) = t(lang, "💥 Удалить ВСЕ существующие комнаты сети", "💥 Видалити ВСІ кімнати мережі", "💥 Wipe ALL Network Rooms")
+    fun wipeAllRoomsBtn(lang: AppLanguage) = t(lang, "💥 Удалить ВСЕ существующие каналы сети", "💥 Видалити ВСІ канали мережі", "💥 Wipe ALL Network Channels")
     fun wipeAllRoomsBtn(c: Context) = wipeAllRoomsBtn(LanguageManager.getLanguage(c))
     fun wipeAllRoomsConfirmTitle(lang: AppLanguage) = t(lang, "ВНИМАНИЕ: Очистка сети", "УВАГА: Очищення мережі", "WARNING: Network Wipe")
     fun wipeAllRoomsConfirmTitle(c: Context) = wipeAllRoomsConfirmTitle(LanguageManager.getLanguage(c))
     fun wipeAllRoomsConfirmText(lang: AppLanguage) = t(
         lang,
-        "Это полностью удалит ВСЕ зарегистрированные комнаты на всех серверах брокеров. Никто не сможет войти в старые комнаты. Продолжить?",
-        "Це повністю видалить ВСІ зареєстровані кімнати на всіх серверах брокерів. Ніхто не зможе увійти в старі кімнати. Продовжити?",
-        "This will completely erase ALL registered rooms across all brokers. Nobody will be able to enter previous rooms. Proceed?"
+        "Это полностью удалит ВСЕ зарегистрированные каналы на всех серверах брокеров. Никто не сможет войти в старые каналы. Продолжить?",
+        "Це повністю видалить ВСІ зареєстровані канали на всіх серверах брокерів. Ніхто не зможе увійти в старі канали. Продовжити?",
+        "This will completely erase ALL registered channels across all brokers. Nobody will be able to enter previous channels. Proceed?"
     )
     fun wipeAllRoomsConfirmText(c: Context) = wipeAllRoomsConfirmText(LanguageManager.getLanguage(c))
-    fun wipeAllRoomsConfirmAction(lang: AppLanguage) = t(lang, "Удалить все комнаты", "Видалити всі кімнати", "Wipe All Rooms")
+    fun wipeAllRoomsConfirmAction(lang: AppLanguage) = t(lang, "Удалить все каналы", "Видалити всі канали", "Wipe All Channels")
     fun wipeAllRoomsConfirmAction(c: Context) = wipeAllRoomsConfirmAction(LanguageManager.getLanguage(c))
 
     // --- Group Members Dialog ---
@@ -763,30 +763,30 @@ Varta GO is a civilian Push-to-Talk (PTT) walkie-talkie and community safety ale
     // --- Notifications & Toasts ---
     fun roomDeletedNotice(lang: AppLanguage) = t(
         lang,
-        "Комната была полностью удалена создателем сети",
-        "Кімната була повністю видалена творцем мережі",
-        "The room was completely deleted by the network creator"
+        "Канал был полностью удален создателем сети",
+        "Канал було повністю видалено творцем мережі",
+        "The channel was completely deleted by the network creator"
     )
     fun roomDeletedNotice(c: Context) = roomDeletedNotice(LanguageManager.getLanguage(c))
     fun kickNotice(lang: AppLanguage) = t(
         lang,
-        "Вы были исключены из комнаты администратором",
-        "Вас було виключено з кімнати адміністратором",
-        "You were kicked from the room by an administrator"
+        "Вы были исключены из канала администратором",
+        "Вас було виключено з каналу адміністратором",
+        "You were kicked from the channel by an administrator"
     )
     fun kickNotice(c: Context) = kickNotice(LanguageManager.getLanguage(c))
     fun banNotice(lang: AppLanguage, untilTime: String) = t(
         lang,
-        "Вы заблокированы в этой комнате до $untilTime",
-        "Вас заблоковано в цій кімнаті до $untilTime",
-        "You are banned in this room until $untilTime"
+        "Вы заблокированы в этом канале до $untilTime",
+        "Вас заблоковано в цьому каналі до $untilTime",
+        "You are banned in this channel until $untilTime"
     )
     fun banNotice(c: Context, untilTime: String) = banNotice(LanguageManager.getLanguage(c), untilTime)
     fun banPermanentNotice(lang: AppLanguage) = t(
         lang,
-        "Вы заблокированы в этой комнате навсегда",
-        "Вас заблоковано в цій кімнаті назавжди",
-        "You are permanently banned in this room"
+        "Вы заблокированы в этом канале навсегда",
+        "Вас заблоковано в цьому каналі назавжди",
+        "You are permanently banned in this channel"
     )
     fun banPermanentNotice(c: Context) = banPermanentNotice(LanguageManager.getLanguage(c))
 

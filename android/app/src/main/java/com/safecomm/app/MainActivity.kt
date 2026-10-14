@@ -375,7 +375,7 @@ class MainActivity : ComponentActivity() {
                         coroutineScope.launch {
                             telegramClient.wipeAllRooms()
                                 .onSuccess { count ->
-                                    Toast.makeText(this@MainActivity, "Все комнаты сети удалены ($count)", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, "Все каналы сети удалены ($count)", Toast.LENGTH_LONG).show()
                                 }
                                 .onFailure {
                                     Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
@@ -627,7 +627,7 @@ class MainActivity : ComponentActivity() {
                         coroutineScope.launch {
                             telegramClient.wipeAllRooms()
                                 .onSuccess { count ->
-                                    Toast.makeText(this@MainActivity, "Все комнаты сети удалены ($count)", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, "Все каналы сети удалены ($count)", Toast.LENGTH_LONG).show()
                                 }
                                 .onFailure {
                                     Toast.makeText(this@MainActivity, "Ошибка: ${it.message}", Toast.LENGTH_LONG).show()
@@ -657,7 +657,7 @@ class MainActivity : ComponentActivity() {
                         coroutineScope.launch {
                             telegramClient.changeRoomPassword(newPass)
                                 .onSuccess {
-                                    Toast.makeText(this@MainActivity, "Пароль комнаты успешно изменён", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Пароль канала успешно изменён", Toast.LENGTH_SHORT).show()
                                 }
                                 .onFailure {
                                     Toast.makeText(this@MainActivity, "Ошибка смены пароля: ${it.message}", Toast.LENGTH_LONG).show()
@@ -699,13 +699,13 @@ class MainActivity : ComponentActivity() {
                     },
                     onLeaveRoom = {
                         telegramClient.leaveRoom()
-                        Toast.makeText(this@MainActivity, "Вы вышли из комнаты", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Вы вышли из канала", Toast.LENGTH_SHORT).show()
                     },
                     onDeleteRoom = {
                         coroutineScope.launch {
                             telegramClient.deleteRoom()
                                 .onSuccess {
-                                    Toast.makeText(this@MainActivity, "Комната удалена из сети", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "Канал удалён из сети", Toast.LENGTH_SHORT).show()
                                 }
                                 .onFailure {
                                     Toast.makeText(this@MainActivity, "Ошибка удаления: ${it.message}", Toast.LENGTH_LONG).show()
