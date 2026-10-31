@@ -124,7 +124,8 @@ data class Alert(
     @SerialName("is_active") val isActive: Boolean = true,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("resolved_at") val resolvedAt: String? = null,
-    val expiresAt: Long = 0L
+    val expiresAt: Long = 0L,
+    @SerialName("custom_icon") val customIcon: String = ""
 ) {
     val typedCategory: AlertType
         get() = AlertType.fromRaw(alertType)

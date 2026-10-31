@@ -32,12 +32,23 @@ import com.safecomm.app.data.model.AlertType
 @Composable
 fun AlertCategoryIcon(
     type: AlertType,
+    customIcon: String = "",
     fontSize: TextUnit = 22.sp,
     modifier: Modifier = Modifier
 ) {
+    val effectiveIcon = customIcon.ifBlank { type.icon }
     if (type == AlertType.MILITARY) {
-        val sizeDp: Dp = (fontSize.value * 1.25f).dp
-        CamoTurtleIcon(size = sizeDp, modifier = modifier)
+        if (effectiveIcon == "🐢") {
+            val sizeDp: Dp = (fontSize.value * 1.25f).dp
+            CamoTurtleIcon(size = sizeDp, modifier = modifier)
+        } else {
+            Text(
+                text = effectiveIcon,
+                fontSize = fontSize,
+                textAlign = TextAlign.Center,
+                modifier = modifier
+            )
+        }
     } else {
         Text(
             text = type.icon,

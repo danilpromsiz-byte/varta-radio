@@ -59,8 +59,8 @@ fun MainHubScreen(
     onStartPtt: () -> Unit,
     onStopPtt: () -> Unit,
     onLaunchCamera: () -> Unit,
-    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double) -> Unit,
-    onConfirmPhotoReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double) -> Unit,
+    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
+    onConfirmPhotoReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
     onResolveAlert: (Alert) -> Unit,
     onPlayHistoryVoice: (VoiceMessage) -> Unit,
     onStopHistoryVoice: () -> Unit,
@@ -560,13 +560,13 @@ fun MainHubScreen(
                 dangerSelectedType = null
                 dangerDescription = ""
             },
-            onConfirmAlert = { type, desc, dur, lat, lng ->
+            onConfirmAlert = { type, desc, dur, lat, lng, icon ->
                 showDangerDialog = false
                 customAlertLat = 0.0
                 customAlertLng = 0.0
                 dangerSelectedType = null
                 dangerDescription = ""
-                onConfirmAlert(type, desc, dur, lat, lng)
+                onConfirmAlert(type, desc, dur, lat, lng, icon)
             },
             onHapticTick = onHapticTick,
             currentLanguage = currentLanguage
@@ -600,13 +600,13 @@ fun MainHubScreen(
                 photoSelectedType = null
                 photoDescription = ""
             },
-            onConfirmReport = { type, desc, lat, lng ->
+            onConfirmReport = { type, desc, lat, lng, icon ->
                 showPhotoDialog = false
                 customAlertLat = 0.0
                 customAlertLng = 0.0
                 photoSelectedType = null
                 photoDescription = ""
-                onConfirmPhotoReport(type, desc, lat, lng)
+                onConfirmPhotoReport(type, desc, lat, lng, icon)
             },
             onHapticTick = onHapticTick,
             currentLanguage = currentLanguage

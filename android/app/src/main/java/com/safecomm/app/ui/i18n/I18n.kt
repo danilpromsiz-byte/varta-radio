@@ -480,6 +480,14 @@ object I18n {
     // --- Hazard & Danger Report Dialogs ---
     fun placeDangerTitle(lang: AppLanguage) = t(lang, "📍 ПОСТАВИТЬ МЕТКУ", "📍 ПОСТАВИТИ МІТКУ", "📍 REPORT HAZARD")
     fun placeDangerTitle(c: Context) = placeDangerTitle(LanguageManager.getLanguage(c))
+    fun hazardIconPickerTitle(lang: AppLanguage) = t(lang, "🎯 Значок опасной зоны", "🎯 Значок небезпечної зони", "🎯 Hazard Zone Icon")
+    fun hazardIconPickerTitle(c: Context) = hazardIconPickerTitle(LanguageManager.getLanguage(c))
+    fun hazardIconPickerSubtitle(lang: AppLanguage) = t(lang, "Выберите значок под себя (20 вариантов)", "Оберіть значок під себе (20 варіантів)", "Choose icon for map & broadcasts (20 presets)")
+    fun hazardIconPickerSubtitle(c: Context) = hazardIconPickerSubtitle(LanguageManager.getLanguage(c))
+    fun activeHazardIconNote(lang: AppLanguage) = t(lang, "Активный значок для метки", "Активний значок для мітки", "Active icon for hazard")
+    fun activeHazardIconNote(c: Context) = activeHazardIconNote(LanguageManager.getLanguage(c))
+    fun customizeHazardIconBtn(lang: AppLanguage) = t(lang, "⚙️ Значок", "⚙️ Значок", "⚙️ Icon")
+    fun customizeHazardIconBtn(c: Context) = customizeHazardIconBtn(LanguageManager.getLanguage(c))
     fun chooseDangerDesc(lang: AppLanguage) = t(
         lang,
         "Выберите тип метки для оповещения всех участников группы:",

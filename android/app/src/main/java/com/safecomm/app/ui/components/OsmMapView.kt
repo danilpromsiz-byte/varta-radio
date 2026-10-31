@@ -162,17 +162,18 @@ fun OsmMapView(
             val alert = cluster.primaryAlert
             val point = GeoPoint(cluster.latitude, cluster.longitude)
             val catLabel = I18n.alertTypeName(currentLanguage, alert.typedCategory.rawValue)
+            val alertEmoji = alert.customIcon.ifBlank { alert.typedCategory.icon }
 
             val marker = Marker(map).apply {
                 position = point
                 title = if (cluster.count > 1) {
-                    "${alert.typedCategory.icon} $catLabel (x${cluster.count})"
+                    "$alertEmoji $catLabel (x${cluster.count})"
                 } else {
-                    "${alert.typedCategory.icon} $catLabel"
+                    "$alertEmoji $catLabel"
                 }
                 snippet = alert.description.ifBlank { "${I18n.reportedByLabel(currentLanguage)}: ${alert.senderNick}" }
                 // Clean icon without circle background, with count badge if clustered
-                icon = createCleanMarkerDrawable(context, alert.typedCategory.icon, cluster.count)
+                icon = createCleanMarkerDrawable(context, alertEmoji, cluster.count)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 setOnMarkerClickListener { _, _ ->
                     onAlertClick(alert)

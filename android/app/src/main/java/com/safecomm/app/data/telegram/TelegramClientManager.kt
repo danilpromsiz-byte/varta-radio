@@ -60,7 +60,8 @@ data class VartaPacket(
     val targetNick: String = "",
     val banUntil: Long = 0L, // 0 = none, -1 = permanent ban, > 0 = timestamp
     val sig: String = "",
-    val userStatus: String = "talk"
+    val userStatus: String = "talk",
+    val customIcon: String = ""
 )
 
 /**
@@ -1586,7 +1587,8 @@ class TelegramClientManager(private val context: Context) {
                         photoPath = photoPath,
                         isActive = true,
                         createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
-                        expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
+                        expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L,
+                        customIcon = packet.customIcon
                     )
 
                     Log.d("VartaNetwork", "Received live alert from ${packet.senderNick}: ${packet.alertType} (room=$roomName)")
@@ -1689,7 +1691,8 @@ class TelegramClientManager(private val context: Context) {
         lng: Double,
         desc: String,
         photoFile: File? = null,
-        durationMinutes: Int = 30
+        durationMinutes: Int = 30,
+        customIcon: String = ""
     ): Result<Alert> = withContext(Dispatchers.IO) {
         var tgSuccess = false
         var alertId = System.currentTimeMillis()
@@ -1740,7 +1743,8 @@ class TelegramClientManager(private val context: Context) {
                 lng = lng,
                 desc = desc,
                 photoBase64 = photoBase64,
-                sig = sig
+                sig = sig,
+                customIcon = customIcon
             )
 
             publishPacket("$currentTopicBase/alert", packet, qos = 1)
@@ -1760,7 +1764,8 @@ class TelegramClientManager(private val context: Context) {
             photoPath = photoFile?.absolutePath ?: "",
             isActive = true,
             createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
-            expiresAt = System.currentTimeMillis() + durationMinutes * 60 * 1000L
+            expiresAt = System.currentTimeMillis() + durationMinutes * 60 * 1000L,
+            customIcon = customIcon
         )
         Result.success(alert)
     }

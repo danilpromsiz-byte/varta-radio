@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.AlertUsageTracker
+import com.safecomm.app.data.model.HazardIconManager
 import com.safecomm.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,7 +53,7 @@ fun DangerReportDialog(
     onStateChange: ((type: AlertType, duration: Int, desc: String) -> Unit)? = null,
     onMoveMarkerOnMap: () -> Unit = {},
     onDismiss: () -> Unit,
-    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double) -> Unit,
+    onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
     onHapticTick: () -> Unit = {},
     currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
@@ -60,6 +61,9 @@ fun DangerReportDialog(
     val sortedCategories = remember { AlertUsageTracker.getSortedCategories(context) }
     val topCategory = sortedCategories.first()
     val otherCategories = sortedCategories.drop(1)
+
+    var chosenMilitaryIcon by remember { mutableStateOf(HazardIconManager.getMilitaryIcon(context)) }
+    var showHazardIconPicker by remember { mutableStateOf(false) }
 
     var selectedType by remember { mutableStateOf(initialType ?: topCategory) }
     var selectedDurationMinutes by remember { mutableIntStateOf(initialDurationMinutes) }
@@ -145,7 +149,7 @@ fun DangerReportDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AlertCategoryIcon(type = topCategory, fontSize = 28.sp)
+                            AlertCategoryIcon(type = topCategory, customIcon = if (topCategory == AlertType.MILITARY) chosenMilitaryIcon else "", fontSize = 28.sp)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
@@ -215,7 +219,7 @@ fun DangerReportDialog(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        AlertCategoryIcon(type = cat, fontSize = 20.sp)
+                                        AlertCategoryIcon(type = cat, customIcon = if (cat == AlertType.MILITARY) chosenMilitaryIcon else "", fontSize = 20.sp)
                                         Spacer(modifier = Modifier.height(1.dp))
                                         Text(
                                             text = com.safecomm.app.ui.i18n.I18n.alertTypeName(currentLanguage, cat.rawValue),
@@ -238,6 +242,58 @@ fun DangerReportDialog(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Dedicated Tactical Icon Customizer for Hazard Zone ("Опасная зона")
+                if (selectedType == AlertType.MILITARY) {
+                    val currentPreset = HazardIconManager.getPresetByEmoji(chosenMilitaryIcon)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showHazardIconPicker = true },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFC107).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color(0xFFFFC107).copy(alpha = 0.6f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .background(Color(0xFFFFC107).copy(alpha = 0.25f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (chosenMilitaryIcon == "🐢") {
+                                        CamoTurtleIcon(size = 22.dp)
+                                    } else {
+                                        Text(text = chosenMilitaryIcon, fontSize = 16.sp)
+                                    }
+                                }
+                                Text(
+                                    text = currentPreset.localizedName(currentLanguage),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                            Text(
+                                text = "${com.safecomm.app.ui.i18n.I18n.customizeHazardIconBtn(currentLanguage)} ▾",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD600)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // Alert Expiry / Duration Selector
                 Text(
@@ -405,7 +461,14 @@ fun DangerReportDialog(
                                             AlertUsageTracker.recordUsage(context, selectedType)
                                             val finalLat = if (initialLat != 0.0) initialLat else userLat
                                             val finalLng = if (initialLng != 0.0) initialLng else userLng
-                                            onConfirmAlert(selectedType, description, selectedDurationMinutes, finalLat, finalLng)
+                                            onConfirmAlert(
+                                                selectedType,
+                                                description,
+                                                selectedDurationMinutes,
+                                                finalLat,
+                                                finalLng,
+                                                if (selectedType == AlertType.MILITARY) chosenMilitaryIcon else ""
+                                            )
                                         }
                                     }
                                     tryAwaitRelease()
@@ -451,5 +514,18 @@ fun DangerReportDialog(
                 }
             }
         }
+    }
+
+    if (showHazardIconPicker) {
+        HazardIconSelectionDialog(
+            currentIcon = chosenMilitaryIcon,
+            onSelectIcon = {
+                chosenMilitaryIcon = it
+                HazardIconManager.setMilitaryIcon(context, it)
+                showHazardIconPicker = false
+            },
+            onDismiss = { showHazardIconPicker = false },
+            currentLanguage = currentLanguage
+        )
     }
 }

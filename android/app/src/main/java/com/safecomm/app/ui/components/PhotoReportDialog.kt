@@ -40,6 +40,7 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.safecomm.app.data.model.AlertType
 import com.safecomm.app.data.model.AlertUsageTracker
+import com.safecomm.app.data.model.HazardIconManager
 import com.safecomm.app.ui.theme.*
 import com.safecomm.app.util.NormalizedArrow
 import com.safecomm.app.util.PhotoMarkupHelper
@@ -71,13 +72,14 @@ fun PhotoReportDialog(
     onMoveMarkerOnMap: () -> Unit = {},
     onLaunchCamera: () -> Unit,
     onDismiss: () -> Unit,
-    onConfirmReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double) -> Unit,
+    onConfirmReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
     onHapticTick: () -> Unit = {},
     currentLanguage: com.safecomm.app.ui.i18n.AppLanguage = com.safecomm.app.ui.i18n.AppLanguage.EN
 ) {
     val context = LocalContext.current
     val sortedCategories = remember { AlertUsageTracker.getSortedCategories(context) }
     var selectedType by remember { mutableStateOf(initialType ?: sortedCategories.first()) }
+    val militaryIcon = remember { HazardIconManager.getMilitaryIcon(context) }
     var description by remember { mutableStateOf(initialDescription) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHolding by remember { mutableStateOf(false) }
@@ -373,7 +375,7 @@ fun PhotoReportDialog(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            AlertCategoryIcon(type = cat, fontSize = 20.sp)
+                            AlertCategoryIcon(type = cat, customIcon = if (cat == AlertType.MILITARY) militaryIcon else "", fontSize = 20.sp)
                         }
                     }
                 }
@@ -499,7 +501,13 @@ fun PhotoReportDialog(
                                             }
                                             val finalLat = if (initialLat != 0.0) initialLat else userLat
                                             val finalLng = if (initialLng != 0.0) initialLng else userLng
-                                            onConfirmReport(selectedType, description, finalLat, finalLng)
+                                            onConfirmReport(
+                                                selectedType,
+                                                description,
+                                                finalLat,
+                                                finalLng,
+                                                if (selectedType == AlertType.MILITARY) militaryIcon else ""
+                                            )
                                         }
                                     }
                                     tryAwaitRelease()

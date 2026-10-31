@@ -522,12 +522,12 @@ class MainActivity : ComponentActivity() {
                             capturedFile = file
                         }
                     },
-                    onConfirmAlert = { type, desc, durationMinutes, targetLat, targetLng ->
+                    onConfirmAlert = { type, desc, durationMinutes, targetLat, targetLng, customIcon ->
                         alertNotificationManager.triggerHapticFeedback(isLong = true)
                         coroutineScope.launch {
                             val alertLat = if (targetLat != 0.0) targetLat else if (userLat != 0.0) userLat else (locationHelper.currentLocation.value?.latitude ?: 50.4501)
                             val alertLng = if (targetLng != 0.0) targetLng else if (userLng != 0.0) userLng else (locationHelper.currentLocation.value?.longitude ?: 30.5234)
-                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, null, durationMinutes)
+                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, null, durationMinutes, customIcon)
                                 .onSuccess { alert ->
                                     alerts = listOf(alert) + alerts.filter { it.id != alert.id }
                                     Toast.makeText(this@MainActivity, "Метка объявлена в эфире!", Toast.LENGTH_SHORT).show()
@@ -537,13 +537,13 @@ class MainActivity : ComponentActivity() {
                                 }
                         }
                     },
-                    onConfirmPhotoReport = { type, desc, targetLat, targetLng ->
+                    onConfirmPhotoReport = { type, desc, targetLat, targetLng, customIcon ->
                         alertNotificationManager.triggerHapticFeedback(isLong = true)
                         coroutineScope.launch {
                             val alertLat = if (targetLat != 0.0) targetLat else if (userLat != 0.0) userLat else (locationHelper.currentLocation.value?.latitude ?: 50.4501)
                             val alertLng = if (targetLng != 0.0) targetLng else if (userLng != 0.0) userLng else (locationHelper.currentLocation.value?.longitude ?: 30.5234)
                             val photoToSend = capturedFile ?: currentPhotoFile
-                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, photoToSend, 30)
+                            telegramClient.broadcastAlert(type, alertLat, alertLng, desc, photoToSend, 30, customIcon)
                                 .onSuccess { alert ->
                                     alerts = listOf(alert) + alerts.filter { it.id != alert.id }
                                     capturedUri = null
