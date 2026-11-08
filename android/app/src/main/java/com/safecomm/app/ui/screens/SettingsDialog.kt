@@ -77,6 +77,8 @@ fun SettingsDialog(
     var userCallSignInput by remember { mutableStateOf(currentCallSign) }
     val audioPrefs = remember { context.getSharedPreferences("varta_audio_prefs", Context.MODE_PRIVATE) }
     var isVolumeBoostOn by remember { mutableStateOf(audioPrefs.getBoolean("volume_boost", true)) }
+    var isMuteScreenOff by remember { mutableStateOf(audioPrefs.getBoolean("mute_screen_off", false)) }
+    var isManualPlayScreenOn by remember { mutableStateOf(audioPrefs.getBoolean("manual_play_screen_on", true)) }
 
     var selectedLang by remember(currentLanguage) { mutableStateOf(currentLanguage) }
     var selectedRadius by remember { mutableDoubleStateOf(currentRadius) }
@@ -409,6 +411,84 @@ fun SettingsDialog(
                                     uncheckedTrackColor = TelegramDarkSurface
                                 )
                             )
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            color = TelegramDivider.copy(alpha = 0.5f)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = I18n.muteScreenOffTitle(selectedLang),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TelegramTextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = I18n.muteScreenOffDesc(selectedLang),
+                                    fontSize = 11.sp,
+                                    color = TelegramTextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = isMuteScreenOff,
+                                onCheckedChange = {
+                                    isMuteScreenOff = it
+                                    audioPrefs.edit().putBoolean("mute_screen_off", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = AlertFireOrange,
+                                    checkedTrackColor = AlertFireOrange.copy(alpha = 0.4f),
+                                    uncheckedThumbColor = TelegramTextSecondary,
+                                    uncheckedTrackColor = TelegramDarkSurface
+                                )
+                            )
+                        }
+
+                        if (isMuteScreenOff) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = I18n.manualPlayScreenOnTitle(selectedLang),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TelegramTextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = I18n.manualPlayScreenOnDesc(selectedLang),
+                                        fontSize = 10.sp,
+                                        color = TelegramTextSecondary
+                                    )
+                                }
+                                Switch(
+                                    checked = isManualPlayScreenOn,
+                                    onCheckedChange = {
+                                        isManualPlayScreenOn = it
+                                        audioPrefs.edit().putBoolean("manual_play_screen_on", it).apply()
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = TelegramBlue,
+                                        checkedTrackColor = TelegramBlue.copy(alpha = 0.4f),
+                                        uncheckedThumbColor = TelegramTextSecondary,
+                                        uncheckedTrackColor = TelegramDarkSurface
+                                    )
+                                )
+                            }
                         }
                     }
                 }

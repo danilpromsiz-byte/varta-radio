@@ -253,6 +253,35 @@ object I18n {
     )
     fun volumeBoostDesc(c: Context) = volumeBoostDesc(LanguageManager.getLanguage(c))
 
+    fun muteScreenOffTitle(lang: AppLanguage) = t(lang, "🔇 Без звука при выключенном экране", "🔇 Без звуку при вимкненому екрані", "🔇 Mute when screen is off")
+    fun muteScreenOffTitle(c: Context) = muteScreenOffTitle(LanguageManager.getLanguage(c))
+    fun muteScreenOffDesc(lang: AppLanguage) = t(
+        lang,
+        "Не воспроизводить голос из динамика, когда телефон заблокирован",
+        "Не відтворювати голос із динаміка, коли телефон заблоковано",
+        "Do not play voice audio through speaker when screen is locked/off"
+    )
+    fun muteScreenOffDesc(c: Context) = muteScreenOffDesc(LanguageManager.getLanguage(c))
+
+    fun manualPlayScreenOnTitle(lang: AppLanguage) = t(lang, "⏯ Кнопка «Прослушать» при включении", "⏯ Кнопка «Прослухати» при увімкненні", "⏯ 'Listen' button on screen-on")
+    fun manualPlayScreenOnTitle(c: Context) = manualPlayScreenOnTitle(LanguageManager.getLanguage(c))
+    fun manualPlayScreenOnDesc(lang: AppLanguage) = t(
+        lang,
+        "Показывать кнопку для прослушивания, а не запускать звук сразу",
+        "Показувати кнопку для прослуховування, а не запускати звук одразу",
+        "Show a button to listen instead of auto-playing immediately"
+    )
+    fun manualPlayScreenOnDesc(c: Context) = manualPlayScreenOnDesc(LanguageManager.getLanguage(c))
+
+    fun missedVoicesBannerTitle(lang: AppLanguage, count: Int) = t(lang, "Пропущено сообщений: $count", "Пропущено повідомлень: $count", "Missed messages: $count")
+    fun missedVoicesBannerTitle(c: Context, count: Int) = missedVoicesBannerTitle(LanguageManager.getLanguage(c), count)
+
+    fun missedVoicesBannerSender(lang: AppLanguage, sender: String) = t(lang, "Последнее: $sender", "Останнє: $sender", "Latest: $sender")
+    fun missedVoicesBannerSender(c: Context, sender: String) = missedVoicesBannerSender(LanguageManager.getLanguage(c), sender)
+
+    fun missedVoicesBannerPlay(lang: AppLanguage) = t(lang, "Слушать", "Слухати", "Play")
+    fun missedVoicesBannerPlay(c: Context) = missedVoicesBannerPlay(LanguageManager.getLanguage(c))
+
     fun hazardNotificationChannel(lang: AppLanguage) = t(lang, "Varta GO: Экстренные метки", "Varta GO: Екстрені мітки", "Varta GO: Hazard Alerts")
     fun hazardNotificationChannel(c: Context) = hazardNotificationChannel(LanguageManager.getLanguage(c))
     fun voiceNotificationChannel(lang: AppLanguage) = t(lang, "Varta GO: Рация и сообщения", "Varta GO: Рація та повідомлення", "Varta GO: Radio & Voice")

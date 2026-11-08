@@ -191,6 +191,41 @@ class MainActivity : ComponentActivity() {
 
         var alerts by remember { mutableStateOf<List<Alert>>(emptyList()) }
         var voiceMessages by remember { mutableStateOf<List<VoiceMessage>>(emptyList()) }
+        var missedVoiceMessages by remember { mutableStateOf<List<VoiceMessage>>(emptyList()) }
+
+        DisposableEffect(Unit) {
+            val filter = android.content.IntentFilter(Intent.ACTION_SCREEN_ON)
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: android.content.Context?, intent: Intent?) {
+                    if (intent?.action == Intent.ACTION_SCREEN_ON) {
+                        val audioPrefs = getSharedPreferences("varta_audio_prefs", android.content.Context.MODE_PRIVATE)
+                        val manualPlay = audioPrefs.getBoolean("manual_play_screen_on", true)
+                        if (!manualPlay && missedVoiceMessages.isNotEmpty()) {
+                            val toPlay = missedVoiceMessages
+                            missedVoiceMessages = emptyList()
+                            toPlay.forEach { vm ->
+                                walkieTalkieManager.playLiveVoiceMessage(
+                                    audioUrl = vm.filePath,
+                                    senderNick = vm.senderNick,
+                                    durationSec = vm.durationSec,
+                                    messageId = vm.id
+                                ) {
+                                    alertNotificationManager.dismissVoiceNotification(vm.id)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            registerReceiver(receiver, filter)
+            onDispose {
+                try {
+                    unregisterReceiver(receiver)
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
+        }
 
         val mainPrefs = remember { getSharedPreferences("varta_main_prefs", android.content.Context.MODE_PRIVATE) }
         val audioModeString = mainPrefs.getString("audio_mode", AudioMode.SOUND.name) ?: AudioMode.SOUND.name
@@ -265,15 +300,33 @@ class MainActivity : ComponentActivity() {
                                 isFromOtherRoom = false
                             )
 
+                            val newVoice = VoiceMessage(
+                                id = event.messageId,
+                                senderNick = event.senderNick,
+                                filePath = event.fileUrl,
+                                durationSec = event.durationSec,
+                                createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                            )
+                            voiceMessages = listOf(newVoice) + voiceMessages.filter { it.id != event.messageId }
+
                             when (audioMode) {
                                 AudioMode.SOUND -> {
-                                    walkieTalkieManager.playLiveVoiceMessage(
-                                        audioUrl = event.fileUrl,
-                                        senderNick = event.senderNick,
-                                        durationSec = event.durationSec,
-                                        messageId = event.messageId
-                                    ) {
-                                        alertNotificationManager.dismissVoiceNotification(event.messageId)
+                                    val powerManager = getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+                                    val isScreenInteractive = powerManager?.isInteractive ?: true
+                                    val audioPrefs = getSharedPreferences("varta_audio_prefs", android.content.Context.MODE_PRIVATE)
+                                    val muteScreenOff = audioPrefs.getBoolean("mute_screen_off", false)
+
+                                    if (!isScreenInteractive && muteScreenOff) {
+                                        missedVoiceMessages = missedVoiceMessages.filter { it.id != event.messageId } + newVoice
+                                    } else {
+                                        walkieTalkieManager.playLiveVoiceMessage(
+                                            audioUrl = event.fileUrl,
+                                            senderNick = event.senderNick,
+                                            durationSec = event.durationSec,
+                                            messageId = event.messageId
+                                        ) {
+                                            alertNotificationManager.dismissVoiceNotification(event.messageId)
+                                        }
                                     }
                                 }
                                 AudioMode.VIBRATE -> {
@@ -284,14 +337,6 @@ class MainActivity : ComponentActivity() {
                                     Toast.makeText(this@MainActivity, "🎙 ${event.senderNick} (" + I18n.audioModeSilent(appLanguage) + ")", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                            val newVoice = VoiceMessage(
-                                id = event.messageId,
-                                senderNick = event.senderNick,
-                                filePath = event.fileUrl,
-                                durationSec = event.durationSec,
-                                createdAt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-                            )
-                            voiceMessages = listOf(newVoice) + voiceMessages.filter { it.id != event.messageId }
                         }
                     }
                     is TelegramLiveEvent.LiveAlert -> {
@@ -715,6 +760,24 @@ class MainActivity : ComponentActivity() {
                     onLogOutTelegram = {
                         telegramClient.logout()
                         Toast.makeText(this@MainActivity, "Выход из Telegram выполнен", Toast.LENGTH_SHORT).show()
+                    },
+                    missedVoiceMessages = missedVoiceMessages,
+                    onPlayMissedVoices = {
+                        val toPlay = missedVoiceMessages
+                        missedVoiceMessages = emptyList()
+                        toPlay.forEach { vm ->
+                            walkieTalkieManager.playLiveVoiceMessage(
+                                audioUrl = vm.filePath,
+                                senderNick = vm.senderNick,
+                                durationSec = vm.durationSec,
+                                messageId = vm.id
+                            ) {
+                                alertNotificationManager.dismissVoiceNotification(vm.id)
+                            }
+                        }
+                    },
+                    onDismissMissedVoices = {
+                        missedVoiceMessages = emptyList()
                     }
                 )
             }

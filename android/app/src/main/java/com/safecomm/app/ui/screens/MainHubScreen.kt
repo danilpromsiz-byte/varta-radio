@@ -95,6 +95,9 @@ fun MainHubScreen(
     onLeaveRoom: () -> Unit = {},
     onDeleteRoom: (() -> Unit)? = null,
     onLogOutTelegram: () -> Unit = {},
+    missedVoiceMessages: List<VoiceMessage> = emptyList(),
+    onPlayMissedVoices: () -> Unit = {},
+    onDismissMissedVoices: () -> Unit = {},
     onHapticTick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -169,19 +172,32 @@ fun MainHubScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // --- 2. ACTIVE ALERTS FLOATING BANNER (Under Top Bar) ---
-        if (alerts.isNotEmpty() && !isPickingLocationOnMap) {
-            Box(
+        // --- 2. FLOATING BANNERS (Active Alerts & Missed Voices) ---
+        if (!isPickingLocationOnMap && (alerts.isNotEmpty() || missedVoiceMessages.isNotEmpty())) {
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 98.dp, start = 14.dp, end = 14.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ActiveAlertsBanner(
-                    alerts = alerts,
-                    userLat = userLat,
-                    userLng = userLng,
-                    onAlertClick = { selectedAlertForDetail = it }
-                )
+                if (alerts.isNotEmpty()) {
+                    ActiveAlertsBanner(
+                        alerts = alerts,
+                        userLat = userLat,
+                        userLng = userLng,
+                        onAlertClick = { selectedAlertForDetail = it }
+                    )
+                }
+                if (missedVoiceMessages.isNotEmpty()) {
+                    MissedVoiceBanner(
+                        missedVoices = missedVoiceMessages,
+                        currentLanguage = currentLanguage,
+                        onPlay = onPlayMissedVoices,
+                        onDismiss = onDismissMissedVoices
+                    )
+                }
             }
         }
 
@@ -821,5 +837,94 @@ fun MainHubScreen(
             onDismiss = { showAvatarDialog = false },
             currentLanguage = currentLanguage
         )
+    }
+}
+
+@Composable
+fun MissedVoiceBanner(
+    missedVoices: List<VoiceMessage>,
+    currentLanguage: AppLanguage,
+    onPlay: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val lastSender = missedVoices.lastOrNull()?.senderNick ?: ""
+    val count = missedVoices.size
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = TelegramDarkSurface.copy(alpha = 0.95f),
+        border = BorderStroke(1.dp, AlertFireOrange.copy(alpha = 0.6f)),
+        shadowElevation = 6.dp,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(AlertFireOrange.copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🎙️", fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = I18n.missedVoicesBannerTitle(currentLanguage, count),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TelegramTextPrimary
+                    )
+                    if (lastSender.isNotBlank()) {
+                        Text(
+                            text = I18n.missedVoicesBannerSender(currentLanguage, lastSender),
+                            fontSize = 11.sp,
+                            color = TelegramTextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = onPlay,
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(
+                        text = "▶ " + I18n.missedVoicesBannerPlay(currentLanguage),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Dismiss",
+                        tint = TelegramTextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
     }
 }
