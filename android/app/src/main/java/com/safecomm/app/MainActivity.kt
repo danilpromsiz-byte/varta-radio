@@ -227,6 +227,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Periodic background update check
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(3500L)
+            val updatePrefs = getSharedPreferences("varta_update_prefs", android.content.Context.MODE_PRIVATE)
+            if (updatePrefs.getBoolean("auto_check_updates", true)) {
+                try {
+                    appUpdateManager.checkForUpdates(force = false)
+                } catch (_: Exception) {}
+            }
+
+            while (true) {
+                kotlinx.coroutines.delay(4 * 3600 * 1000L) // every 4 hours
+                if (updatePrefs.getBoolean("auto_check_updates", true)) {
+                    try {
+                        appUpdateManager.checkForUpdates(force = false)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
         val mainPrefs = remember { getSharedPreferences("varta_main_prefs", android.content.Context.MODE_PRIVATE) }
         val audioModeString = mainPrefs.getString("audio_mode", AudioMode.SOUND.name) ?: AudioMode.SOUND.name
         var audioMode by remember { mutableStateOf(try { AudioMode.valueOf(audioModeString) } catch (e: Exception) { AudioMode.SOUND }) }
@@ -535,7 +555,17 @@ class MainActivity : ComponentActivity() {
                     isDownloadingUpdate = false,
                     downloadProgress = 0,
                     onCheckUpdate = { _ ->
-                        appUpdateManager.openGooglePlay(this@MainActivity)
+                        coroutineScope.launch {
+                            Toast.makeText(this@MainActivity, I18n.checkingUpdatesStatus(appLanguage), Toast.LENGTH_SHORT).show()
+                            val res = appUpdateManager.checkForUpdates(force = true)
+                            res.onSuccess { hasNewer ->
+                                if (!hasNewer) {
+                                    Toast.makeText(this@MainActivity, I18n.upToDateStatus(appLanguage, BuildConfig.VERSION_NAME), Toast.LENGTH_SHORT).show()
+                                }
+                            }.onFailure { err ->
+                                Toast.makeText(this@MainActivity, "⚠️ ${err.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     },
                     onForceUpdate = { _ ->
                         appUpdateManager.openGooglePlay(this@MainActivity)

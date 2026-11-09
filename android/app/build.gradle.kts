@@ -12,8 +12,8 @@ android {
         applicationId = "com.safecomm.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 33
-        versionName = "1.2.13"
+        versionCode = 34
+        versionName = "1.2.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

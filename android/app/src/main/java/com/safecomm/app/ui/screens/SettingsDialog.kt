@@ -80,6 +80,9 @@ fun SettingsDialog(
     var isMuteScreenOff by remember { mutableStateOf(audioPrefs.getBoolean("mute_screen_off", false)) }
     var isManualPlayScreenOn by remember { mutableStateOf(audioPrefs.getBoolean("manual_play_screen_on", true)) }
 
+    val updatePrefs = remember { context.getSharedPreferences("varta_update_prefs", Context.MODE_PRIVATE) }
+    var isAutoCheckUpdates by remember { mutableStateOf(updatePrefs.getBoolean("auto_check_updates", true)) }
+
     var selectedLang by remember(currentLanguage) { mutableStateOf(currentLanguage) }
     var selectedRadius by remember { mutableDoubleStateOf(currentRadius) }
     var isSoundOn by remember { mutableStateOf(soundEnabled) }
@@ -251,7 +254,7 @@ fun SettingsDialog(
                 // 2. APP UPDATES SECTION (Restored & Enhanced)
                 // =====================================================================
                 Text(
-                    text = I18n.updatesSection(selectedLang),
+                    text = "📦 " + I18n.updatesSection(selectedLang),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TelegramTextPrimary
@@ -289,16 +292,75 @@ fun SettingsDialog(
                             }
                         }
 
-                        if (updateStatusText.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = updateStatusText,
-                                fontSize = 12.sp,
-                                color = if (isUpdateAvailable) AlertFireOrange else TelegramTextSecondary
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            color = TelegramDivider.copy(alpha = 0.5f)
+                        )
+
+                        // Auto-check updates in background toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = I18n.autoCheckUpdatesTitle(selectedLang),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TelegramTextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = I18n.autoCheckUpdatesDesc(selectedLang),
+                                    fontSize = 11.sp,
+                                    color = TelegramTextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = isAutoCheckUpdates,
+                                onCheckedChange = {
+                                    isAutoCheckUpdates = it
+                                    updatePrefs.edit().putBoolean("auto_check_updates", it).apply()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = TelegramBlue,
+                                    checkedTrackColor = TelegramBlue.copy(alpha = 0.4f),
+                                    uncheckedThumbColor = TelegramTextSecondary,
+                                    uncheckedTrackColor = TelegramDarkSurface
+                                )
                             )
                         }
 
+                        if (updateStatusText.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = TelegramDarkSurface,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = updateStatusText,
+                                    fontSize = 12.sp,
+                                    color = if (isUpdateAvailable) AlertFireOrange else TelegramTextPrimary,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(12.dp))
+
+                        if (isUpdateAvailable) {
+                            Button(
+                                onClick = onInstallUpdate,
+                                modifier = Modifier.fillMaxWidth().height(42.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AlertFireOrange),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("⚡ " + I18n.installUpdateBtn(selectedLang) + " (Google Play)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
 
                         Button(
                             onClick = { onCheckUpdate(githubRepo) },
@@ -308,7 +370,7 @@ fun SettingsDialog(
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Google Play Store", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(I18n.checkForUpdatesBtn(selectedLang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

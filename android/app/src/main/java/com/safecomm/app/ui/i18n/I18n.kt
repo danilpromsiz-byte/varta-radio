@@ -365,6 +365,20 @@ object I18n {
     fun checkForUpdatesBtn(lang: AppLanguage) = t(lang, "🔄 Проверить обновления", "🔄 Перевірити оновлення", "🔄 Check for Updates")
     fun checkForUpdatesBtn(c: Context) = checkForUpdatesBtn(LanguageManager.getLanguage(c))
 
+    fun autoCheckUpdatesTitle(lang: AppLanguage) = t(lang, "Автопроверка обновлений", "Автоперевірка оновлень", "Auto-check for updates")
+    fun autoCheckUpdatesTitle(c: Context) = autoCheckUpdatesTitle(LanguageManager.getLanguage(c))
+
+    fun autoCheckUpdatesDesc(lang: AppLanguage) = t(
+        lang,
+        "Периодически проверять свежие версии в фоне",
+        "Періодично перевіряти свіжі версії у фоні",
+        "Periodically check for new versions in background"
+    )
+    fun autoCheckUpdatesDesc(c: Context) = autoCheckUpdatesDesc(LanguageManager.getLanguage(c))
+
+    fun openInGooglePlayBtn(lang: AppLanguage) = t(lang, "Открыть в Google Play", "Відкрити в Google Play", "Open in Google Play")
+    fun openInGooglePlayBtn(c: Context) = openInGooglePlayBtn(LanguageManager.getLanguage(c))
+
     fun reinstallUpdateBtn(lang: AppLanguage) = t(lang, "Принудительно переустановить", "Примусово перевстановити", "Reinstall latest from GitHub")
     fun reinstallUpdateBtn(c: Context) = reinstallUpdateBtn(LanguageManager.getLanguage(c))
 

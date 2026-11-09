@@ -1,6 +1,7 @@
 package com.safecomm.app.ui.components
 
 import android.content.Context
+import android.widget.Toast
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
@@ -100,11 +101,11 @@ fun OsmMapView(
     }
 
     // 1. Initial centering ONLY ONCE when valid location is acquired
-    LaunchedEffect(userLat, userLng) {
+    LaunchedEffect(mapViewInstance, userLat, userLng) {
         val map = mapViewInstance ?: return@LaunchedEffect
         if (!hasCenteredInitial && userLat != 0.0 && userLng != 0.0) {
             map.controller.setCenter(GeoPoint(userLat, userLng))
-            map.controller.setZoom(15.0)
+            map.controller.setZoom(16.0)
             hasCenteredInitial = true
         }
     }
@@ -194,9 +195,14 @@ fun OsmMapView(
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     setMultiTouchControls(true)
                     isTilesScaledToDpi = true
-                    controller.setZoom(15.0)
+                    controller.setZoom(16.0)
+                    val locPrefs = ctx.getSharedPreferences("varta_location_prefs", Context.MODE_PRIVATE)
+                    val savedLat = locPrefs.getFloat("last_lat", 0f).toDouble()
+                    val savedLng = locPrefs.getFloat("last_lng", 0f).toDouble()
                     val startPoint = if (userLat != 0.0 && userLng != 0.0) {
                         GeoPoint(userLat, userLng)
+                    } else if (savedLat != 0.0 && savedLng != 0.0) {
+                        GeoPoint(savedLat, savedLng)
                     } else {
                         GeoPoint(50.4501, 30.5234) // Default fallback
                     }
@@ -312,6 +318,17 @@ fun OsmMapView(
                 val map = mapViewInstance ?: return@FloatingActionButton
                 if (userLat != 0.0 && userLng != 0.0) {
                     map.controller.animateTo(GeoPoint(userLat, userLng))
+                    map.controller.setZoom(16.0)
+                } else {
+                    val locPrefs = context.getSharedPreferences("varta_location_prefs", Context.MODE_PRIVATE)
+                    val sLat = locPrefs.getFloat("last_lat", 0f).toDouble()
+                    val sLng = locPrefs.getFloat("last_lng", 0f).toDouble()
+                    if (sLat != 0.0 && sLng != 0.0) {
+                        map.controller.animateTo(GeoPoint(sLat, sLng))
+                        map.controller.setZoom(16.0)
+                    } else {
+                        Toast.makeText(context, "📡 Определение координат GPS...", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
             modifier = Modifier

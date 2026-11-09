@@ -130,7 +130,7 @@ class AppUpdateManager(private val context: Context) {
             Log.d("AppUpdater", "Current: $currentVersion, Latest: $remoteTag, Force=$force")
 
             val isNewer = isVersionNewer(remoteTag, currentVersion)
-            if (isNewer || force) {
+            if (isNewer) {
                 _updateStatus.value = UpdateStatus.UpdateAvailable(
                     newVersion = release.tagName,
                     releaseNotes = release.body ?: ""
