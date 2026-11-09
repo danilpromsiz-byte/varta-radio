@@ -96,3 +96,25 @@ dependencies {
 
     testImplementation(libs.junit)
 }
+
+tasks.register("copyAabToRoot") {
+    doLast {
+        val bundleDir = layout.buildDirectory.dir("outputs/bundle/release").get().asFile
+        val aabFile = File(bundleDir, "app-release.aab")
+        if (aabFile.exists()) {
+            val rootDir = rootProject.projectDir.parentFile
+            val vName = android.defaultConfig.versionName
+            aabFile.copyTo(File(rootDir, "app-release.aab"), overwrite = true)
+            aabFile.copyTo(File(rootDir, "Varta-GO-v${vName}-release.aab"), overwrite = true)
+            val parentWorkDir = rootDir.parentFile
+            if (parentWorkDir != null && parentWorkDir.exists()) {
+                aabFile.copyTo(File(parentWorkDir, "app-release.aab"), overwrite = true)
+                aabFile.copyTo(File(parentWorkDir, "Varta-GO-v${vName}-release.aab"), overwrite = true)
+            }
+        }
+    }
+}
+
+tasks.named("bundleRelease") {
+    finalizedBy("copyAabToRoot")
+}
