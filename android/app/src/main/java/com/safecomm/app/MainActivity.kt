@@ -62,6 +62,9 @@ class MainActivity : ComponentActivity() {
         if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
             locationHelper.startLocationUpdates()
         }
+        if (permissions[Manifest.permission.CAMERA] == true && photoReadyCallback != null) {
+            launchCameraCapture(photoReadyCallback!!)
+        }
     }
 
     private var photoReadyCallback: ((Uri?, File?) -> Unit)? = null
@@ -76,6 +79,31 @@ class MainActivity : ComponentActivity() {
             currentPhotoFile?.delete()
             currentPhotoFile = null
             currentPhotoUri = null
+            photoReadyCallback?.invoke(null, null)
+        }
+    }
+
+    // Photo picker / Gallery launcher (essential for Emulators and file selection)
+    private val pickImageLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val destFile = File(cacheDir, "alert_photo_${System.currentTimeMillis()}.jpg")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                currentPhotoFile = destFile
+                currentPhotoUri = Uri.fromFile(destFile)
+                photoReadyCallback?.invoke(currentPhotoUri, currentPhotoFile)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to process picked photo: ${e.message}")
+                Toast.makeText(this, "Ошибка загрузки фото: ${e.message}", Toast.LENGTH_SHORT).show()
+                photoReadyCallback?.invoke(null, null)
+            }
+        } else {
             photoReadyCallback?.invoke(null, null)
         }
     }
@@ -152,17 +180,45 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchCameraCapture(onResult: (Uri?, File?) -> Unit) {
-        val cacheDir = cacheDir
-        val photoFile = File(cacheDir, "alert_photo_${System.currentTimeMillis()}.jpg")
-        currentPhotoFile = photoFile
-        val uri = FileProvider.getUriForFile(
-            this,
-            "${packageName}.fileprovider",
-            photoFile
-        )
-        currentPhotoUri = uri
         photoReadyCallback = onResult
-        takePictureLauncher.launch(uri)
+
+        val hasCameraPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (!hasCameraPermission) {
+            requestPermissionsLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+            return
+        }
+
+        try {
+            val cacheDir = cacheDir
+            val photoFile = File(cacheDir, "alert_photo_${System.currentTimeMillis()}.jpg")
+            currentPhotoFile = photoFile
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                photoFile
+            )
+            currentPhotoUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: android.content.ActivityNotFoundException) {
+            Log.e("MainActivity", "Camera app not found on device/emulator: ${e.message}")
+            Toast.makeText(this, "Камера недоступна (эмулятор). Выберите фото из файлов", Toast.LENGTH_LONG).show()
+            launchGalleryPicker(onResult)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Camera launch failure: ${e.message}")
+            Toast.makeText(this, "Камера недоступна: ${e.message}. Открываем выбор файлов...", Toast.LENGTH_SHORT).show()
+            launchGalleryPicker(onResult)
+        }
+    }
+
+    private fun launchGalleryPicker(onResult: (Uri?, File?) -> Unit) {
+        photoReadyCallback = onResult
+        try {
+            pickImageLauncher.launch("image/*")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Gallery picker failure: ${e.message}")
+            Toast.makeText(this, "Не удалось открыть выбор файлов: ${e.message}", Toast.LENGTH_SHORT).show()
+            onResult(null, null)
+        }
     }
 
     @Composable
@@ -593,6 +649,12 @@ class MainActivity : ComponentActivity() {
                     },
                     onLaunchCamera = {
                         launchCameraCapture { uri, file ->
+                            capturedUri = uri
+                            capturedFile = file
+                        }
+                    },
+                    onPickGallery = {
+                        launchGalleryPicker { uri, file ->
                             capturedUri = uri
                             capturedFile = file
                         }

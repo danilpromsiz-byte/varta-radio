@@ -59,6 +59,7 @@ fun MainHubScreen(
     onStartPtt: () -> Unit,
     onStopPtt: () -> Unit,
     onLaunchCamera: () -> Unit,
+    onPickGallery: () -> Unit = {},
     onConfirmAlert: (type: AlertType, description: String, durationMinutes: Int, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
     onConfirmPhotoReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
     onResolveAlert: (Alert) -> Unit,
@@ -609,6 +610,7 @@ fun MainHubScreen(
                 isPickingLocationOnMap = true
             },
             onLaunchCamera = onLaunchCamera,
+            onPickGallery = onPickGallery,
             onDismiss = {
                 showPhotoDialog = false
                 customAlertLat = 0.0

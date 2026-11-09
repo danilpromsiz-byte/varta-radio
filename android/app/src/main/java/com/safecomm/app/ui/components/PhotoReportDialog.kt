@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,6 +72,7 @@ fun PhotoReportDialog(
     onStateChange: ((type: AlertType, desc: String) -> Unit)? = null,
     onMoveMarkerOnMap: () -> Unit = {},
     onLaunchCamera: () -> Unit,
+    onPickGallery: () -> Unit = {},
     onDismiss: () -> Unit,
     onConfirmReport: (type: AlertType, description: String, targetLat: Double, targetLng: Double, customIcon: String) -> Unit,
     onHapticTick: () -> Unit = {},
@@ -275,43 +277,81 @@ fun PhotoReportDialog(
                                 }
                             }
 
-                            // Re-take photo button floating in top-right
-                            IconButton(
-                                onClick = onLaunchCamera,
+                            // Action buttons floating in top-right: Retake camera & Pick from Gallery
+                            Row(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .size(36.dp)
-                                    .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CameraAlt,
-                                    contentDescription = "Retake",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                IconButton(
+                                    onClick = onLaunchCamera,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Retake",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = onPickGallery,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Image,
+                                        contentDescription = "Gallery",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     } else {
-                        // Empty photo placeholder
+                        // Empty photo placeholder with Camera and Gallery options
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
                             modifier = Modifier
-                                .clickable { onLaunchCamera() }
+                                .fillMaxSize()
                                 .padding(16.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Camera",
-                                tint = PhotoActionBlue,
-                                modifier = Modifier.size(46.dp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = onLaunchCamera,
+                                    colors = ButtonDefaults.buttonColors(containerColor = PhotoActionBlue),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(com.safecomm.app.ui.i18n.I18n.takePhotoBtn(currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                OutlinedButton(
+                                    onClick = onPickGallery,
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TelegramTextPrimary),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(com.safecomm.app.ui.i18n.I18n.pickFromGalleryBtn(currentLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = com.safecomm.app.ui.i18n.I18n.tapToTakePhoto(currentLanguage),
-                                color = TelegramTextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                                color = TelegramTextSecondary,
+                                fontSize = 11.sp
                             )
                         }
                     }

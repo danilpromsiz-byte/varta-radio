@@ -580,6 +580,12 @@ object I18n {
     fun photoFixationTitle(c: Context) = photoFixationTitle(LanguageManager.getLanguage(c))
     fun tapToTakePhoto(lang: AppLanguage) = t(lang, "Нажмите, чтобы сделать фото", "Натисніть, щоб зробити фото", "Tap to take a photo")
     fun tapToTakePhoto(c: Context) = tapToTakePhoto(LanguageManager.getLanguage(c))
+
+    fun takePhotoBtn(lang: AppLanguage) = t(lang, "📷 Снимок", "📷 Знімок", "📷 Camera")
+    fun takePhotoBtn(c: Context) = takePhotoBtn(LanguageManager.getLanguage(c))
+
+    fun pickFromGalleryBtn(lang: AppLanguage) = t(lang, "🖼 Галерея", "🖼 Галерея", "🖼 Gallery")
+    fun pickFromGalleryBtn(c: Context) = pickFromGalleryBtn(LanguageManager.getLanguage(c))
     fun photoHazardTypeLabel(lang: AppLanguage) = t(lang, "Тип опасности:", "Тип небезпеки:", "Hazard type:")
     fun photoHazardTypeLabel(c: Context) = photoHazardTypeLabel(LanguageManager.getLanguage(c))
     fun photoDetailsHint(lang: AppLanguage) = t(
