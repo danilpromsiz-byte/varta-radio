@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -354,33 +355,20 @@ fun MainHubScreen(
                             }
                         }
 
-                    // Right: Quick Tactical Actions (Audio Mode, Radio History, Members, Settings)
+                    // Right: Quick Tactical Actions (Exit Channel, Radio History, Members, Settings)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // 3-State Audio Mode Toggle Button (Sound 🔊 / Vibrate 📳 / Silent 🔇)
-                        val audioStatusDesc = when (audioMode) {
-                            AudioMode.SOUND -> I18n.audioModeSound(currentLanguage)
-                            AudioMode.VIBRATE -> I18n.audioModeVibrate(currentLanguage)
-                            AudioMode.SILENT -> I18n.audioModeSilent(currentLanguage)
-                        }
+                        // Exit Channel Button (🚪)
                         IconButton(
-                            onClick = onToggleAudioMode,
+                            onClick = { showLeaveRoomConfirm = true },
                             modifier = Modifier.size(38.dp)
                         ) {
                             Icon(
-                                imageVector = when (audioMode) {
-                                    AudioMode.SOUND -> Icons.Default.VolumeUp
-                                    AudioMode.VIBRATE -> Icons.Default.Vibration
-                                    AudioMode.SILENT -> Icons.Default.VolumeOff
-                                },
-                                contentDescription = audioStatusDesc,
-                                tint = when (audioMode) {
-                                    AudioMode.SOUND -> Color(0xFFFFD600)
-                                    AudioMode.VIBRATE -> Color(0xFF64B5F6)
-                                    AudioMode.SILENT -> Color(0xFFFF5252)
-                                },
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = I18n.leaveRoomBtn(currentLanguage),
+                                tint = Color(0xFFFF5252),
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -542,7 +530,9 @@ fun MainHubScreen(
                         onLaunchCamera()
                         showPhotoDialog = true
                     },
-                    currentLanguage = currentLanguage
+                    currentLanguage = currentLanguage,
+                    audioMode = audioMode,
+                    onToggleAudioMode = onToggleAudioMode
                 )
             }
         }

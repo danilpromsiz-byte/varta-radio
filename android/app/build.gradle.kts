@@ -12,8 +12,8 @@ android {
         applicationId = "com.safecomm.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 35
-        versionName = "1.2.15"
+        versionCode = 36
+        versionName = "1.2.16"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -97,24 +97,31 @@ dependencies {
     testImplementation(libs.junit)
 }
 
+val copyTargetDirPaths = listOfNotNull(
+    rootProject.projectDir.parentFile?.absolutePath,
+    rootProject.projectDir.parentFile?.parentFile?.absolutePath
+)
+val aabVersionName = "1.2.16"
+
 tasks.register("copyAabToRoot") {
+    val bundleDirProvider = layout.buildDirectory.dir("outputs/bundle/release")
+    val dirs = copyTargetDirPaths
+    val vName = aabVersionName
     doLast {
-        val bundleDir = layout.buildDirectory.dir("outputs/bundle/release").get().asFile
+        val bundleDir = bundleDirProvider.get().asFile
         val aabFile = File(bundleDir, "app-release.aab")
         if (aabFile.exists()) {
-            val rootDir = rootProject.projectDir.parentFile
-            val vName = android.defaultConfig.versionName
-            aabFile.copyTo(File(rootDir, "app-release.aab"), overwrite = true)
-            aabFile.copyTo(File(rootDir, "Varta-GO-v${vName}-release.aab"), overwrite = true)
-            val parentWorkDir = rootDir.parentFile
-            if (parentWorkDir != null && parentWorkDir.exists()) {
-                aabFile.copyTo(File(parentWorkDir, "app-release.aab"), overwrite = true)
-                aabFile.copyTo(File(parentWorkDir, "Varta-GO-v${vName}-release.aab"), overwrite = true)
+            for (path in dirs) {
+                val dir = File(path)
+                if (dir.exists()) {
+                    aabFile.copyTo(File(dir, "app-release.aab"), overwrite = true)
+                    aabFile.copyTo(File(dir, "Varta-GO-v${vName}-release.aab"), overwrite = true)
+                }
             }
         }
     }
 }
 
-tasks.named("bundleRelease") {
+tasks.matching { it.name == "bundleRelease" }.configureEach {
     finalizedBy("copyAabToRoot")
 }

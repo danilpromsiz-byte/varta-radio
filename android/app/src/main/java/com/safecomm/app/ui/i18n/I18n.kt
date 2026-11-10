@@ -243,6 +243,14 @@ object I18n {
     fun audioModeSilent(lang: AppLanguage) = t(lang, "Без звука", "Без звуку", "Silent")
     fun audioModeSilent(c: Context) = audioModeSilent(LanguageManager.getLanguage(c))
 
+    // Tactical Bottom Buttons
+    fun audioBtnSound(lang: AppLanguage) = t(lang, "ЗВУК", "ЗВУК", "SOUND")
+    fun audioBtnSound(c: Context) = audioBtnSound(LanguageManager.getLanguage(c))
+    fun audioBtnVibrate(lang: AppLanguage) = t(lang, "ВИБРО", "ВІБРО", "VIBRATE")
+    fun audioBtnVibrate(c: Context) = audioBtnVibrate(LanguageManager.getLanguage(c))
+    fun audioBtnSilent(lang: AppLanguage) = t(lang, "БЕЗ ЗВУКА", "БЕЗ ЗВУКУ", "MUTE")
+    fun audioBtnSilent(c: Context) = audioBtnSilent(LanguageManager.getLanguage(c))
+
     fun volumeBoostTitle(lang: AppLanguage) = t(lang, "🔊 Принудительное усиление звука (+12 dB)", "🔊 Примусове підсилення звуку (+12 dB)", "🔊 Forced Volume Boost (+12 dB)")
     fun volumeBoostTitle(c: Context) = volumeBoostTitle(LanguageManager.getLanguage(c))
     fun volumeBoostDesc(lang: AppLanguage) = t(
