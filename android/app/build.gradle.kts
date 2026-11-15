@@ -12,8 +12,8 @@ android {
         applicationId = "com.safecomm.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 36
-        versionName = "1.2.16"
+        versionCode = 37
+        versionName = "1.2.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -101,7 +101,7 @@ val copyTargetDirPaths = listOfNotNull(
     rootProject.projectDir.parentFile?.absolutePath,
     rootProject.projectDir.parentFile?.parentFile?.absolutePath
 )
-val aabVersionName = "1.2.16"
+val aabVersionName = "1.2.17"
 
 tasks.register("copyAabToRoot") {
     val bundleDirProvider = layout.buildDirectory.dir("outputs/bundle/release")
